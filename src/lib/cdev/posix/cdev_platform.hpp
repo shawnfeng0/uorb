@@ -20,7 +20,7 @@ using mode_t = uint32_t;
 
 struct file_t {
 	int f_oflags{0};
-	void *f_priv{nullptr};
+	void *f_priv{nullptr}; /** Per file driver private data */
 	void *vdev{nullptr};
 
 	file_t() = default;

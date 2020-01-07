@@ -31,7 +31,7 @@
 #
 ############################################################################
 
-project(uorb)
+project(uORB)
 cmake_minimum_required(VERSION 3.15)
 
 add_compile_definitions(__PX4_POSIX)

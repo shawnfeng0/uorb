@@ -90,7 +90,9 @@ void *adviser_cpuload(void *) {
   cpuload.ram_usage = 1.0f;
 
   if (cpuload_pub == nullptr) {
+    LOG_TRACE("before advertise");
     cpuload_pub = orb_advertise(ORB_ID(cpuload), &cpuload);
+    LOG_TRACE("after advertise");
     // cpuload_pub = orb_advertise_queue(ORB_ID(cpuload), &cpuload, 2);
   }
   usleep(2 * 1000 * 1000);
@@ -158,14 +160,14 @@ int main(int argc, char *argv[])
 
     pthread_t pthread1, pthread2, pthread3, pthread4;
     pthread_create(&pthread1, nullptr, adviser_cpuload, nullptr);
-    pthread_create(&pthread2, nullptr, cpuload_update_poll, nullptr);
-    pthread_create(&pthread3, nullptr, cpuload_update_poll, nullptr);
-    pthread_create(&pthread4, nullptr, cpuload_update_poll, nullptr);
+//    pthread_create(&pthread2, nullptr, cpuload_update_poll, nullptr);
+//    pthread_create(&pthread3, nullptr, cpuload_update_poll, nullptr);
+//    pthread_create(&pthread4, nullptr, cpuload_update_poll, nullptr);
 
     pthread_join(pthread1, nullptr);
-    pthread_join(pthread2, nullptr);
-    pthread_join(pthread3, nullptr);
-    pthread_join(pthread4, nullptr);
+//    pthread_join(pthread2, nullptr);
+//    pthread_join(pthread3, nullptr);
+//    pthread_join(pthread4, nullptr);
 
     return OK;
   }

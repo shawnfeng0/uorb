@@ -149,7 +149,9 @@ extern "C" {
 	int px4_open(const char *path, int flags, ...)
 	{
 		PX4_DEBUG("px4_open");
+		LOG_TOKEN(path);
 		cdev::CDev *dev = getDev(path);
+		LOG_TOKEN((void*)dev);
 		int ret = 0;
 		int i;
 		mode_t mode;

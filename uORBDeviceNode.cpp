@@ -91,7 +91,7 @@ uORB::DeviceNode::open(cdev::file_t *filp)
 	if (filp->f_oflags == PX4_F_RDONLY) {
 
 		/* allocate subscriber data */
-		SubscriberData *sd = new SubscriberData{};
+		auto *sd = new SubscriberData{};
 
 		if (nullptr == sd) {
 			return -ENOMEM;
@@ -99,7 +99,7 @@ uORB::DeviceNode::open(cdev::file_t *filp)
 
 		/* If there were any previous publications, allow the subscriber to read them */
 		const unsigned gen = published_message_count();
-		sd->generation = gen - (_queue_size < gen ? _queue_size : gen);
+		sd->generation = gen - (_queue_size < gen ? _queue_size : gen); // = (_queue_size < gen ? gen - _queue_size : 0);
 
 		filp->f_priv = (void *)sd;
 
