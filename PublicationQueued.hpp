@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2017 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,68 +32,63 @@
  ****************************************************************************/
 
 /**
- * @file Publication.cpp
+ * @file PublicationQueued.hpp
  *
  */
 
-#include "Publication.hpp"
+#pragma once
+
 #include <px4_defines.h>
+#include <systemlib/err.h>
+#include <uORB/uORB.h>
 
 namespace uORB
 {
 
-PublicationBase::PublicationBase(const struct orb_metadata *meta, int priority) :
-	_meta(meta),
-	_priority(priority)
+/**
+ * Queued publication with queue length set as a message constant (ORB_QUEUE_LENGTH)
+ */
+template<typename T>
+class PublicationQueued
 {
-}
+public:
 
-PublicationBase::~PublicationBase()
-{
-	orb_unadvertise(_handle);
-}
-
-bool PublicationBase::update(void *data)
-{
-	bool updated = false;
-
-	if (_handle != nullptr) {
-		if (orb_publish(_meta, _handle, data) != PX4_OK) {
-			PX4_ERR("%s publish fail", _meta->o_name);
-
-		} else {
-			updated = true;
-		}
-
-	} else {
-		orb_advert_t handle = nullptr;
-
-		if (_priority > 0) {
-			int instance;
-			handle = orb_advertise_multi(_meta, data, &instance, _priority);
-
-		} else {
-			handle = orb_advertise(_meta, data);
-		}
-
-		if (handle != nullptr) {
-			_handle = handle;
-			updated = true;
-
-		} else {
-			PX4_ERR("%s advert fail", _meta->o_name);
-		}
+	/**
+	 * Constructor
+	 *
+	 * @param meta The uORB metadata (usually from the ORB_ID() macro) for the topic.
+	 */
+	PublicationQueued(const orb_metadata *meta) : _meta(meta) {}
+	~PublicationQueued()
+	{
+		//orb_unadvertise(_handle);
 	}
 
-	return updated;
-}
+	/**
+	 * Publish the struct
+	 * @param data The uORB message struct we are updating.
+	 */
+	bool publish(const T &data)
+	{
+		if (_handle != nullptr) {
+			return (orb_publish(_meta, _handle, &data) == PX4_OK);
 
-PublicationNode::PublicationNode(const struct orb_metadata *meta, int priority, List<PublicationNode *> *list) :
-	PublicationBase(meta, priority)
-{
-	if (list != nullptr) {
-		list->add(this);
+		} else {
+			orb_advert_t handle = orb_advertise_queue(_meta, &data, T::ORB_QUEUE_LENGTH);
+
+			if (handle != nullptr) {
+				_handle = handle;
+				return true;
+			}
+		}
+
+		return false;
 	}
-}
 
-}  // namespace uORB
+protected:
+	const orb_metadata *_meta;
+
+	orb_advert_t _handle{nullptr};
+};
+
+} // namespace uORB

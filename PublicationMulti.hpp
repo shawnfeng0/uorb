@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -46,10 +46,10 @@ namespace uORB
 {
 
 /**
- * Base publication wrapper class
+ * Base publication multi wrapper class
  */
 template<typename T>
-class Publication
+class PublicationMulti
 {
 public:
 
@@ -57,9 +57,14 @@ public:
 	 * Constructor
 	 *
 	 * @param meta The uORB metadata (usually from the ORB_ID() macro) for the topic.
+	 * @param priority The priority for multi pub/sub, 0 means don't publish as multi
 	 */
-	Publication(const orb_metadata *meta) : _meta(meta) {}
-	~Publication() { orb_unadvertise(_handle); }
+	PublicationMulti(const orb_metadata *meta, uint8_t priority = ORB_PRIO_DEFAULT) :
+		_meta(meta),
+		_priority(priority)
+	{}
+
+	~PublicationMulti() { orb_unadvertise(_handle); }
 
 	/**
 	 * Publish the struct
@@ -71,7 +76,8 @@ public:
 			return (orb_publish(_meta, _handle, &data) == PX4_OK);
 
 		} else {
-			orb_advert_t handle = orb_advertise(_meta, &data);
+			int instance = 0;
+			orb_advert_t handle = orb_advertise_multi(_meta, &data, &instance, _priority);
 
 			if (handle != nullptr) {
 				_handle = handle;
@@ -86,32 +92,38 @@ protected:
 	const orb_metadata *_meta;
 
 	orb_advert_t _handle{nullptr};
+
+	const uint8_t _priority;
 };
 
 /**
- * The publication class with data embedded.
+ * The publication multi class with data embedded.
  */
 template<typename T>
-class PublicationData : public Publication<T>
+class PublicationMultiData : public PublicationMulti<T>
 {
 public:
 	/**
 	 * Constructor
 	 *
 	 * @param meta The uORB metadata (usually from the ORB_ID() macro) for the topic.
+	 * @param priority The priority for multi pub
 	 */
-	PublicationData(const orb_metadata *meta) : Publication<T>(meta) {}
-	~PublicationData() = default;
+	PublicationMultiData(const orb_metadata *meta, uint8_t priority = ORB_PRIO_DEFAULT) :
+		PublicationMulti<T>(meta, priority)
+	{}
+
+	~PublicationMultiData() = default;
 
 	T	&get() { return _data; }
 	void	set(const T &data) { _data = data; }
 
 	// Publishes the embedded struct.
-	bool	update() { return Publication<T>::publish(_data); }
+	bool	update() { return PublicationMulti<T>::publish(_data); }
 	bool	update(const T &data)
 	{
 		_data = data;
-		return Publication<T>::publish(_data);
+		return PublicationMulti<T>::publish(_data);
 	}
 
 private:
