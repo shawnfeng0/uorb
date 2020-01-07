@@ -39,15 +39,18 @@ add_compile_definitions(__PX4_LINUX)
 
 # this includes the generated topics directory
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
+include_directories(${CMAKE_SOURCE_DIR})
 include_directories(${CMAKE_SOURCE_DIR}/../)
 include_directories(${CMAKE_SOURCE_DIR}/src/platforms)
 include_directories(${CMAKE_SOURCE_DIR}/src)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib)
 include_directories(${CMAKE_SOURCE_DIR}/src/include)
+include_directories(${CMAKE_SOURCE_DIR}/src/drivers)
 include_directories(${CMAKE_SOURCE_DIR}/platforms/common/include)
 include_directories(${CMAKE_SOURCE_DIR}/platforms/common)
 include_directories(${CMAKE_SOURCE_DIR}/platforms/posix/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/DriverFramework/framework/include)
+include_directories(${CMAKE_SOURCE_DIR}/topic_header)
 
 file(GLOB UORB_SOURCE "${CMAKE_SOURCE_DIR}/*.[ch]pp" "${CMAKE_SOURCE_DIR}/*.[ch]")
 file(GLOB ULOG_SOURCE "${CMAKE_SOURCE_DIR}/src/platforms/ulog/src/*.[ch]")
@@ -61,6 +64,7 @@ file(GLOB EXTRA_SOURCE
         "${CMAKE_SOURCE_DIR}/src/platforms/*.c"
         "${CMAKE_SOURCE_DIR}/platforms/common/work_queue/*.c"
         "${CMAKE_SOURCE_DIR}/src/lib/DriverFramework/framework/src/*.cpp"
+        "${CMAKE_SOURCE_DIR}/topic_source/*.cpp"
         )
 add_executable(uorb ${UORB_SOURCE} ${ULOG_SOURCE} ${EXTRA_SOURCE})
 target_link_libraries(uorb pthread)
