@@ -31,26 +31,13 @@
 #
 ############################################################################
 
-project(uorb)
-cmake_minimum_required(VERSION 3.15)
-
-add_compile_definitions(__PX4_POSIX)
-add_compile_definitions(__PX4_LINUX)
-
-# this includes the generated topics directory
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
-include_directories(${CMAKE_SOURCE_DIR}/../)
-include_directories(${CMAKE_SOURCE_DIR}/src/platforms)
-include_directories(${CMAKE_SOURCE_DIR}/src)
-include_directories(${CMAKE_SOURCE_DIR}/src/include)
-
-file(GLOB UORB_SOURCE "${CMAKE_SOURCE_DIR}/*.[ch]pp" "${CMAKE_SOURCE_DIR}/*.[ch]")
-file(GLOB ULOG_SOURCE "${CMAKE_SOURCE_DIR}/src/platforms/ulog/src/*.[ch]")
-add_executable(uorb ${UORB_SOURCE} ${ULOG_SOURCE})
-
-#		DEPENDS
-#		cdev
-#		uorb_msgs
-
-#add_subdirectory(uORB_tests)
-
+px4_add_module(
+	MODULE lib__cdev__test__cdev_test
+	MAIN cdev_test
+	SRCS
+		cdevtest_example.cpp
+		cdevtest_main.cpp
+		cdevtest_start.cpp
+	DEPENDS
+		cdev
+	)

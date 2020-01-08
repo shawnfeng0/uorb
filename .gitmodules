@@ -1,0 +1,3 @@
+[submodule "src/platforms/ulog"]
+	path = src/platforms/ulog
+	url = https://github.com/ShawnFeng0/ulog.git

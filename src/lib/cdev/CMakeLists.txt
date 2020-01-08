@@ -31,26 +31,23 @@
 #
 ############################################################################
 
-project(uorb)
-cmake_minimum_required(VERSION 3.15)
+set(SRCS_PLATFORM)
+if (${PX4_PLATFORM} STREQUAL "nuttx")
+	list(APPEND SRCS_PLATFORM
+		nuttx/cdev_platform.cpp
+	)
+else()
+	list(APPEND SRCS_PLATFORM
+		posix/cdev_platform.cpp
+		posix/vfile.cpp
+	)
+endif()
 
-add_compile_definitions(__PX4_POSIX)
-add_compile_definitions(__PX4_LINUX)
+px4_add_library(cdev
+	CDev.cpp
+	${SRCS_PLATFORM}
+	)
 
-# this includes the generated topics directory
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
-include_directories(${CMAKE_SOURCE_DIR}/../)
-include_directories(${CMAKE_SOURCE_DIR}/src/platforms)
-include_directories(${CMAKE_SOURCE_DIR}/src)
-include_directories(${CMAKE_SOURCE_DIR}/src/include)
-
-file(GLOB UORB_SOURCE "${CMAKE_SOURCE_DIR}/*.[ch]pp" "${CMAKE_SOURCE_DIR}/*.[ch]")
-file(GLOB ULOG_SOURCE "${CMAKE_SOURCE_DIR}/src/platforms/ulog/src/*.[ch]")
-add_executable(uorb ${UORB_SOURCE} ${ULOG_SOURCE})
-
-#		DEPENDS
-#		cdev
-#		uorb_msgs
-
-#add_subdirectory(uORB_tests)
-
+if(PX4_TESTING)
+	add_subdirectory(test)
+endif()

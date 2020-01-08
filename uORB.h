@@ -43,6 +43,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "visibility.h"
 
 /**
  * Object metadata.
