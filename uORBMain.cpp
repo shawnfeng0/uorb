@@ -82,8 +82,7 @@ $ uorb top
 	PRINT_MODULE_USAGE_ARG("<filter1> [<filter2>]", "topic(s) to match (implies -a)", true);
 }
 
-int
-uorb_main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
 	if (argc < 2) {
 		usage();
@@ -117,7 +116,7 @@ uorb_main(int argc, char *argv[])
 		/* FIXME: this fails on Snapdragon (see https://github.com/PX4/Firmware/issues/5406),
 		 * so we disable logging messages to the ulog for now. This needs further investigations.
 		 */
-		px4_log_initialize();
+//		px4_log_initialize();
 #endif
 
 		return OK;

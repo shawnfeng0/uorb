@@ -35,6 +35,7 @@
  ************************************************************************/
 
 // FIXME - need px4_queue
+#include "visibility.h"
 #include <queue.h>
 #include <stddef.h>
 

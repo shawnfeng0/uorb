@@ -43,6 +43,7 @@
 #include <px4_log.h>
 #include <px4_posix.h>
 #include <px4_time.h>
+#include <stdarg.h>
 
 #include "DevMgr.hpp"
 

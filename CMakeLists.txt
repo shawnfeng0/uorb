@@ -42,15 +42,31 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 include_directories(${CMAKE_SOURCE_DIR}/../)
 include_directories(${CMAKE_SOURCE_DIR}/src/platforms)
 include_directories(${CMAKE_SOURCE_DIR}/src)
+include_directories(${CMAKE_SOURCE_DIR}/src/lib)
 include_directories(${CMAKE_SOURCE_DIR}/src/include)
+include_directories(${CMAKE_SOURCE_DIR}/platforms/common/include)
+include_directories(${CMAKE_SOURCE_DIR}/platforms/common)
+include_directories(${CMAKE_SOURCE_DIR}/platforms/posix/include)
+include_directories(${CMAKE_SOURCE_DIR}/src/lib/DriverFramework/framework/include)
 
 file(GLOB UORB_SOURCE "${CMAKE_SOURCE_DIR}/*.[ch]pp" "${CMAKE_SOURCE_DIR}/*.[ch]")
 file(GLOB ULOG_SOURCE "${CMAKE_SOURCE_DIR}/src/platforms/ulog/src/*.[ch]")
-add_executable(uorb ${UORB_SOURCE} ${ULOG_SOURCE})
+file(GLOB EXTRA_SOURCE
+        "${CMAKE_SOURCE_DIR}/platforms/common/module.cpp"
+        "${CMAKE_SOURCE_DIR}/src/drivers/*.cpp"
+        "${CMAKE_SOURCE_DIR}/src/lib/cdev/posix/*"
+        "${CMAKE_SOURCE_DIR}/src/lib/cdev/*.[ch]pp"
+        "${CMAKE_SOURCE_DIR}/platforms/posix/src/px4/common/px4_sem.cpp"
+        "${CMAKE_SOURCE_DIR}/platforms/posix/src/px4/common/px4_posix_tasks.cpp"
+        "${CMAKE_SOURCE_DIR}/src/platforms/*.c"
+        "${CMAKE_SOURCE_DIR}/platforms/common/work_queue/*.c"
+        "${CMAKE_SOURCE_DIR}/src/lib/DriverFramework/framework/src/*.cpp"
+        )
+add_executable(uorb ${UORB_SOURCE} ${ULOG_SOURCE} ${EXTRA_SOURCE})
+target_link_libraries(uorb pthread)
 
 #		DEPENDS
 #		cdev
 #		uorb_msgs
 
 #add_subdirectory(uORB_tests)
-

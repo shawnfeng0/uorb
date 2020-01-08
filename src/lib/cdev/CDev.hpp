@@ -40,6 +40,7 @@
 #ifndef _CDEV_HPP
 #define _CDEV_HPP
 
+#include <errno.h>
 #include <px4_config.h>
 #include <px4_posix.h>
 

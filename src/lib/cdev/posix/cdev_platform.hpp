@@ -3,6 +3,7 @@
 
 #include <inttypes.h>
 #include <string.h>
+#include "visibility.h"
 
 #define ATOMIC_ENTER lock()
 #define ATOMIC_LEAVE unlock()

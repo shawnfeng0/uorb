@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <time.h>
 #include <pthread.h>
+#include "visibility.h"
 
 #if defined(__PX4_APPLE_LEGACY)
 #define clockid_t int
