@@ -109,20 +109,33 @@ void *adviser_cpuload(void *) {
 void* cpuload_update_poll(void*) {
   bool updated;
   struct cpuload_s container{};
-  int sub = orb_subscribe(ORB_ID(cpuload));
+  int cpuload_sub = orb_subscribe(ORB_ID(cpuload));
+
+  px4_pollfd_struct_t fds[] = {
+      {.fd = cpuload_sub, .events = POLLIN},
+  };
 
   memset(&container, 0, sizeof(container));
+  int error_counter = 0;
+
   for (int i = 0; i < 15; i ++) {
-    usleep(1 * 1000 * 1000);
     LOG_INFO("TOPIC: cpuload #%d", i);
-    orb_check(sub, &updated);
-    if (updated) {
-      orb_copy(ORB_ID(cpuload), sub, &container);
+    int poll_ret = px4_poll(fds, 1, 5000);
+    if (poll_ret < 0) {
+      /* this is seriously bad - should be an emergency */
+      if (error_counter < 10 || error_counter % 50 == 0) {
+        /* use a counter to prevent flooding (and slowing us down) */
+        PX4_ERR("ERROR return value from poll(): %d", poll_ret);
+      }
+      error_counter++;
+    } else if (poll_ret == 0) {
+      /* this means none of our providers is giving us data */
+      PX4_ERR("Got no data within a second");
+    } else {
+      orb_copy(ORB_ID(cpuload), cpuload_sub, &container);
       LOG_TOKEN(container.timestamp);
       LOG_TOKEN(container.load);
       LOG_TOKEN(container.ram_usage);
-    } else {
-      LOG_INFO("Not updated");
     }
   }
   return nullptr;
@@ -160,12 +173,12 @@ int main(int argc, char *argv[])
 
     pthread_t pthread1, pthread2, pthread3, pthread4;
     pthread_create(&pthread1, nullptr, adviser_cpuload, nullptr);
-//    pthread_create(&pthread2, nullptr, cpuload_update_poll, nullptr);
+    pthread_create(&pthread2, nullptr, cpuload_update_poll, nullptr);
 //    pthread_create(&pthread3, nullptr, cpuload_update_poll, nullptr);
 //    pthread_create(&pthread4, nullptr, cpuload_update_poll, nullptr);
 
     pthread_join(pthread1, nullptr);
-//    pthread_join(pthread2, nullptr);
+    pthread_join(pthread2, nullptr);
 //    pthread_join(pthread3, nullptr);
 //    pthread_join(pthread4, nullptr);
 
