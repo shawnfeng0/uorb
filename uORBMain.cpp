@@ -120,7 +120,8 @@ void* cpuload_update_poll(void*) {
 
   for (int i = 0; i < 15; i ++) {
     LOG_INFO("TOPIC: cpuload #%d", i);
-    int poll_ret = px4_poll(fds, 1, 5000);
+    int timeout_ms = 5000;
+    int poll_ret = px4_poll(fds, 1, timeout_ms);
     if (poll_ret < 0) {
       /* this is seriously bad - should be an emergency */
       if (error_counter < 10 || error_counter % 50 == 0) {
@@ -130,7 +131,7 @@ void* cpuload_update_poll(void*) {
       error_counter++;
     } else if (poll_ret == 0) {
       /* this means none of our providers is giving us data */
-      PX4_ERR("Got no data within a second");
+      PX4_ERR("Got no data within %d second", timeout_ms);
     } else {
       orb_copy(ORB_ID(cpuload), cpuload_sub, &container);
       LOG_TOKEN(container.timestamp);

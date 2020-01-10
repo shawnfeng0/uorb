@@ -32,13 +32,8 @@
  ****************************************************************************/
 
 #include <sys/types.h>
-#include <sys/stat.h>
-#include <stdarg.h>
-#include <fcntl.h>
 
-#include <px4_config.h>
-#include <px4_posix.h>
-#include <px4_tasks.h>
+#include <px4_posix.h> // mark
 
 #include "uORBDeviceNode.hpp"
 #include "uORBUtils.hpp"

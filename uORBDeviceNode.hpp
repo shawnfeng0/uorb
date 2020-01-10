@@ -36,10 +36,10 @@
 #include "uORBCommon.hpp"
 #include "uORBDeviceMaster.hpp"
 
-#include <lib/cdev/CDev.hpp>
+#include <lib/cdev/CDev.hpp> // mark
 
 #include <containers/List.hpp>
-#include <px4_atomic.h>
+#include <px4_atomic.h> // mark
 
 namespace uORB
 {
