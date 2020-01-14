@@ -40,8 +40,6 @@
 #include <px4_defines.h>
 #include <drivers/drv_hrt.h>
 
-#include <lib/perf/perf_counter.h>
-
 namespace px4
 {
 

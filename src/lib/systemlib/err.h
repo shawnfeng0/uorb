@@ -79,21 +79,6 @@ __BEGIN_DECLS
 #define EXIT(eval) px4_task_exit(eval)
 #endif
 
-
-#define err(eval, ...)		do { \
-		PX4_ERR(__VA_ARGS__); \
-		PX4_ERR("Task exited with errno=%i\n", errno); \
-		EXIT(eval); \
-	} while(0)
-
-#define errx(eval, ...)		do { \
-		PX4_ERR(__VA_ARGS__); \
-		EXIT(eval); \
-	} while(0)
-
-#define warn(...) 		PX4_WARN(__VA_ARGS__)
-#define warnx(...) 		PX4_WARN(__VA_ARGS__)
-
 __END_DECLS
 
 #endif

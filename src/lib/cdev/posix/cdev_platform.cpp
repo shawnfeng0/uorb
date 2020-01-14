@@ -45,10 +45,10 @@
 #include <px4_time.h>
 #include <stdarg.h>
 
-#include "DevMgr.hpp"
+//#include "DevMgr.hpp"
 
 using namespace std;
-using namespace DriverFramework;
+//using namespace DriverFramework;
 
 const cdev::px4_file_operations_t cdev::CDev::fops = {};
 
@@ -61,9 +61,7 @@ static cdev::file_t filemap[PX4_MAX_FD] = {};
 
 extern "C" {
 
-	int px4_errno;
-
-	static cdev::CDev *getDev(const char *path)
+static cdev::CDev *getDev(const char *path)
 	{
 		PX4_DEBUG("CDev::getDev");
 
@@ -236,8 +234,7 @@ extern "C" {
 		}
 
 		if (ret < 0) {
-			px4_errno = -ret;
-			ret = PX4_ERROR;
+                  ret = PX4_ERROR;
 		}
 
 		return ret;
@@ -258,8 +255,7 @@ extern "C" {
 		}
 
 		if (ret < 0) {
-			px4_errno = -ret;
-			ret = PX4_ERROR;
+                  ret = PX4_ERROR;
 		}
 
 		return ret;
@@ -280,8 +276,7 @@ extern "C" {
 		}
 
 		if (ret < 0) {
-			px4_errno = -ret;
-			ret = PX4_ERROR;
+                  ret = PX4_ERROR;
 		}
 
 		return ret;
@@ -302,8 +297,7 @@ extern "C" {
 		}
 
 		if (ret < 0) {
-			px4_errno = -ret;
-		}
+                }
 
 		return ret;
 	}
@@ -462,7 +456,7 @@ extern "C" {
 
 		do {
 			// Each look increments index and returns -1 if end reached
-			i = DevMgr::getNextDeviceName(index, &dev_path);
+//			i = DevMgr::getNextDeviceName(index, &dev_path);
 
 			if (i == 0) {
 				PX4_INFO("   %s", dev_path);

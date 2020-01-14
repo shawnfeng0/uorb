@@ -38,9 +38,7 @@
  */
 
 #include <px4_defines.h>
-#include <px4_workqueue.h>
 #include <px4_time.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <pthread.h>
 #include <errno.h>
