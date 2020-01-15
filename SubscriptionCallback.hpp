@@ -40,7 +40,6 @@
 
 #include <uORB/SubscriptionInterval.hpp>
 #include <containers/List.hpp>
-#include <px4_platform_common/px4_work_queue/WorkItem.hpp> // mark
 
 namespace uORB
 {
@@ -101,37 +100,6 @@ public:
 
 	virtual void call() = 0;
 
-};
-
-// Subscription with callback that schedules a WorkItem
-class SubscriptionCallbackWorkItem : public SubscriptionCallback
-{
-public:
-	/**
-	 * Constructor
-	 *
-	 * @param work_item The WorkItem that will be scheduled immediately on new publications.
-	 * @param meta The uORB metadata (usually from the ORB_ID() macro) for the topic.
-	 * @param instance The instance for multi sub.
-	 */
-	SubscriptionCallbackWorkItem(px4::WorkItem *work_item, const orb_metadata *meta, uint8_t instance = 0) :
-		SubscriptionCallback(meta, 0, instance),	// interval 0
-		_work_item(work_item)
-	{
-	}
-
-	virtual ~SubscriptionCallbackWorkItem() = default;
-
-	void call() override
-	{
-		// schedule immediately if no interval, otherwise check time elapsed
-		if ((_interval_us == 0) || (hrt_elapsed_time_atomic(&_last_update) >= _interval_us)) {
-			_work_item->ScheduleNow();
-		}
-	}
-
-private:
-	px4::WorkItem *_work_item;
 };
 
 } // namespace uORB
