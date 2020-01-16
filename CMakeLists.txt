@@ -49,7 +49,6 @@ include_directories(${CMAKE_SOURCE_DIR}/src/drivers)
 include_directories(${CMAKE_SOURCE_DIR}/platforms/common/include)
 include_directories(${CMAKE_SOURCE_DIR}/platforms/common)
 include_directories(${CMAKE_SOURCE_DIR}/platforms/posix/include)
-include_directories(${CMAKE_SOURCE_DIR}/src/lib/DriverFramework/framework/include)
 include_directories(${CMAKE_SOURCE_DIR}/topic_header)
 
 file(GLOB UORB_SOURCE "${CMAKE_SOURCE_DIR}/*.[ch]pp" "${CMAKE_SOURCE_DIR}/*.[ch]")
@@ -63,7 +62,6 @@ file(GLOB EXTRA_SOURCE
         "${CMAKE_SOURCE_DIR}/platforms/posix/src/px4/common/px4_posix_tasks.cpp"
         "${CMAKE_SOURCE_DIR}/src/platforms/*.c"
         "${CMAKE_SOURCE_DIR}/platforms/common/work_queue/*.c"
-        "${CMAKE_SOURCE_DIR}/src/lib/DriverFramework/framework/src/*.cpp"
         "${CMAKE_SOURCE_DIR}/topic_source/*.cpp"
         )
 add_executable(uorb ${UORB_SOURCE} ${ULOG_SOURCE} ${EXTRA_SOURCE})

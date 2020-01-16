@@ -59,10 +59,6 @@
 #  define __END_DECLS
 #endif
 
-
-
-
-
 /* exit() is used on NuttX to exit a task. However on Posix, it will exit the
  * whole application, so we prevent its use there. There are cases where it
  * still needs to be used, thus we remap system_exit to exit.
@@ -107,19 +103,3 @@
 #endif // !defined(__PX4_NUTTX)
 #define system_usleep usleep
 #define system_sleep sleep
-
-
-/* On NuttX we call clearenv() so we cannot use getenv() and others (see
- * px4_task_spawn_cmd() in px4_nuttx_tasks.c).
- * We need to include the headers declaring getenv() before the pragma,
- * otherwise it will trigger a poison error.  */
-#if defined(__PX4_NUTTX)
-#include <stdlib.h>
-#ifdef __cplusplus
-#include <cstdlib>
-#endif
-/* We should include cstdlib or stdlib.h but this doesn't
- * compile because many C++ files include stdlib.h and would
- * need to get changed. */
-#pragma GCC poison getenv setenv putenv
-#endif // defined(__PX4_NUTTX)
