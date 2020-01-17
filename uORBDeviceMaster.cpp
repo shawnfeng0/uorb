@@ -330,44 +330,13 @@ void uORB::DeviceMaster::showTop(char **topic_filter, int num_filters)
 		PX4_ERR("addNewDeviceNodes failed (%i)", ret);
 	}
 
-#ifdef __PX4_QURT //QuRT has no poll()
-	only_once = true;
-#else
-	const int stdin_fileno = 0;
+	only_once = true; // For full platform use, so only output once
 
-	struct pollfd fds;
-	fds.fd = stdin_fileno;
-	fds.events = POLLIN;
-#endif
 	bool quit = false;
 
 	hrt_abstime start_time = hrt_absolute_time();
 
 	while (!quit) {
-
-#ifndef __PX4_QURT
-
-		/* Sleep 200 ms waiting for user input five times ~ 1s */
-		for (int k = 0; k < 5; k++) {
-			char c;
-
-			ret = ::poll(&fds, 1, 0); //just want to check if there is new data available
-
-			if (ret > 0) {
-
-				ret = ::read(stdin_fileno, &c, 1);
-
-				if (ret) {
-					quit = true;
-					break;
-				}
-			}
-
-			px4_usleep(200000);
-		}
-
-#endif
-
 		if (!quit) {
 
 			//update the stats
