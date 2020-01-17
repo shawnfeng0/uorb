@@ -37,7 +37,6 @@
  */
 
 #include "Subscription.hpp"
-#include <px4_defines.h>
 
 namespace uORB
 {

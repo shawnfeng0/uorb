@@ -30,14 +30,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  ****************************************************************************/
-
-#include <sys/types.h>
-
-#include <px4_posix.h> // mark
-
+#include "uORBManager.hpp"
 #include "uORBDeviceNode.hpp"
 #include "uORBUtils.hpp"
-#include "uORBManager.hpp"
+
+#include "base/orb_log.h"
+#include "base/orb_posix.h"
 
 uORB::Manager *uORB::Manager::_Instance = nullptr;
 
@@ -67,7 +65,7 @@ uORB::Manager::Manager()
 	const char *file_name = PX4_STORAGEDIR"/orb_publisher.rules";
 	int ret = readPublisherRulesFromFile(file_name, _publisher_rule);
 
-	if (ret == PX4_OK) {
+	if (ret == ORB_OK) {
 		_has_publisher_rules = true;
 		PX4_INFO("Using orb rules from %s", file_name);
 
@@ -100,7 +98,7 @@ uORB::DeviceMaster *uORB::Manager::get_device_master()
 
 int uORB::Manager::orb_exists(const struct orb_metadata *meta, int instance)
 {
-	int ret = PX4_ERROR;
+	int ret = ORB_ERROR;
 
 	// instance valid range: [0, ORB_MULTI_MAX_INSTANCES)
 	if ((instance < 0) || (instance > (ORB_MULTI_MAX_INSTANCES - 1))) {
@@ -112,7 +110,7 @@ int uORB::Manager::orb_exists(const struct orb_metadata *meta, int instance)
 
 		if (node != nullptr) {
 			if (node->is_advertised()) {
-				return PX4_OK;
+				return ORB_OK;
 			}
 		}
 	}
@@ -127,15 +125,15 @@ int uORB::Manager::orb_exists(const struct orb_metadata *meta, int instance)
 
 	ret = uORB::Utils::node_mkpath(path, meta, &inst);
 
-	if (ret != OK) {
+	if (ret != ORB_OK) {
 		errno = -ret;
-		return PX4_ERROR;
+		return ORB_ERROR;
 	}
 
 	ret = px4_access(path, F_OK);
 
 	if (ret == -1 && meta != nullptr && !_remote_topics.empty()) {
-		ret = (_remote_topics.find(meta->o_name) != _remote_topics.end()) ? OK : PX4_ERROR;
+		ret = (_remote_topics.find(meta->o_name) != _remote_topics.end()) ? ORB_OK : ORB_ERROR;
 	}
 
 	if (ret == 0) {
@@ -149,7 +147,7 @@ int uORB::Manager::orb_exists(const struct orb_metadata *meta, int instance)
 
 			if (px4_ioctl(fd, ORBIOCISADVERTISED, (unsigned long)&is_advertised) == 0) {
 				if (!is_advertised) {
-					ret = PX4_ERROR;
+					ret = ORB_ERROR;
 				}
 			}
 
@@ -192,7 +190,7 @@ orb_advert_t uORB::Manager::orb_advertise_multi(const struct orb_metadata *meta,
 	/* open the node as an advertiser */
 	int fd = node_open(meta, true, instance, priority);
 
-	if (fd == PX4_ERROR) {
+	if (fd == ORB_ERROR) {
 		PX4_ERR("%s advertise failed (%i)", meta->o_name, errno);
 		return nullptr;
 	}
@@ -212,7 +210,7 @@ orb_advert_t uORB::Manager::orb_advertise_multi(const struct orb_metadata *meta,
 	result = px4_ioctl(fd, ORBIOCGADVERTISER, (unsigned long)&advertiser);
 	px4_close(fd);
 
-	if (result == PX4_ERROR) {
+	if (result == ORB_ERROR) {
 		PX4_WARN("px4_ioctl ORBIOCGADVERTISER failed. fd = %d", fd);
 		return nullptr;
 	}
@@ -225,7 +223,7 @@ orb_advert_t uORB::Manager::orb_advertise_multi(const struct orb_metadata *meta,
 	/* the advertiser must perform an initial publish to initialise the object */
 	result = orb_publish(meta, advertiser, data);
 
-	if (result == PX4_ERROR) {
+	if (result == ORB_ERROR) {
 		PX4_WARN("orb_publish failed");
 		return nullptr;
 	}
@@ -238,7 +236,7 @@ int uORB::Manager::orb_unadvertise(orb_advert_t handle)
 #ifdef ORB_USE_PUBLISHER_RULES
 
 	if (handle == _Instance) {
-		return PX4_OK; //pretend success
+		return ORB_OK; //pretend success
 	}
 
 #endif /* ORB_USE_PUBLISHER_RULES */
@@ -267,7 +265,7 @@ int uORB::Manager::orb_publish(const struct orb_metadata *meta, orb_advert_t han
 #ifdef ORB_USE_PUBLISHER_RULES
 
 	if (handle == _Instance) {
-		return PX4_OK; //pretend success
+		return ORB_OK; //pretend success
 	}
 
 #endif /* ORB_USE_PUBLISHER_RULES */
@@ -282,15 +280,15 @@ int uORB::Manager::orb_copy(const struct orb_metadata *meta, int handle, void *b
 	ret = px4_read(handle, buffer, meta->o_size);
 
 	if (ret < 0) {
-		return PX4_ERROR;
+		return ORB_ERROR;
 	}
 
 	if (ret != (int)meta->o_size) {
 		errno = EIO;
-		return PX4_ERROR;
+		return ORB_ERROR;
 	}
 
-	return PX4_OK;
+	return ORB_OK;
 }
 
 int uORB::Manager::orb_check(int handle, bool *updated)
@@ -324,15 +322,15 @@ int uORB::Manager::orb_get_interval(int handle, unsigned *interval)
 
 int uORB::Manager::node_advertise(const struct orb_metadata *meta, bool is_advertiser, int *instance, int priority)
 {
-	int ret = PX4_ERROR;
+	int ret = ORB_ERROR;
 
 	if (get_device_master()) {
 		ret = _device_master->advertise(meta, is_advertiser, instance, priority);
 	}
 
-	/* it's PX4_OK if it already exists */
-	if ((PX4_OK != ret) && (EEXIST == errno)) {
-		ret = PX4_OK;
+	/* it's ORB_OK if it already exists */
+	if ((ORB_OK != ret) && (EEXIST == errno)) {
+		ret = ORB_OK;
 	}
 
 	return ret;
@@ -342,7 +340,7 @@ int uORB::Manager::node_open(const struct orb_metadata *meta, bool advertiser, i
 {
 	char path[orb_maxpath];
 	int fd = -1;
-	int ret = PX4_ERROR;
+	int ret = ORB_ERROR;
 
 	/*
 	 * If meta is null, the object was not defined, i.e. it is not
@@ -350,7 +348,7 @@ int uORB::Manager::node_open(const struct orb_metadata *meta, bool advertiser, i
 	 */
 	if (nullptr == meta) {
 		errno = ENOENT;
-		return PX4_ERROR;
+		return ORB_ERROR;
 	}
 
 	/* if we have an instance and are an advertiser, we will generate a new node and set the instance,
@@ -361,9 +359,9 @@ int uORB::Manager::node_open(const struct orb_metadata *meta, bool advertiser, i
 		 */
 		ret = uORB::Utils::node_mkpath(path, meta, instance);
 
-		if (ret != OK) {
+		if (ret != ORB_OK) {
 			errno = -ret;
-			return PX4_ERROR;
+			return ORB_ERROR;
 		}
 
 		/* open the path as either the advertiser or the subscriber */
@@ -379,18 +377,18 @@ int uORB::Manager::node_open(const struct orb_metadata *meta, bool advertiser, i
 		/* try to create the node */
 		ret = node_advertise(meta, advertiser, instance, priority);
 
-		if (ret == PX4_OK) {
+		if (ret == ORB_OK) {
 			/* update the path, as it might have been updated during the node_advertise call */
 			ret = uORB::Utils::node_mkpath(path, meta, instance);
 
-			if (ret != PX4_OK) {
+			if (ret != ORB_OK) {
 				errno = -ret;
-				return PX4_ERROR;
+				return ORB_ERROR;
 			}
 		}
 
 		/* on success, try to open again */
-		if (ret == PX4_OK) {
+		if (ret == ORB_OK) {
 			fd = px4_open(path, (advertiser) ? PX4_F_WRONLY : PX4_F_RDONLY);
 		}
 	}
@@ -408,10 +406,10 @@ int uORB::Manager::node_open(const struct orb_metadata *meta, bool advertiser, i
 
 	if (fd < 0) {
 		errno = EIO;
-		return PX4_ERROR;
+		return ORB_ERROR;
 	}
 
-	/* everything has been OK, we can return the handle now */
+	/* everything has been ORB_OK, we can return the handle now */
 	return fd;
 }
 
@@ -454,7 +452,7 @@ int16_t uORB::Manager::process_add_subscription(const char *messageName, int32_t
 	int ret = uORB::Utils::node_mkpath(nodepath, messageName);
 	DeviceMaster *device_master = get_device_master();
 
-	if (ret == OK && device_master) {
+	if (ret == ORB_OK && device_master) {
 		uORB::DeviceNode *node = device_master->getDeviceNode(nodepath);
 
 		if (node == nullptr) {
@@ -480,7 +478,7 @@ int16_t uORB::Manager::process_remove_subscription(const char *messageName)
 	int ret = uORB::Utils::node_mkpath(nodepath, messageName);
 	DeviceMaster *device_master = get_device_master();
 
-	if (ret == OK && device_master) {
+	if (ret == ORB_OK && device_master) {
 		uORB::DeviceNode *node = device_master->getDeviceNode(nodepath);
 
 		// get the node name.
@@ -505,7 +503,7 @@ int16_t uORB::Manager::process_received_message(const char *messageName, int32_t
 	int ret = uORB::Utils::node_mkpath(nodepath, messageName);
 	DeviceMaster *device_master = get_device_master();
 
-	if (ret == OK && device_master) {
+	if (ret == ORB_OK && device_master) {
 		uORB::DeviceNode *node = device_master->getDeviceNode(nodepath);
 
 		// get the node name.
@@ -565,7 +563,7 @@ int uORB::Manager::readPublisherRulesFromFile(const char *file_name, PublisherRu
 {
 	FILE *fp;
 	static const int line_len = 1024;
-	int ret = PX4_OK;
+	int ret = ORB_OK;
 	char *line = new char[line_len];
 
 	if (!line) {
@@ -587,7 +585,7 @@ int uORB::Manager::readPublisherRulesFromFile(const char *file_name, PublisherRu
 	rule.module_name = nullptr;
 	rule.topics = nullptr;
 
-	while (fgets(line, line_len, fp) && ret == PX4_OK) {
+	while (fgets(line, line_len, fp) && ret == ORB_OK) {
 
 		if (strlen(line) < 2 || line[0] == '#') {
 			continue;
@@ -660,7 +658,7 @@ int uORB::Manager::readPublisherRulesFromFile(const char *file_name, PublisherRu
 		}
 	}
 
-	if (ret == PX4_OK && (!rule.module_name || !rule.topics)) {
+	if (ret == ORB_OK && (!rule.module_name || !rule.topics)) {
 		PX4_ERR("Wrong format in orb publisher rules file");
 		ret = -EINVAL;
 	}

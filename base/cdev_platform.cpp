@@ -37,18 +37,12 @@
 #include <string>
 #include <map>
 
-#include "vfile.h"
-#include "../CDev.hpp"
+#include "CDev.hpp"
 
-#include <px4_log.h>
-#include <px4_posix.h>
-#include <px4_time.h>
-#include <stdarg.h>
-
-//#include "DevMgr.hpp"
+#include "orb_log.h"
+#include "orb_posix.h"
 
 using namespace std;
-//using namespace DriverFramework;
 
 const cdev::px4_file_operations_t cdev::CDev::fops = {};
 
@@ -115,7 +109,7 @@ static cdev::CDev *getDev(const char *path)
 			return -EEXIST;
 		}
 
-		devmap[name] = (void *)data;
+		devmap[name] = data;
 		PX4_DEBUG("Registered DEV %s", name);
 
 		pthread_mutex_unlock(&devmutex);
@@ -149,21 +143,7 @@ static cdev::CDev *getDev(const char *path)
 		PX4_DEBUG("px4_open");
 		cdev::CDev *dev = getDev(path);
 		int ret = 0;
-		int i;
-		mode_t mode;
-
-		if (!dev && (flags & PX4_F_WRONLY) != 0 &&
-		    strncmp(path, "/obj/", 5) != 0 &&
-		    strncmp(path, "/dev/", 5) != 0) {
-			va_list p;
-			va_start(p, flags);
-			mode = va_arg(p, int);
-			va_end(p);
-
-			// Create the file
-			PX4_DEBUG("Creating virtual file %s", path);
-			dev = cdev::VFile::createFile(path, mode);
-		}
+		int i = 0;
 
 		if (dev) {
 
@@ -232,7 +212,7 @@ static cdev::CDev *getDev(const char *path)
 		}
 
 		if (ret < 0) {
-                  ret = PX4_ERROR;
+                  ret = ORB_ERROR;
 		}
 
 		return ret;
@@ -253,7 +233,7 @@ static cdev::CDev *getDev(const char *path)
 		}
 
 		if (ret < 0) {
-                  ret = PX4_ERROR;
+                  ret = ORB_ERROR;
 		}
 
 		return ret;
@@ -274,7 +254,7 @@ static cdev::CDev *getDev(const char *path)
 		}
 
 		if (ret < 0) {
-                  ret = PX4_ERROR;
+                  ret = ORB_ERROR;
 		}
 
 		return ret;
@@ -367,7 +347,7 @@ static cdev::CDev *getDev(const char *path)
 				struct timespec ts;
 				// Note, we can't actually use CLOCK_MONOTONIC on macOS
 				// but that's hidden and implemented in px4_clock_gettime.
-				px4_clock_gettime(CLOCK_MONOTONIC, &ts);
+				clock_gettime(CLOCK_MONOTONIC, &ts);
 
 				// Calculate an absolute time in the future
 				const unsigned billion = (1000 * 1000 * 1000);
@@ -416,12 +396,7 @@ static cdev::CDev *getDev(const char *path)
 		return (count) ? count : ret;
 	}
 
-	int px4_fsync(int fd)
-	{
-		return 0;
-	}
-
-	int px4_access(const char *pathname, int mode)
+        int px4_access(const char *pathname, int mode)
 	{
 		if (mode != F_OK) {
 			errno = EINVAL;
@@ -432,37 +407,7 @@ static cdev::CDev *getDev(const char *path)
 		return (dev != nullptr) ? 0 : -1;
 	}
 
-	void px4_show_devices()
-	{
-		int i = 0;
-		PX4_INFO("PX4 Devices:");
-
-		pthread_mutex_lock(&devmutex);
-
-		for (const auto &dev : devmap) {
-			if (strncmp(dev.first.c_str(), "/dev/", 5) == 0) {
-				PX4_INFO("   %s", dev.first.c_str());
-			}
-		}
-
-		pthread_mutex_unlock(&devmutex);
-
-		PX4_INFO("DF Devices:");
-		const char *dev_path;
-		unsigned int index = 0;
-		i = 0;
-
-		do {
-			// Each look increments index and returns -1 if end reached
-//			i = DevMgr::getNextDeviceName(index, &dev_path);
-
-			if (i == 0) {
-				PX4_INFO("   %s", dev_path);
-			}
-		} while (i == 0);
-	}
-
-	void px4_show_topics()
+        void px4_show_topics()
 	{
 		PX4_INFO("Devices:");
 
@@ -477,20 +422,4 @@ static cdev::CDev *getDev(const char *path)
 		pthread_mutex_unlock(&devmutex);
 	}
 
-	void px4_show_files()
-	{
-		PX4_INFO("Files:");
-
-		pthread_mutex_lock(&devmutex);
-
-		for (const auto &dev : devmap) {
-			if (strncmp(dev.first.c_str(), "/obj/", 5) != 0 &&
-			    strncmp(dev.first.c_str(), "/dev/", 5) != 0) {
-				PX4_INFO("   %s", dev.first.c_str());
-			}
-		}
-
-		pthread_mutex_unlock(&devmutex);
-	}
-
-} // extern "C"
+        } // extern "C"

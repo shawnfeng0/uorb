@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2015 Mark Charlebois. All rights reserved.
+ *   Copyright (c) 2015 Mark Charlebois. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,36 +32,60 @@
  ****************************************************************************/
 
 /**
- * @file vdev_file.cpp
- * Virtual file
+ * @file px4_posix.h
  *
- * @author Mark Charlebois <charlebm@gmail.com>
+ * Includes POSIX-like functions for virtual character devices
  */
 
-#include "vfile.h"
+#pragma once
 
-namespace cdev
-{
+#include "visibility.h" // Many source files need this header file
 
-VFile::VFile(const char *fname, mode_t mode) :
-	CDev(fname)
-{
-}
+#include <stdint.h>
 
-VFile *VFile::createFile(const char *fname, mode_t mode)
-{
-	VFile *me = new VFile(fname, mode);
-	px4_file_operations_t *file_ops = nullptr;
-	register_driver(fname, file_ops, 0666, (void *)me);
-	return me;
-}
+#include "orb_sem.h"
 
-ssize_t VFile::write(file_t *handlep, const char *buffer, size_t buflen)
-{
-	// ignore what was written, but let pollers know something was written
-	poll_notify(POLLIN);
+#define  PX4_F_RDONLY 1
+#define  PX4_F_WRONLY 2
 
-	return buflen;
-}
+__BEGIN_DECLS
+/* Type used for the number of file descriptors.  */
+#if defined(__unix__)
+#include <unistd.h>
+#include <poll.h>
+#else
+typedef unsigned long int nfds_t;
+typedef long int ssize_t ;
+typedef long int off_t ;
+#if !defined(POLLIN)
+#define POLLIN		0x001		/* There is data to read.  */
+#endif // POLLIN
+#endif
 
-} // namespace cdev
+typedef short pollevent_t;
+
+#if !defined(F_OK)
+#define	F_OK	0		/* Test for existence.  */
+#endif
+
+typedef struct {
+	/* This part of the struct is POSIX-like */
+	int		fd;       /* The descriptor being polled */
+	pollevent_t 	events;   /* The input event flags */
+	pollevent_t 	revents;  /* The output event flags */
+
+	/* Required for PX4 compatibility */
+	px4_sem_t   *sem;  	/* Pointer to semaphore used to post output event */
+	void   *priv;     	/* For use by drivers */
+} px4_pollfd_struct_t;
+
+__EXPORT int 		px4_open(const char *path, int flags, ...);
+__EXPORT int 		px4_close(int fd);
+__EXPORT ssize_t	px4_read(int fd, void *buffer, size_t buflen);
+__EXPORT ssize_t	px4_write(int fd, const void *buffer, size_t buflen);
+__EXPORT int		px4_ioctl(int fd, int cmd, unsigned long arg);
+__EXPORT int		px4_poll(px4_pollfd_struct_t *fds, nfds_t nfds, int timeout);
+__EXPORT int		px4_access(const char *pathname, int mode);
+__EXPORT void		px4_show_topics(void);
+
+__END_DECLS

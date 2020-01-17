@@ -38,10 +38,9 @@
 
 #pragma once
 
-#include <uORB/uORB.h>
-#include <containers/List.hpp>
-#include <systemlib/err.h>
-#include <px4_defines.h>
+#include "base/List.hpp"
+#include "base/orb_defines.h"
+#include "uORB.h"
 
 namespace uORB
 {
@@ -121,7 +120,7 @@ public:
 	SubscriptionPollableNode(const struct orb_metadata *meta, unsigned interval = 0, unsigned instance = 0,
 				 List<SubscriptionPollableNode *> *list = nullptr);
 
-	virtual ~SubscriptionPollableNode() override = default;
+	~SubscriptionPollableNode() override = default;
 
 	/**
 	 * This function is the callback for list traversal
@@ -179,7 +178,7 @@ public:
 
 	bool forcedUpdate() override
 	{
-		return orb_copy(_meta, _handle, &_data) == PX4_OK;
+		return orb_copy(_meta, _handle, &_data) == ORB_OK;
 	}
 
 	/*

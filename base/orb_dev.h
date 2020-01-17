@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2014 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2015 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,29 +31,52 @@
  *
  ****************************************************************************/
 
+#pragma once
+
 /**
- * @file drv_device.h
+ * @file orb_dev.h
  *
- * Generic device / sensor interface.
+ * uORB published object driver.
  */
 
-#ifndef _DRV_DEVICE_H
-#define _DRV_DEVICE_H
-
-#include <stdint.h>
+#if defined(__unix__)
 #include <sys/ioctl.h>
-
-#include "drv_orb_dev.h"
-
-//#include "DevIOCTL.h"
-
-#ifdef __PX4_POSIX
-
-#ifndef SIOCDEVPRIVATE
-#define SIOCDEVPRIVATE 1
 #endif
 
-#define DIOC_GETPRIV    SIOCDEVPRIVATE
+#if !defined(_IO)
+#define _IO(x,y) (x+y)
 #endif
 
-#endif /* _DRV_DEVICE_H */
+// NuttX _IOC is equivalent to Linux _IO
+#define _PX4_IOC(x,y) _IO(x,y)
+
+#define _ORBIOCBASE		(0x2600)
+#define _ORBIOC(_n)		(_PX4_IOC(_ORBIOCBASE, _n))
+
+/*
+ * IOCTLs for individual topics.
+ */
+
+/** Fetch the time at which the topic was last updated into *(uint64_t *)arg */
+#define ORBIOCLASTUPDATE	_ORBIOC(10)
+
+/** Check whether the topic has been updated since it was last read, sets *(bool *)arg */
+#define ORBIOCUPDATED		_ORBIOC(11)
+
+/** Set the minimum interval at which the topic can be seen to be updated for this subscription */
+#define ORBIOCSETINTERVAL	_ORBIOC(12)
+
+/** Get the global advertiser handle for the topic */
+#define ORBIOCGADVERTISER	_ORBIOC(13)
+
+/** Get the priority for the topic */
+#define ORBIOCGPRIORITY		_ORBIOC(14)
+
+/** Set the queue size of the topic */
+#define ORBIOCSETQUEUESIZE	_ORBIOC(15)
+
+/** Get the minimum interval at which the topic can be seen to be updated for this subscription */
+#define ORBIOCGETINTERVAL	_ORBIOC(16)
+
+/** Check whether the topic is advertised, sets *(unsigned long *)arg to 1 if advertised, 0 otherwise */
+#define ORBIOCISADVERTISED	_ORBIOC(17)

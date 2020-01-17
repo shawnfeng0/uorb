@@ -43,13 +43,7 @@
 #include <string.h>
 #endif
 
-#include "uORB.h"
-
-
-#ifndef __cplusplus
-
-#endif
-
+#include "../uORB.h"
 
 #ifdef __cplusplus
 struct __EXPORT log_message_s {

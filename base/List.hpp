@@ -110,7 +110,7 @@ public:
 		{
 			if (node) {
 				node = node->getSibling();
-			};
+			}
 
 			return *this;
 		}

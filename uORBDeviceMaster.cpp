@@ -40,8 +40,8 @@
 #include "uORBCommunicator.hpp"
 #endif /* ORB_COMMUNICATOR */
 
-#include <px4_sem.hpp>
-#include <systemlib/px4_macros.h>
+#include "base/orb_log.h"
+#include "base/orb_sem.hpp"
 
 uORB::DeviceMaster::DeviceMaster()
 {
@@ -57,18 +57,18 @@ uORB::DeviceMaster::~DeviceMaster()
 int
 uORB::DeviceMaster::advertise(const struct orb_metadata *meta, bool is_advertiser, int *instance, int priority)
 {
-	int ret = PX4_ERROR;
+	int ret = ORB_ERROR;
 
 	char nodepath[orb_maxpath];
 
 	/* construct a path to the node - this also checks the node name */
 	ret = uORB::Utils::node_mkpath(nodepath, meta, instance);
 
-	if (ret != PX4_OK) {
+	if (ret != ORB_OK) {
 		return ret;
 	}
 
-	ret = PX4_ERROR;
+	ret = ORB_ERROR;
 
 	/* try for topic groups */
 	const unsigned max_group_tries = (instance != nullptr) ? ORB_MULTI_MAX_INSTANCES : 1;
@@ -103,7 +103,7 @@ uORB::DeviceMaster::advertise(const struct orb_metadata *meta, bool is_advertise
 		}
 
 		/* construct the new node, passing the ownership of path to it */
-		uORB::DeviceNode *node = new uORB::DeviceNode(meta, group_tries, devpath, priority);
+		auto *node = new uORB::DeviceNode(meta, group_tries, devpath, priority);
 
 		/* if we didn't get a device, that's bad, free the path too */
 		if (node == nullptr) {
@@ -115,7 +115,7 @@ uORB::DeviceMaster::advertise(const struct orb_metadata *meta, bool is_advertise
 		ret = node->init();
 
 		/* if init failed, discard the node and its name */
-		if (ret != PX4_OK) {
+		if (ret != ORB_OK) {
 			delete node;
 
 			if (ret == -EEXIST) {
@@ -145,7 +145,7 @@ uORB::DeviceMaster::advertise(const struct orb_metadata *meta, bool is_advertise
 						existing_node->mark_as_advertised();
 					}
 
-					ret = PX4_OK;
+					ret = ORB_OK;
 
 				} else {
 					/* otherwise: already advertised, keep looking */
@@ -163,9 +163,9 @@ uORB::DeviceMaster::advertise(const struct orb_metadata *meta, bool is_advertise
 
 		group_tries++;
 
-	} while (ret != PX4_OK && (group_tries < max_group_tries));
+	} while (ret != ORB_OK && (group_tries < max_group_tries));
 
-	if (ret != PX4_OK && group_tries >= max_group_tries) {
+	if (ret != ORB_OK && group_tries >= max_group_tries) {
 		ret = -ENOMEM;
 	}
 

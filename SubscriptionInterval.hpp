@@ -38,8 +38,8 @@
 
 #pragma once
 
-#include <uORB/uORB.h>
-#include <px4_defines.h>
+#include "base/orb_defines.h"
+#include "uORB.h"
 
 #include "uORBDeviceNode.hpp"
 #include "uORBManager.hpp"

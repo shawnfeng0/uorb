@@ -37,7 +37,8 @@
  */
 
 #include "SubscriptionPollable.hpp"
-#include <px4_defines.h>
+#include "base/orb_defines.h"
+#include "base/orb_log.h"
 
 namespace uORB
 {
@@ -67,7 +68,7 @@ bool SubscriptionPollableBase::updated()
 {
 	bool isUpdated = false;
 
-	if (orb_check(_handle, &isUpdated) != PX4_OK) {
+	if (orb_check(_handle, &isUpdated) != ORB_OK) {
 		PX4_ERR("%s check failed", _meta->o_name);
 	}
 
@@ -79,7 +80,7 @@ bool SubscriptionPollableBase::update(void *data)
 	bool orb_updated = false;
 
 	if (updated()) {
-		if (orb_copy(_meta, _handle, data) != PX4_OK) {
+		if (orb_copy(_meta, _handle, data) != ORB_OK) {
 			PX4_ERR("%s copy failed", _meta->o_name);
 
 		} else {
@@ -92,7 +93,7 @@ bool SubscriptionPollableBase::update(void *data)
 
 SubscriptionPollableBase::~SubscriptionPollableBase()
 {
-	if (orb_unsubscribe(_handle) != PX4_OK) {
+	if (orb_unsubscribe(_handle) != ORB_OK) {
 		PX4_ERR("%s unsubscribe failed", _meta->o_name);
 	}
 }

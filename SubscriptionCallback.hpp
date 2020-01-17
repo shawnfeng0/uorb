@@ -38,8 +38,8 @@
 
 #pragma once
 
-#include <uORB/SubscriptionInterval.hpp>
-#include <containers/List.hpp>
+#include "SubscriptionInterval.hpp"
+#include "base/List.hpp"
 
 namespace uORB
 {

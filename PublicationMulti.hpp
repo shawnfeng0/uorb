@@ -38,9 +38,8 @@
 
 #pragma once
 
-#include <px4_defines.h>
-#include <systemlib/err.h>
-#include <uORB/uORB.h>
+#include "orb_defines.h"
+#include "uORB.h"
 
 namespace uORB
 {
@@ -73,7 +72,7 @@ public:
 	bool publish(const T &data)
 	{
 		if (_handle != nullptr) {
-			return (orb_publish(_meta, _handle, &data) == PX4_OK);
+			return (orb_publish(_meta, _handle, &data) == ORB_OK);
 
 		} else {
 			int instance = 0;

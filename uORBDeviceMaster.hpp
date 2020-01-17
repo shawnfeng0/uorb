@@ -35,8 +35,12 @@
 
 #include <stdint.h>
 
+#include "base/orb_posix.h"
+#include "base/List.hpp"
 #include "uORBCommon.hpp"
-#include <px4_posix.h> // mark
+
+#include <string.h>
+#include <stdlib.h>
 
 namespace uORB
 {
@@ -45,10 +49,6 @@ class DeviceMaster;
 class Manager;
 }
 
-#include <string.h>
-#include <stdlib.h>
-
-#include <containers/List.hpp>
 
 /**
  * Master control device for ObjDev.

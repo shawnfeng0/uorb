@@ -39,8 +39,7 @@
 
 #pragma once
 
-#include "px4_sem.h"
-
+#include "orb_sem.h"
 
 /**
  * @class Smart locking object that uses a semaphore. It automatically

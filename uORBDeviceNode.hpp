@@ -36,10 +36,9 @@
 #include "uORBCommon.hpp"
 #include "uORBDeviceMaster.hpp"
 
-#include <lib/cdev/CDev.hpp> // mark
-
-#include <containers/List.hpp>
-#include <px4_atomic.h> // mark
+#include "base/CDev.hpp"
+#include "base/orb_atomic.hpp"
+#include "base/List.hpp"
 
 namespace uORB
 {
@@ -57,7 +56,7 @@ class uORB::DeviceNode : public cdev::CDev, public ListNode<uORB::DeviceNode *>
 public:
 	DeviceNode(const struct orb_metadata *meta, const uint8_t instance, const char *path, uint8_t priority,
 		   uint8_t queue_size = 1);
-	virtual ~DeviceNode();
+	~DeviceNode() override;
 
 	// no copy, assignment, move, move assignment
 	DeviceNode(const DeviceNode &) = delete;
@@ -171,7 +170,7 @@ public:
 	 * This is the case, for example when orb_subscribe was called before an orb_advertise.
 	 * The queue size can only be increased.
 	 * @param queue_size new size of the queue
-	 * @return PX4_OK if queue size successfully set
+	 * @return ORB_OK if queue size successfully set
 	 */
 	int update_queue_size(unsigned int queue_size);
 

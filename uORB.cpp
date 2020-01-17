@@ -38,7 +38,8 @@
 
 #include "uORB.h"
 #include "uORBManager.hpp"
-#include "uORBCommon.hpp"
+
+#include "base/orb_defines.h"
 
 orb_advert_t orb_advertise(const struct orb_metadata *meta, const void *data)
 {
@@ -111,9 +112,10 @@ int  orb_group_count(const struct orb_metadata *meta)
 {
 	unsigned instance = 0;
 
-	while (uORB::Manager::get_instance()->orb_exists(meta, instance) == OK) {
+	while (uORB::Manager::get_instance()->orb_exists(meta, instance) ==
+               ORB_OK) {
 		++instance;
-	};
+	}
 
 	return instance;
 }

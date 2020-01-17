@@ -37,15 +37,15 @@
  * PX4 Middleware Wrapper Linux Implementation
  */
 
-#include <px4_defines.h>
-#include <px4_time.h>
-#include <stdio.h>
 #include <pthread.h>
+
+#include "orb_log.h"
+#include "orb_posix.h"
 #include <errno.h>
 
-#if (defined(__PX4_DARWIN) || defined(__PX4_CYGWIN) || defined(__PX4_POSIX)) && !defined(__PX4_QURT)
-
-#include <px4_posix.h>
+#if !defined(ETIMEDOUT)
+#define	ETIMEDOUT	110	/* Connection timed out */
+#endif
 
 int px4_sem_init(px4_sem_t *s, int pshared, unsigned value)
 {
@@ -131,7 +131,7 @@ int px4_sem_timedwait(px4_sem_t *s, const struct timespec *abstime)
 	errno = 0;
 
 	if (s->value < 0) {
-		ret = px4_pthread_cond_timedwait(&(s->wait), &(s->lock), abstime);
+		ret = pthread_cond_timedwait(&(s->wait), &(s->lock), abstime);
 
 	} else {
 		ret = 0;
@@ -212,5 +212,3 @@ int px4_sem_destroy(px4_sem_t *s)
 
 	return 0;
 }
-
-#endif

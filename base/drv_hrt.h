@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2015 Mark Charlebois. All rights reserved.
+ *   Copyright (c) 2012-2016 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,31 +32,74 @@
  ****************************************************************************/
 
 /**
- * @file vfile.cpp
- * Virtual file
+ * @file drv_hrt.h
  *
- * @author Mark Charlebois <charlebm@gmail.com>
+ * High-resolution timer with callouts and timekeeping.
  */
 
 #pragma once
 
-#include "../CDev.hpp"
+#include <stdbool.h>
+#include <inttypes.h>
 
-namespace cdev
+#include "visibility.h"
+
+__BEGIN_DECLS
+
+/**
+ * Absolute time, in microsecond units.
+ *
+ * Absolute time is measured from some arbitrary epoch shortly after
+ * system startup.  It should never wrap or go backwards.
+ */
+typedef uint64_t	hrt_abstime;
+
+/**
+ * Get absolute time in [us] (does not wrap).
+ */
+__EXPORT extern hrt_abstime hrt_absolute_time(void);
+
+/**
+ * Convert a timespec to absolute time.
+ */
+__EXPORT extern hrt_abstime ts_to_abstime(const struct timespec *ts);
+
+/**
+ * Compute the delta between a timestamp taken in the past
+ * and now.
+ *
+ * This function is not interrupt save.
+ */
+static inline hrt_abstime hrt_elapsed_time(const hrt_abstime *then)
+{
+	return hrt_absolute_time() - *then;
+}
+
+__END_DECLS
+
+#ifdef	__cplusplus
+
+namespace time_literals
 {
 
-class VFile : public CDev
+// User-defined integer literals for different time units.
+// The base unit is hrt_abstime in microseconds
+
+constexpr hrt_abstime operator "" _s(unsigned long long seconds)
 {
-public:
+	return hrt_abstime(seconds * 1000000ULL);
+}
 
-	static VFile *createFile(const char *fname, mode_t mode);
-	~VFile() {}
+constexpr hrt_abstime operator "" _ms(unsigned long long seconds)
+{
+	return hrt_abstime(seconds * 1000ULL);
+}
 
-	ssize_t write(file_t *handlep, const char *buffer, size_t buflen) override;
+constexpr hrt_abstime operator "" _us(unsigned long long seconds)
+{
+	return hrt_abstime(seconds);
+}
 
-private:
-	VFile(const char *fname, mode_t mode);
-	VFile(const VFile &);
-};
+} /* namespace time_literals */
 
-} // namespace cdev
+#endif /* __cplusplus */

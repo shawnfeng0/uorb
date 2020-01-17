@@ -33,11 +33,10 @@
 
 #include <string.h>
 
-#include "uORBManager.hpp"
-#include "uORB.h"
-#include "uORBCommon.hpp"
+#include "base/orb_defines.h"
+#include "base/orb_log.h"
 
-#include <px4_log.h>
+#include "uORBManager.hpp"
 
 static uORB::DeviceMaster *g_dev = nullptr;
 static void usage()
@@ -109,7 +108,7 @@ int uorb_main(int argc, char *argv[])
       return -errno;
     }
 
-    return OK;
+    return ORB_OK;
   }
 
   /*
@@ -123,7 +122,7 @@ int uorb_main(int argc, char *argv[])
       PX4_INFO("uorb is not running");
     }
 
-    return OK;
+    return ORB_OK;
   }
 
   if (!strcmp(argv[1], "top")) {
@@ -134,7 +133,7 @@ int uorb_main(int argc, char *argv[])
       PX4_INFO("uorb is not running");
     }
 
-    return OK;
+    return ORB_OK;
   }
 
   usage();

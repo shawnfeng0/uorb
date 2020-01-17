@@ -41,15 +41,19 @@
 
 #pragma once
 
-#ifdef __EXPORT
-#  undef __EXPORT
+#if __GNUC__ >= 4
+  #ifdef __EXPORT
+    #  undef __EXPORT
+  #endif
+  #define __EXPORT __attribute__ ((visibility ("default")))
+  #ifdef __PRIVATE
+    #  undef __PRIVATE
+  #endif
+  #define __PRIVATE __attribute__ ((visibility ("hidden")))
+#else
+  #define __EXPORT
+  #define __PRIVATE
 #endif
-#define __EXPORT __attribute__ ((visibility ("default")))
-
-#ifdef __PRIVATE
-#  undef __PRIVATE
-#endif
-#define __PRIVATE __attribute__ ((visibility ("hidden")))
 
 #ifdef __cplusplus
 #  define __BEGIN_DECLS		extern "C" {
@@ -58,48 +62,3 @@
 #  define __BEGIN_DECLS
 #  define __END_DECLS
 #endif
-
-/* exit() is used on NuttX to exit a task. However on Posix, it will exit the
- * whole application, so we prevent its use there. There are cases where it
- * still needs to be used, thus we remap system_exit to exit.
- */
-#define system_exit exit
-#if !defined(__PX4_NUTTX)
-#include <stdlib.h>
-#ifdef __cplusplus
-#include <cstdlib>
-#endif
-/* We should include cstdlib or stdlib.h but this doesn't
- * compile because many C++ files include stdlib.h and would
- * need to get changed. */
-#pragma GCC poison exit
-#endif // !defined(__PX4_NUTTX)
-
-
-/* For SITL lockstep we fake the clock, sleeping, and timedwaits
- * Therefore, we prefix these syscalls with system_. */
-#include <time.h>
-#define system_clock_gettime clock_gettime
-#define system_clock_settime clock_settime
-/* We can't poison clock_settime/clock_gettime because they are
- * used in DriverFramework. */
-
-#if !defined(__PX4_NUTTX)
-#include <pthread.h>
-// We can't include this for NuttX otherwise we get conflicts for read/write
-// symbols in cannode.
-#endif // !defined(__PX4_NUTTX)
-#define system_pthread_cond_timedwait pthread_cond_timedwait
-/* We can't poison pthread_cond_timedwait because it seems to be used in the
- * <string> include. */
-
-
-/* We don't poison usleep and sleep because it is used in dependencies
- * like uavcan and DriverFramework. */
-#if !defined(__PX4_NUTTX)
-#include <unistd.h>
-// We can't include this for NuttX otherwise we get conflicts for read/write
-// symbols in cannode.
-#endif // !defined(__PX4_NUTTX)
-#define system_usleep usleep
-#define system_sleep sleep

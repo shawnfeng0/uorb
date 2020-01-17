@@ -2,27 +2,24 @@
 // Created by fs on 2020-01-15.
 //
 
-#include "uORB.h"
-#include <pthread.h>
-#include <src/drivers/drv_hrt.h>
-#include <src/platforms/px4_posix.h>
-#include <topic_header/cpuload.h>
 #include <unistd.h>
+#include <pthread.h>
+
+#include "base/drv_hrt.h"
+#include "base/orb_posix.h"
+#include "base/orb_log.h"
+#include "topic_header/cpuload.h"
+#include "uORB.h"
 
 void *adviser_cpuload(void *) {
   struct cpuload_s cpuload {};
-  static orb_advert_t cpuload_pub = nullptr;
 
   cpuload.timestamp = hrt_absolute_time();
   cpuload.load = 1.0f;
   cpuload.ram_usage = 1.0f;
 
-  if (cpuload_pub == nullptr) {
-    LOG_TRACE("before advertise");
-    cpuload_pub = orb_advertise(ORB_ID(cpuload), &cpuload);
-    LOG_TRACE("after advertise");
-    // cpuload_pub = orb_advertise_queue(ORB_ID(cpuload), &cpuload, 2);
-  }
+  orb_advert_t cpuload_pub = orb_advertise_queue(ORB_ID(cpuload), &cpuload, 10);
+
   usleep(2 * 1000 * 1000);
   for (int i = 0; i < 10; i++) {
     usleep(1 * 1000 * 1000);
@@ -86,33 +83,14 @@ void uorb_sample() {
   pthread_create(&pthread4, nullptr, cpuload_update_poll, &sleep_time_us_3);
 }
 
-
 int uorb_main(int argc, char *argv[]);
-
-extern "C" int uorb_tests_main(int argc, char *argv[]);
-extern "C" __EXPORT int cdev_test_main(int argc, char *argv[]);
 
 int main(int argc, char *argv[]) {
   // uorb initial
   char *orb_start_args[] = {(char *) "orb", (char *) "start"};
   uorb_main(sizeof(orb_start_args) / sizeof(orb_start_args[0]), orb_start_args);
 
-  if (argc > 1) {
-    if (!strcmp(argv[1], "orb_test")) {
-      // uorb unit test
-      char *orb_test_args[] = {(char *)"orb_test"};
-      uorb_tests_main(sizeof(orb_test_args) / sizeof(orb_test_args[0]),
-                      orb_test_args);
-    } else if (!strcmp(argv[1], "cdev_test")) {
-      // cdev unit test
-      char *cdev_start_args[] = {(char *) "cdev", (char *) "start"};
-      cdev_test_main(sizeof(cdev_start_args) / sizeof(cdev_start_args[0]),cdev_start_args);
-    } else {
-      uorb_sample();
-    }
-  } else {
-    uorb_sample();
-  }
+  uorb_sample();
 
   // Wait for all threads to finish
   pthread_exit(nullptr);

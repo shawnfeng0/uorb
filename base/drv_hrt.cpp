@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2015 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012 - 2018 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,44 +31,35 @@
  *
  ****************************************************************************/
 
-#include "uORBUtils.hpp"
-#include <errno.h>
-#include <stdio.h>
+/**
+ * @file drv_hrt.cpp
+ *
+ * High-resolution timer with callouts and timekeeping.
+ */
 
-#include "base/orb_defines.h"
+#include "drv_hrt.h"
 
-int uORB::Utils::node_mkpath(char *buf, const struct orb_metadata *meta, int *instance)
+#include <time.h>
+
+/*
+ * Get absolute time.
+ */
+hrt_abstime hrt_absolute_time()
 {
-	unsigned len;
-
-	unsigned index = 0;
-
-	if (instance != nullptr) {
-		index = *instance;
-	}
-
-	len = snprintf(buf, orb_maxpath, "/%s/%s%d", "obj", meta->o_name, index);
-
-	if (len >= orb_maxpath) {
-		return -ENAMETOOLONG;
-	}
-
-	return ORB_OK;
+	struct timespec ts{};
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	return ts_to_abstime(&ts);
 }
 
-//-----------------------------------------------------------------------------
-//-----------------------------------------------------------------------------
-int uORB::Utils::node_mkpath(char *buf, const char *orbMsgName)
+/*
+ * Convert a timespec to absolute time.
+ */
+hrt_abstime ts_to_abstime(const struct timespec *ts)
 {
-	unsigned len;
+	hrt_abstime	result;
 
-	unsigned index = 0;
+	result = (hrt_abstime)(ts->tv_sec) * 1000000;
+	result += ts->tv_nsec / 1000;
 
-	len = snprintf(buf, orb_maxpath, "/%s/%s%d", "obj", orbMsgName, index);
-
-	if (len >= orb_maxpath) {
-		return -ENAMETOOLONG;
-	}
-
-	return ORB_OK;
+	return result;
 }

@@ -39,10 +39,9 @@
 
 #include "CDev.hpp"
 
-#include <cstring>
-
-#include <px4_posix.h>
-#include <drivers/drv_device.h>
+#include "orb_log.h"
+#include "orb_posix.h"
+#include <stdlib.h>
 
 namespace cdev
 {
@@ -91,7 +90,7 @@ CDev::register_class_devname(const char *class_devname)
 		snprintf(name, sizeof(name), "%s%d", class_devname, class_instance);
 		ret = register_driver(name, &fops, 0666, (void *)this);
 
-		if (ret == OK) {
+		if (ret == ORB_OK) {
 			break;
 		}
 
@@ -120,13 +119,13 @@ CDev::init()
 {
 	PX4_DEBUG("CDev::init");
 
-	int ret = PX4_OK;
+	int ret = ORB_OK;
 
 	// now register the driver
 	if (_devname != nullptr) {
 		ret = register_driver(_devname, &fops, 0666, (void *)this);
 
-		if (ret == PX4_OK) {
+		if (ret == ORB_OK) {
 			_registered = true;
 		}
 	}
@@ -141,7 +140,7 @@ int
 CDev::open(file_t *filep)
 {
 	PX4_DEBUG("CDev::open");
-	int ret = PX4_OK;
+	int ret = ORB_OK;
 
 	lock();
 	/* increment the open count */
@@ -152,7 +151,7 @@ CDev::open(file_t *filep)
 		/* first-open callback may decline the open */
 		ret = open_first(filep);
 
-		if (ret != PX4_OK) {
+		if (ret != ORB_OK) {
 			_open_count--;
 		}
 	}
@@ -166,7 +165,7 @@ int
 CDev::close(file_t *filep)
 {
 	PX4_DEBUG("CDev::close");
-	int ret = PX4_OK;
+	int ret = ORB_OK;
 
 	lock();
 
@@ -192,28 +191,14 @@ int
 CDev::ioctl(file_t *filep, int cmd, unsigned long arg)
 {
 	PX4_DEBUG("CDev::ioctl");
-	int ret = -ENOTTY;
-
-	switch (cmd) {
-
-	/* fetch a pointer to the driver's private data */
-	case DIOC_GETPRIV:
-		*(void **)(uintptr_t)arg = (void *)this;
-		ret = PX4_OK;
-		break;
-
-	default:
-		break;
-	}
-
-	return ret;
+	return -ORB_ERROR;
 }
 
 int
 CDev::poll(file_t *filep, px4_pollfd_struct_t *fds, bool setup)
 {
 	PX4_DEBUG("CDev::Poll %s", setup ? "setup" : "teardown");
-	int ret = PX4_OK;
+	int ret;
 
 	if (setup) {
 		/*
@@ -247,7 +232,7 @@ CDev::poll(file_t *filep, px4_pollfd_struct_t *fds, bool setup)
 			// malloc uses a semaphore, we need to call it enabled IRQ's
 			px4_leave_critical_section(flags);
 #endif
-			px4_pollfd_struct_t **new_pollset = new px4_pollfd_struct_t *[new_count];
+			auto **new_pollset = new px4_pollfd_struct_t *[new_count];
 
 #ifdef __PX4_NUTTX
 			flags = px4_enter_critical_section();
@@ -283,7 +268,7 @@ CDev::poll(file_t *filep, px4_pollfd_struct_t *fds, bool setup)
 #endif
 
 				// Success
-				ret = PX4_OK;
+				ret = ORB_OK;
 				break;
 			}
 
@@ -297,7 +282,7 @@ CDev::poll(file_t *filep, px4_pollfd_struct_t *fds, bool setup)
 #endif
 		}
 
-		if (ret == PX4_OK) {
+		if (ret == ORB_OK) {
 
 			/*
 			 * Check to see whether we should send a poll notification
@@ -370,7 +355,7 @@ CDev::store_poll_waiter(px4_pollfd_struct_t *fds)
 			/* save the pollfd */
 			_pollset[i] = fds;
 
-			return PX4_OK;
+			return ORB_OK;
 		}
 	}
 
@@ -386,7 +371,7 @@ CDev::remove_poll_waiter(px4_pollfd_struct_t *fds)
 		if (fds == _pollset[i]) {
 
 			_pollset[i] = nullptr;
-			return PX4_OK;
+			return ORB_OK;
 
 		}
 	}
@@ -397,7 +382,7 @@ CDev::remove_poll_waiter(px4_pollfd_struct_t *fds)
 
 int CDev::unregister_driver_and_memory()
 {
-	int retval = PX4_OK;
+	int retval = ORB_OK;
 
 	if (_registered) {
 		unregister_driver(_devname);

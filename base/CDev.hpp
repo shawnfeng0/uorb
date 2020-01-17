@@ -40,14 +40,14 @@
 #ifndef _CDEV_HPP
 #define _CDEV_HPP
 
+#include "orb_defines.h"
+#include "orb_posix.h"
 #include <errno.h>
-#include <px4_config.h>
-#include <px4_posix.h>
 
 #ifdef __PX4_NUTTX
 #include "nuttx/cdev_platform.hpp"
 #else
-#include "posix/cdev_platform.hpp"
+#include "cdev_platform.hpp"
 #endif
 
 namespace cdev
@@ -75,10 +75,10 @@ public:
 	 * Handle an open of the device.
 	 *
 	 * This function is called for every open of the device. The default
-	 * implementation maintains _open_count and always returns OK.
+	 * implementation maintains _open_count and always returns ORB_OK.
 	 *
 	 * @param filep		Pointer to the NuttX file structure.
-	 * @return		OK if the open is allowed, -errno otherwise.
+	 * @return		ORB_OK if the open is allowed, -errno otherwise.
 	 */
 	virtual int	open(file_t *filep);
 
@@ -86,10 +86,10 @@ public:
 	 * Handle a close of the device.
 	 *
 	 * This function is called for every close of the device. The default
-	 * implementation maintains _open_count and returns OK as long as it is not zero.
+	 * implementation maintains _open_count and returns ORB_OK as long as it is not zero.
 	 *
 	 * @param filep		Pointer to the NuttX file structure.
-	 * @return		OK if the close was successful, -errno otherwise.
+	 * @return		ORB_OK if the close was successful, -errno otherwise.
 	 */
 	virtual int	close(file_t *filep);
 
@@ -139,7 +139,7 @@ public:
 	 * @param filep		Pointer to the NuttX file structure.
 	 * @param cmd		The ioctl command value.
 	 * @param arg		The ioctl argument value.
-	 * @return		OK on success, or -errno otherwise.
+	 * @return		ORB_OK on success, or -errno otherwise.
 	 */
 	virtual int	ioctl(file_t *filep, int cmd, unsigned long arg);
 
@@ -152,7 +152,7 @@ public:
 	 * @param fds		Poll descriptor being waited on.
 	 * @param setup		True if this is establishing a request, false if
 	 *			it is being torn down.
-	 * @return		OK on success, or -errno otherwise.
+	 * @return		ORB_OK on success, or -errno otherwise.
 	 */
 	virtual int	poll(file_t *filep, px4_pollfd_struct_t *fds, bool setup);
 
@@ -208,12 +208,12 @@ protected:
 	 * This function is called when the device open count transitions from zero
 	 * to one.  The driver lock is held for the duration of the call.
 	 *
-	 * The default implementation returns OK.
+	 * The default implementation returns ORB_OK.
 	 *
 	 * @param filep		Pointer to the NuttX file structure.
-	 * @return		OK if the open should proceed, -errno otherwise.
+	 * @return		ORB_OK if the open should proceed, -errno otherwise.
 	 */
-	virtual int	open_first(file_t *filep) { return PX4_OK; }
+	virtual int	open_first(file_t *filep) { return ORB_OK; }
 
 	/**
 	 * Notification of the last close.
@@ -221,12 +221,12 @@ protected:
 	 * This function is called when the device open count transitions from
 	 * one to zero.  The driver lock is held for the duration of the call.
 	 *
-	 * The default implementation returns OK.
+	 * The default implementation returns ORB_OK.
 	 *
 	 * @param filep		Pointer to the NuttX file structure.
-	 * @return		OK if the open should return OK, -errno otherwise.
+	 * @return		ORB_OK if the open should return ORB_OK, -errno otherwise.
 	 */
-	virtual int	close_last(file_t *filep) { return PX4_OK; }
+	virtual int	close_last(file_t *filep) { return ORB_OK; }
 
 	/**
 	 * Register a class device name, automatically adding device
@@ -243,7 +243,7 @@ protected:
 	 *
 	 * @param class_devname   Device class name
 	 * @param class_instance  Device class instance from register_class_devname()
-	 * @return		  OK on success, -errno otherwise
+	 * @return		  ORB_OK on success, -errno otherwise
 	 */
 	virtual int unregister_class_devname(const char *class_devname, unsigned class_instance);
 
@@ -272,7 +272,7 @@ protected:
 	*
 	* This is only needed if the ownership of the devname was passed to the CDev, otherwise ~CDev handles it.
 	*
-	* @return  PX4_OK on success, -ENODEV if the devname is already nullptr
+	* @return  ORB_OK on success, -ENODEV if the devname is already nullptr
 	*/
 	int unregister_driver_and_memory();
 
@@ -291,14 +291,14 @@ private:
 	 *
 	 * Expands the pollset as required.  Must be called with the driver locked.
 	 *
-	 * @return		OK, or -errno on error.
+	 * @return		ORB_OK, or -errno on error.
 	 */
 	inline int	store_poll_waiter(px4_pollfd_struct_t *fds);
 
 	/**
 	 * Remove a poll waiter.
 	 *
-	 * @return		OK, or -errno on error.
+	 * @return		ORB_OK, or -errno on error.
 	 */
 	inline int	remove_poll_waiter(px4_pollfd_struct_t *fds);
 
