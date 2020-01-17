@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2015 Mark Charlebois. All rights reserved.
+ * Copyright (c) 2015 Mark Charlebois. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,65 +32,43 @@
  ****************************************************************************/
 
 /**
- * @file cdevtest_start.cpp
+ * @file px4_app.h
  *
- * @author Thomas Gubler <thomasgubler@gmail.com>
- * @author Mark Charlebois <mcharleb@gmail.com>
+ * PX4 app template classes, functions and defines. Apps need to call their
+ * main function PX4_MAIN.
  */
-#include "cdevtest_example.h"
 
-#include <px4_app.h>
-#include <px4_tasks.h>
-#include <stdio.h>
-#include <string.h>
+#pragma once
 
-static int daemon_task;             /* Handle of deamon task / thread */
-
-//using namespace px4;
-int PX4_MAIN(int argc, char **argv);
-
-extern "C" __EXPORT int cdev_test_main(int argc, char *argv[]);
-int cdev_test_main(int argc, char *argv[])
+namespace px4
 {
-	if (argc < 2) {
-		printf("usage: cdevtest {start|stop|status}\n");
-		return 1;
-	}
 
-	if (!strcmp(argv[1], "start")) {
+class AppState
+{
+public:
+	~AppState() {}
 
-		if (CDevExample::appState.isRunning()) {
-			printf("already running\n");
-			/* this is not an error */
-			return 0;
-		}
+	AppState() : _exitRequested(false), _isRunning(false) {}
 
-		daemon_task = px4_task_spawn_cmd("cdevtest",
-						 SCHED_DEFAULT,
-						 SCHED_PRIORITY_MAX - 5,
-						 2000,
-						 PX4_MAIN,
-						 (argc > 2) ? (char *const *)&argv[2] : (char *const *)nullptr);
+	bool exitRequested() { return _exitRequested; }
+	void requestExit() { _exitRequested = true; }
 
-		return 0;
-	}
+	bool isRunning() { return _isRunning; }
+	void setRunning(bool running) { _isRunning = running; }
 
-	if (!strcmp(argv[1], "stop")) {
-		CDevExample::appState.requestExit();
-		return 0;
-	}
-
-	if (!strcmp(argv[1], "status")) {
-		if (CDevExample::appState.isRunning()) {
-			printf("is running\n");
-
-		} else {
-			printf("not started\n");
-		}
-
-		return 0;
-	}
-
-	printf("usage: cdevtest_main {start|stop|status}\n");
-	return 1;
+protected:
+	bool _exitRequested;
+	bool _isRunning;
+private:
+	AppState(const AppState &);
+	const AppState &operator=(const AppState &);
+};
 }
+
+// Task/process based build
+
+#ifdef PX4_MAIN
+extern int PX4_MAIN(int argc, char *argv[]);
+#endif
+
+

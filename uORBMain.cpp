@@ -36,10 +36,8 @@
 #include "uORBManager.hpp"
 #include "uORB.h"
 #include "uORBCommon.hpp"
-#include "topic_header/cpuload.h"
 
 #include <px4_log.h>
-//#include <px4_module.h>
 
 static uORB::DeviceMaster *g_dev = nullptr;
 static void usage()
@@ -81,67 +79,7 @@ static void usage()
 //  PRINT_MODULE_USAGE_ARG("<filter1> [<filter2>]", "topic(s) to match (implies -a)", true);
 }
 
-void *adviser_cpuload(void *) {
-  struct cpuload_s cpuload {};
-  static orb_advert_t cpuload_pub = nullptr;
-
-  cpuload.timestamp = hrt_absolute_time();
-  cpuload.load = 1.0f;
-  cpuload.ram_usage = 1.0f;
-
-  if (cpuload_pub == nullptr) {
-    LOG_TRACE("before advertise");
-    cpuload_pub = orb_advertise(ORB_ID(cpuload), &cpuload);
-    LOG_TRACE("after advertise");
-    // cpuload_pub = orb_advertise_queue(ORB_ID(cpuload), &cpuload, 2);
-  }
-  usleep(2 * 1000 * 1000);
-  for (int i = 0; i < 10; i++) {
-    usleep(1 * 1000 * 1000);
-    cpuload.timestamp = hrt_absolute_time();
-    cpuload.load++;
-    cpuload.ram_usage++;
-    orb_publish(ORB_ID(cpuload), cpuload_pub, &cpuload);
-  }
-  return nullptr;
-}
-
-void* cpuload_update_poll(void*) {
-  struct cpuload_s container{};
-  int cpuload_sub = orb_subscribe(ORB_ID(cpuload));
-
-  px4_pollfd_struct_t fds[] = {
-      {.fd = cpuload_sub, .events = POLLIN},
-  };
-
-  memset(&container, 0, sizeof(container));
-  int error_counter = 0;
-
-  for (int i = 0; i < 15; i ++) {
-    LOG_INFO("TOPIC: cpuload #%d", i);
-    int timeout_ms = 5000;
-    int poll_ret = px4_poll(fds, 1, timeout_ms);
-    if (poll_ret < 0) {
-      /* this is seriously bad - should be an emergency */
-      if (error_counter < 10 || error_counter % 50 == 0) {
-        /* use a counter to prevent flooding (and slowing us down) */
-        PX4_ERR("ERROR return value from poll(): %d", poll_ret);
-      }
-      error_counter++;
-    } else if (poll_ret == 0) {
-      /* this means none of our providers is giving us data */
-      PX4_ERR("Got no data within %d second", timeout_ms);
-    } else {
-      orb_copy(ORB_ID(cpuload), cpuload_sub, &container);
-      LOG_TOKEN(container.timestamp);
-      LOG_TOKEN(container.load);
-      LOG_TOKEN(container.ram_usage);
-    }
-  }
-  return nullptr;
-}
-
-int main(int argc, char *argv[])
+int uorb_main(int argc, char *argv[])
 {
   if (argc < 2) {
     usage();
@@ -170,17 +108,6 @@ int main(int argc, char *argv[])
     if (g_dev == nullptr) {
       return -errno;
     }
-
-    pthread_t pthread1, pthread2, pthread3, pthread4;
-    pthread_create(&pthread1, nullptr, adviser_cpuload, nullptr);
-    pthread_create(&pthread2, nullptr, cpuload_update_poll, nullptr);
-//    pthread_create(&pthread3, nullptr, cpuload_update_poll, nullptr);
-//    pthread_create(&pthread4, nullptr, cpuload_update_poll, nullptr);
-
-    pthread_join(pthread1, nullptr);
-    pthread_join(pthread2, nullptr);
-//    pthread_join(pthread3, nullptr);
-//    pthread_join(pthread4, nullptr);
 
     return OK;
   }

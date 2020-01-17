@@ -54,7 +54,6 @@ include_directories(${CMAKE_SOURCE_DIR}/topic_header)
 file(GLOB UORB_SOURCE "${CMAKE_SOURCE_DIR}/*.[ch]pp" "${CMAKE_SOURCE_DIR}/*.[ch]")
 file(GLOB ULOG_SOURCE "${CMAKE_SOURCE_DIR}/src/platforms/ulog/src/*.[ch]")
 file(GLOB EXTRA_SOURCE
-        "${CMAKE_SOURCE_DIR}/platforms/common/module.cpp"
         "${CMAKE_SOURCE_DIR}/src/drivers/*.cpp"
         "${CMAKE_SOURCE_DIR}/src/lib/cdev/posix/*"
         "${CMAKE_SOURCE_DIR}/src/lib/cdev/*.[ch]pp"
@@ -63,8 +62,10 @@ file(GLOB EXTRA_SOURCE
         "${CMAKE_SOURCE_DIR}/src/platforms/*.c"
         "${CMAKE_SOURCE_DIR}/platforms/common/work_queue/*.c"
         "${CMAKE_SOURCE_DIR}/topic_source/*.cpp"
+        "${CMAKE_SOURCE_DIR}/uORB_tests/*.cpp"
+        "${CMAKE_SOURCE_DIR}/src/lib/cdev/test/*.cpp"
         )
-add_executable(uorb ${UORB_SOURCE} ${ULOG_SOURCE} ${EXTRA_SOURCE})
+add_executable(uorb ${UORB_SOURCE} ${ULOG_SOURCE} ${EXTRA_SOURCE} uorb_test.cpp )
 target_link_libraries(uorb pthread)
 
 #		DEPENDS
