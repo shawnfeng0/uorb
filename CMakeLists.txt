@@ -40,5 +40,5 @@ file(GLOB EXTRA_SOURCE
         "${CMAKE_SOURCE_DIR}/base/*.cpp"
         "${CMAKE_SOURCE_DIR}/topic_source/*.cpp"
         )
-add_executable(uorb ${UORB_SOURCE} ${ULOG_SOURCE} ${EXTRA_SOURCE} uorb_test.cpp)
+add_executable(uorb ${UORB_SOURCE} ${ULOG_SOURCE} ${EXTRA_SOURCE} test/uorb_test.cpp)
 target_link_libraries(uorb pthread)
