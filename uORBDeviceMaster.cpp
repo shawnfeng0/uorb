@@ -54,6 +54,18 @@ uORB::DeviceMaster::~DeviceMaster()
 	orb_sem_destroy(&_lock);
 }
 
+/* Duplicate S, returning an identical string assigned using "new". */
+static inline char *strdup_with_new(const char *__s)
+{
+  const char *__old = (__s);
+  size_t __len = strlen (__old) + 1;
+  char *__new = new char[__len];
+  // Possibility of allocation failure in microcontroller
+  if (__new == nullptr)
+    return __new;
+  return (char *) memcpy(__new, __old, __len);
+}
+
 int
 uORB::DeviceMaster::advertise(const struct orb_metadata *meta, bool is_advertiser, int *instance, int priority)
 {
@@ -96,7 +108,7 @@ uORB::DeviceMaster::advertise(const struct orb_metadata *meta, bool is_advertise
 		}
 
 		/* driver wants a permanent copy of the path, so make one here */
-		const char *devpath = strdup(nodepath);
+                char *devpath = strdup_with_new(nodepath);
 
 		if (devpath == nullptr) {
 			return -ENOMEM;
@@ -107,7 +119,7 @@ uORB::DeviceMaster::advertise(const struct orb_metadata *meta, bool is_advertise
 
 		/* if we didn't get a device, that's bad, free the path too */
 		if (node == nullptr) {
-			free((void *)devpath);
+			delete[] devpath;
 			return -ENOMEM;
 		}
 

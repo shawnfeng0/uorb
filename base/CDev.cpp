@@ -396,7 +396,7 @@ int CDev::unregister_driver_and_memory()
 	}
 
 	if (_devname != nullptr) {
-		free((void *)_devname);
+		delete[] _devname;
 		_devname = nullptr;
 
 	} else {
