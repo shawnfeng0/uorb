@@ -5,9 +5,9 @@
 
 #pragma once
 
-#if defined(ORB_DEBUG)
+#if defined(ORB_EBUG)
 
-#include "ulog/src/ulog.h"
+#include "../test/ulog/src/ulog.h"
 
 #define ORB_INFO_RAW LOG_RAW
 #define ORB_ERR(FMT, ...) LOG_ERROR(FMT, ##__VA_ARGS__)
