@@ -34,17 +34,11 @@
 project(uORB)
 cmake_minimum_required(VERSION 3.15)
 
-file(GLOB UORB_SOURCE "${CMAKE_SOURCE_DIR}/*.[ch]pp" "${CMAKE_SOURCE_DIR}/*.[ch]")
+file(GLOB UORB_SOURCE "${CMAKE_SOURCE_DIR}/*.cpp" "${CMAKE_SOURCE_DIR}/*.c")
 file(GLOB ULOG_SOURCE "${CMAKE_SOURCE_DIR}/base/ulog/src/*.c")
 file(GLOB EXTRA_SOURCE
         "${CMAKE_SOURCE_DIR}/base/*.cpp"
         "${CMAKE_SOURCE_DIR}/topic_source/*.cpp"
         )
-add_executable(uorb ${UORB_SOURCE} ${ULOG_SOURCE} ${EXTRA_SOURCE} uorb_test.cpp )
+add_executable(uorb ${UORB_SOURCE} ${ULOG_SOURCE} ${EXTRA_SOURCE} uorb_test.cpp)
 target_link_libraries(uorb pthread)
-
-#		DEPENDS
-#		cdev
-#		uorb_msgs
-
-#add_subdirectory(uORB_tests)

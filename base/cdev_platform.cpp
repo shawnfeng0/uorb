@@ -34,17 +34,18 @@
 
 #include "cdev_platform.hpp"
 
-#include <string>
-#include <map>
-
 #include "CDev.hpp"
 
 #include "orb_log.h"
 #include "orb_posix.h"
 
+#include <string>
+#include <map>
+#include <string.h>
+
 using namespace std;
 
-const cdev::px4_file_operations_t cdev::CDev::fops = {};
+const cdev::orb_file_operations_t cdev::CDev::fops = {};
 
 pthread_mutex_t devmutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t filemutex = PTHREAD_MUTEX_INITIALIZER;
@@ -57,7 +58,7 @@ extern "C" {
 
 static cdev::CDev *getDev(const char *path)
 	{
-		PX4_DEBUG("CDev::getDev");
+  ORB_DEBUG("CDev::getDev");
 
 		pthread_mutex_lock(&devmutex);
 
@@ -90,9 +91,9 @@ static cdev::CDev *getDev(const char *path)
 		return dev;
 	}
 
-	int register_driver(const char *name, const cdev::px4_file_operations_t *fops, cdev::mode_t mode, void *data)
+	int register_driver(const char *name, const cdev::orb_file_operations_t *fops, cdev::mode_t mode, void *data)
 	{
-		PX4_DEBUG("CDev::register_driver %s", name);
+          ORB_DEBUG("CDev::register_driver %s", name);
 		int ret = 0;
 
 		if (name == nullptr || data == nullptr) {
@@ -110,7 +111,7 @@ static cdev::CDev *getDev(const char *path)
 		}
 
 		devmap[name] = data;
-		PX4_DEBUG("Registered DEV %s", name);
+                ORB_DEBUG("Registered DEV %s", name);
 
 		pthread_mutex_unlock(&devmutex);
 
@@ -119,7 +120,7 @@ static cdev::CDev *getDev(const char *path)
 
 	int unregister_driver(const char *name)
 	{
-		PX4_DEBUG("CDev::unregister_driver %s", name);
+          ORB_DEBUG("CDev::unregister_driver %s", name);
 		int ret = -EINVAL;
 
 		if (name == nullptr) {
@@ -129,7 +130,7 @@ static cdev::CDev *getDev(const char *path)
 		pthread_mutex_lock(&devmutex);
 
 		if (devmap.erase(name) > 0) {
-			PX4_DEBUG("Unregistered DEV %s", name);
+                  ORB_DEBUG("Unregistered DEV %s", name);
 			ret = 0;
 		}
 
@@ -138,9 +139,9 @@ static cdev::CDev *getDev(const char *path)
 		return ret;
 	}
 
-	int px4_open(const char *path, int flags, ...)
+	int orb_open(const char *path, int flags, ...)
 	{
-		PX4_DEBUG("px4_open");
+          ORB_DEBUG("orb_open");
 		cdev::CDev *dev = getDev(path);
 		int ret = 0;
 		int i = 0;
@@ -166,13 +167,13 @@ static cdev::CDev *getDev(const char *path)
 				const unsigned NAMELEN = 32;
 				char thread_name[NAMELEN] = {};
 
-				PX4_WARN("%s: exceeded maximum number of file descriptors, accessing %s",
+                                ORB_WARN("%s: exceeded maximum number of file descriptors, accessing %s",
 					 thread_name, path);
 #ifndef __PX4_QURT
 				int nret = pthread_getname_np(pthread_self(), thread_name, NAMELEN);
 
 				if (nret || thread_name[0] == 0) {
-					PX4_WARN("failed getting thread name");
+                                  ORB_WARN("failed getting thread name");
 				}
 
 #endif
@@ -188,11 +189,11 @@ static cdev::CDev *getDev(const char *path)
 			return -1;
 		}
 
-		PX4_DEBUG("px4_open fd = %d", i);
+                ORB_DEBUG("orb_open fd = %d", i);
 		return i;
 	}
 
-	int px4_close(int fd)
+	int orb_close(int fd)
 	{
 		int ret;
 
@@ -205,7 +206,7 @@ static cdev::CDev *getDev(const char *path)
 			filemap[fd].vdev = nullptr;
 
 			pthread_mutex_unlock(&filemutex);
-			PX4_DEBUG("px4_close fd = %d", fd);
+                        ORB_DEBUG("orb_close fd = %d", fd);
 
 		} else {
 			ret = -EINVAL;
@@ -218,14 +219,14 @@ static cdev::CDev *getDev(const char *path)
 		return ret;
 	}
 
-	ssize_t px4_read(int fd, void *buffer, size_t buflen)
+	ssize_t orb_read(int fd, void *buffer, size_t buflen)
 	{
 		int ret;
 
 		cdev::CDev *dev = get_vdev(fd);
 
 		if (dev) {
-			PX4_DEBUG("px4_read fd = %d", fd);
+                  ORB_DEBUG("orb_read fd = %d", fd);
 			ret = dev->read(&filemap[fd], (char *)buffer, buflen);
 
 		} else {
@@ -239,14 +240,14 @@ static cdev::CDev *getDev(const char *path)
 		return ret;
 	}
 
-	ssize_t px4_write(int fd, const void *buffer, size_t buflen)
+	ssize_t orb_write(int fd, const void *buffer, size_t buflen)
 	{
 		int ret;
 
 		cdev::CDev *dev = get_vdev(fd);
 
 		if (dev) {
-			PX4_DEBUG("px4_write fd = %d", fd);
+                  ORB_DEBUG("orb_write fd = %d", fd);
 			ret = dev->write(&filemap[fd], (const char *)buffer, buflen);
 
 		} else {
@@ -260,9 +261,9 @@ static cdev::CDev *getDev(const char *path)
 		return ret;
 	}
 
-	int px4_ioctl(int fd, int cmd, unsigned long arg)
+	int orb_ioctl(int fd, int cmd, unsigned long arg)
 	{
-		PX4_DEBUG("px4_ioctl fd = %d", fd);
+          ORB_DEBUG("orb_ioctl fd = %d", fd);
 		int ret = 0;
 
 		cdev::CDev *dev = get_vdev(fd);
@@ -280,14 +281,14 @@ static cdev::CDev *getDev(const char *path)
 		return ret;
 	}
 
-	int px4_poll(px4_pollfd_struct_t *fds, nfds_t nfds, int timeout)
+	int orb_poll(orb_pollfd_struct_t *fds, nfds_t nfds, int timeout)
 	{
 		if (nfds == 0) {
-			PX4_WARN("px4_poll with no fds");
+                  ORB_WARN("orb_poll with no fds");
 			return -1;
 		}
 
-		px4_sem_t sem;
+		orb_sem_t sem;
 		int count = 0;
 		int ret = -1;
 		unsigned int i;
@@ -299,17 +300,17 @@ static cdev::CDev *getDev(const char *path)
 		int nret = pthread_getname_np(pthread_self(), thread_name, NAMELEN);
 
 		if (nret || thread_name[0] == 0) {
-			PX4_WARN("failed getting thread name");
+                  ORB_WARN("failed getting thread name");
 		}
 
 #endif
 
-		PX4_DEBUG("Called px4_poll timeout = %d", timeout);
+                ORB_DEBUG("Called orb_poll timeout = %d", timeout);
 
-		px4_sem_init(&sem, 0, 0);
+		orb_sem_init(&sem, 0, 0);
 
 		// sem use case is a signal
-		px4_sem_setprotocol(&sem, SEM_PRIO_NONE);
+		orb_sem_setprotocol(&sem, SEM_PRIO_NONE);
 
 		// Go through all fds and check them for a pollable state
 		bool fd_pollable = false;
@@ -323,11 +324,11 @@ static cdev::CDev *getDev(const char *path)
 
 			// If fd is valid
 			if (dev) {
-				PX4_DEBUG("%s: px4_poll: CDev->poll(setup) %d", thread_name, fds[i].fd);
+                          ORB_DEBUG("%s: orb_poll: CDev->poll(setup) %d", thread_name, fds[i].fd);
 				ret = dev->poll(&filemap[fds[i].fd], &fds[i], true);
 
 				if (ret < 0) {
-					PX4_WARN("%s: px4_poll() error: %s",
+                                  ORB_WARN("%s: orb_poll() error: %s",
 						 thread_name, strerror(errno));
 					break;
 				}
@@ -346,7 +347,7 @@ static cdev::CDev *getDev(const char *path)
 				// Get the current time
 				struct timespec ts;
 				// Note, we can't actually use CLOCK_MONOTONIC on macOS
-				// but that's hidden and implemented in px4_clock_gettime.
+				// but that's hidden and implemented in orb_clock_gettime.
 				clock_gettime(CLOCK_MONOTONIC, &ts);
 
 				// Calculate an absolute time in the future
@@ -356,14 +357,14 @@ static cdev::CDev *getDev(const char *path)
 				nsecs -= (nsecs / billion) * billion;
 				ts.tv_nsec = nsecs;
 
-				ret = px4_sem_timedwait(&sem, &ts);
+				ret = orb_sem_timedwait(&sem, &ts);
 
 				if (ret && errno != ETIMEDOUT) {
-					PX4_WARN("%s: px4_poll() sem error: %s", thread_name, strerror(errno));
+                                  ORB_WARN("%s: orb_poll() sem error: %s", thread_name, strerror(errno));
 				}
 
 			} else if (timeout < 0) {
-				px4_sem_wait(&sem);
+				orb_sem_wait(&sem);
 			}
 
 			// We have waited now (or not, depending on timeout),
@@ -374,11 +375,11 @@ static cdev::CDev *getDev(const char *path)
 
 				// If fd is valid
 				if (dev) {
-					PX4_DEBUG("%s: px4_poll: CDev->poll(teardown) %d", thread_name, fds[i].fd);
+                                  ORB_DEBUG("%s: orb_poll: CDev->poll(teardown) %d", thread_name, fds[i].fd);
 					ret = dev->poll(&filemap[fds[i].fd], &fds[i], false);
 
 					if (ret < 0) {
-						PX4_WARN("%s: px4_poll() 2nd poll fail", thread_name);
+                                          ORB_WARN("%s: orb_poll() 2nd poll fail", thread_name);
 						break;
 					}
 
@@ -389,14 +390,14 @@ static cdev::CDev *getDev(const char *path)
 			}
 		}
 
-		px4_sem_destroy(&sem);
+		orb_sem_destroy(&sem);
 
 		// Return the positive count if present,
 		// return the negative error number if failed
 		return (count) ? count : ret;
 	}
 
-        int px4_access(const char *pathname, int mode)
+        int orb_access(const char *pathname, int mode)
 	{
 		if (mode != F_OK) {
 			errno = EINVAL;
@@ -407,15 +408,15 @@ static cdev::CDev *getDev(const char *path)
 		return (dev != nullptr) ? 0 : -1;
 	}
 
-        void px4_show_topics()
+        void orb_show_topics()
 	{
-		PX4_INFO("Devices:");
+          ORB_INFO("Devices:");
 
 		pthread_mutex_lock(&devmutex);
 
 		for (const auto &dev : devmap) {
 			if (strncmp(dev.first.c_str(), "/obj/", 5) == 0) {
-				PX4_INFO("   %s", dev.first.c_str());
+                          ORB_INFO("   %s", dev.first.c_str());
 			}
 		}
 

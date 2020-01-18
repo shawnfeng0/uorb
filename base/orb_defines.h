@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file px4_defines.h
+ * @file orb_defines.h
  *
  * Generally used magic defines
  */

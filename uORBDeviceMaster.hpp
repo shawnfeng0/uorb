@@ -114,8 +114,8 @@ private:
 
 	hrt_abstime       _last_statistics_output;
 
-	px4_sem_t	_lock; /**< lock to protect access to all class members (also for derived classes) */
+	orb_sem_t	_lock; /**< lock to protect access to all class members (also for derived classes) */
 
-	void		lock() { do {} while (px4_sem_wait(&_lock) != 0); }
-	void		unlock() { px4_sem_post(&_lock); }
+	void		lock() { do {} while (orb_sem_wait(&_lock) != 0); }
+	void		unlock() { orb_sem_post(&_lock); }
 };

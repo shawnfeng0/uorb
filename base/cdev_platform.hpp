@@ -14,7 +14,7 @@ struct file_operations {
 	void *op;
 };
 
-using px4_file_operations_t = struct file_operations;
+using orb_file_operations_t = struct file_operations;
 using mode_t = uint32_t;
 
 struct file_t {
@@ -28,6 +28,6 @@ struct file_t {
 
 } // namespace cdev
 
-extern "C" __EXPORT int register_driver(const char *name, const cdev::px4_file_operations_t *fops,
+extern "C" __EXPORT int register_driver(const char *name, const cdev::orb_file_operations_t *fops,
 					cdev::mode_t mode, void *data);
 extern "C" __EXPORT int unregister_driver(const char *path);

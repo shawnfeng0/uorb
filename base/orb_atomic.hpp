@@ -58,7 +58,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-namespace px4
+namespace orb
 {
 
 template <typename T>
@@ -180,6 +180,6 @@ using atomic_int = atomic<int>;
 using atomic_int32_t = atomic<int32_t>;
 using atomic_bool = atomic<bool>;
 
-} /* namespace px4 */
+} /* namespace orb */
 
 #endif /* __cplusplus */

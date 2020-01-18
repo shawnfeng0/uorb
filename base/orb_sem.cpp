@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file px4_sem.cpp
+ * @file orb_sem.cpp
  *
  * PX4 Middleware Wrapper Linux Implementation
  */
@@ -47,7 +47,7 @@
 #define	ETIMEDOUT	110	/* Connection timed out */
 #endif
 
-int px4_sem_init(px4_sem_t *s, int pshared, unsigned value)
+int orb_sem_init(orb_sem_t *s, int pshared, unsigned value)
 {
 	// We do not used the process shared arg
 	(void)pshared;
@@ -67,12 +67,12 @@ int px4_sem_init(px4_sem_t *s, int pshared, unsigned value)
 	return 0;
 }
 
-int px4_sem_setprotocol(px4_sem_t *s, int protocol)
+int orb_sem_setprotocol(orb_sem_t *s, int protocol)
 {
 	return 0;
 }
 
-int px4_sem_wait(px4_sem_t *s)
+int orb_sem_wait(orb_sem_t *s)
 {
 	int ret = pthread_mutex_lock(&(s->lock));
 
@@ -90,7 +90,7 @@ int px4_sem_wait(px4_sem_t *s)
 	}
 
 	if (ret) {
-		PX4_WARN("px4_sem_wait failure");
+          ORB_WARN("orb_sem_wait failure");
 	}
 
 	int mret = pthread_mutex_unlock(&(s->lock));
@@ -98,7 +98,7 @@ int px4_sem_wait(px4_sem_t *s)
 	return (ret) ? ret : mret;
 }
 
-int px4_sem_trywait(px4_sem_t *s)
+int orb_sem_trywait(orb_sem_t *s)
 {
 	int ret = pthread_mutex_lock(&(s->lock));
 
@@ -119,7 +119,7 @@ int px4_sem_trywait(px4_sem_t *s)
 	return (ret) ? ret : mret;
 }
 
-int px4_sem_timedwait(px4_sem_t *s, const struct timespec *abstime)
+int orb_sem_timedwait(orb_sem_t *s, const struct timespec *abstime)
 {
 	int ret = pthread_mutex_lock(&(s->lock));
 
@@ -140,12 +140,10 @@ int px4_sem_timedwait(px4_sem_t *s, const struct timespec *abstime)
 	errno = ret;
 
 	if (ret != 0 && ret != ETIMEDOUT) {
-		setbuf(stdout, nullptr);
-		setbuf(stderr, nullptr);
 		const unsigned NAMELEN = 32;
 		char thread_name[NAMELEN] = {};
 		(void)pthread_getname_np(pthread_self(), thread_name, NAMELEN);
-		PX4_WARN("%s: px4_sem_timedwait failure: ret: %d", thread_name, ret);
+                ORB_WARN("%s: orb_sem_timedwait failure: ret: %d", thread_name, ret);
 	}
 
 	int mret = pthread_mutex_unlock(&(s->lock));
@@ -157,7 +155,7 @@ int px4_sem_timedwait(px4_sem_t *s, const struct timespec *abstime)
 	return 0;
 }
 
-int px4_sem_post(px4_sem_t *s)
+int orb_sem_post(orb_sem_t *s)
 {
 	int ret = pthread_mutex_lock(&(s->lock));
 
@@ -175,7 +173,7 @@ int px4_sem_post(px4_sem_t *s)
 	}
 
 	if (ret) {
-		PX4_WARN("px4_sem_post failure");
+          ORB_WARN("orb_sem_post failure");
 	}
 
 	int mret = pthread_mutex_unlock(&(s->lock));
@@ -185,12 +183,12 @@ int px4_sem_post(px4_sem_t *s)
 	return (ret) ? ret : mret;
 }
 
-int px4_sem_getvalue(px4_sem_t *s, int *sval)
+int orb_sem_getvalue(orb_sem_t *s, int *sval)
 {
 	int ret = pthread_mutex_lock(&(s->lock));
 
 	if (ret) {
-		PX4_WARN("px4_sem_getvalue failure");
+          ORB_WARN("orb_sem_getvalue failure");
 	}
 
 	if (ret) {
@@ -203,7 +201,7 @@ int px4_sem_getvalue(px4_sem_t *s, int *sval)
 	return ret;
 }
 
-int px4_sem_destroy(px4_sem_t *s)
+int orb_sem_destroy(orb_sem_t *s)
 {
 	pthread_mutex_lock(&(s->lock));
 	pthread_cond_destroy(&(s->wait));

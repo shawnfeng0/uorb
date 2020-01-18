@@ -91,13 +91,13 @@ int uorb_main(int argc, char *argv[])
   if (!strcmp(argv[1], "start")) {
 
     if (g_dev != nullptr) {
-      PX4_WARN("already loaded");
+      ORB_WARN("already loaded");
       /* user wanted to start uorb, its already running, no error */
       return 0;
     }
 
     if (!uORB::Manager::initialize()) {
-      PX4_ERR("uorb manager alloc failed");
+      ORB_ERR("uorb manager alloc failed");
       return -ENOMEM;
     }
 
@@ -119,7 +119,7 @@ int uorb_main(int argc, char *argv[])
       g_dev->printStatistics(true);
 
     } else {
-      PX4_INFO("uorb is not running");
+      ORB_INFO("uorb is not running");
     }
 
     return ORB_OK;
@@ -130,7 +130,7 @@ int uorb_main(int argc, char *argv[])
       g_dev->showTop(argv + 2, argc - 2);
 
     } else {
-      PX4_INFO("uorb is not running");
+      ORB_INFO("uorb is not running");
     }
 
     return ORB_OK;

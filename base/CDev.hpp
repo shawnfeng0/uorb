@@ -154,7 +154,7 @@ public:
 	 *			it is being torn down.
 	 * @return		ORB_OK on success, or -errno otherwise.
 	 */
-	virtual int	poll(file_t *filep, px4_pollfd_struct_t *fds, bool setup);
+	virtual int	poll(file_t *filep, orb_pollfd_struct_t *fds, bool setup);
 
 	/**
 	 * Get the device name.
@@ -168,7 +168,7 @@ protected:
 	 * Pointer to the default cdev file operations table; useful for
 	 * registering clone devices etc.
 	 */
-	static const px4_file_operations_t	fops;
+	static const orb_file_operations_t	fops;
 
 	/**
 	 * Check the current state of the device for poll events from the
@@ -200,7 +200,7 @@ protected:
 	 * @param fds		A poll waiter to notify.
 	 * @param events	The event(s) to send to the waiter.
 	 */
-	virtual void	poll_notify_one(px4_pollfd_struct_t *fds, pollevent_t events);
+	virtual void	poll_notify_one(orb_pollfd_struct_t *fds, pollevent_t events);
 
 	/**
 	 * Notification of the first open.
@@ -256,14 +256,14 @@ protected:
 	 *
 	 * Careful: lock() calls cannot be nested!
 	 */
-	void		lock() { do {} while (px4_sem_wait(&_lock) != 0); }
+	void		lock() { do {} while (orb_sem_wait(&_lock) != 0); }
 
 	/**
 	 * Release the driver lock.
 	 */
-	void		unlock() { px4_sem_post(&_lock); }
+	void		unlock() { orb_sem_post(&_lock); }
 
-	px4_sem_t	_lock; /**< lock to protect access to all class members (also for derived classes) */
+	orb_sem_t	_lock; /**< lock to protect access to all class members (also for derived classes) */
 
 
 	/**
@@ -279,7 +279,7 @@ protected:
 private:
 	const char	*_devname{nullptr};		/**< device node name */
 
-	px4_pollfd_struct_t	**_pollset{nullptr};
+	orb_pollfd_struct_t	**_pollset{nullptr};
 
 	bool		_registered{false};		/**< true if device name was registered */
 
@@ -293,14 +293,14 @@ private:
 	 *
 	 * @return		ORB_OK, or -errno on error.
 	 */
-	inline int	store_poll_waiter(px4_pollfd_struct_t *fds);
+	inline int	store_poll_waiter(orb_pollfd_struct_t *fds);
 
 	/**
 	 * Remove a poll waiter.
 	 *
 	 * @return		ORB_OK, or -errno on error.
 	 */
-	inline int	remove_poll_waiter(px4_pollfd_struct_t *fds);
+	inline int	remove_poll_waiter(orb_pollfd_struct_t *fds);
 
 	/* do not allow copying this class */
 	CDev(const CDev &);

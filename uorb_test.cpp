@@ -6,8 +6,9 @@
 #include <pthread.h>
 
 #include "base/drv_hrt.h"
-#include "base/orb_posix.h"
 #include "base/orb_log.h"
+#include "base/orb_posix.h"
+#include "base/ulog/src/ulog.h"
 #include "topic_header/cpuload.h"
 #include "uORB.h"
 
@@ -39,7 +40,7 @@ void* cpuload_update_poll(void* arg) {
   if (arg)
     sleep_time_us = *(uint32_t *) arg;
 
-  px4_pollfd_struct_t fds[] = {
+  orb_pollfd_struct_t fds[] = {
       {.fd = cpuload_sub, .events = POLLIN},
   };
 
@@ -50,17 +51,17 @@ void* cpuload_update_poll(void* arg) {
     usleep(sleep_time_us);
     LOG_INFO("TOPIC: cpuload #%d", i);
     int timeout_ms = 5000;
-    int poll_ret = px4_poll(fds, 1, timeout_ms);
+    int poll_ret = orb_poll(fds, 1, timeout_ms);
     if (poll_ret < 0) {
       /* this is seriously bad - should be an emergency */
       if (error_counter < 10 || error_counter % 50 == 0) {
         /* use a counter to prevent flooding (and slowing us down) */
-        PX4_ERR("ERROR return value from poll(): %d", poll_ret);
+        LOG_ERROR("ERROR return value from poll(): %d", poll_ret);
       }
       error_counter++;
     } else if (poll_ret == 0) {
       /* this means none of our providers is giving us data */
-      PX4_ERR("Got no data within %d second", timeout_ms);
+      LOG_ERROR("Got no data within %d second", timeout_ms);
     } else {
       orb_copy(ORB_ID(cpuload), cpuload_sub, &cpu_loader);
       LOG_TOKEN(cpu_loader.timestamp);

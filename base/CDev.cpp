@@ -41,7 +41,10 @@
 
 #include "orb_log.h"
 #include "orb_posix.h"
+
 #include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
 
 namespace cdev
 {
@@ -49,18 +52,18 @@ namespace cdev
 CDev::CDev(const char *devname) :
 	_devname(devname)
 {
-	PX4_DEBUG("CDev::CDev");
+  ORB_DEBUG("CDev::CDev");
 
-	int ret = px4_sem_init(&_lock, 0, 1);
+	int ret = orb_sem_init(&_lock, 0, 1);
 
 	if (ret != 0) {
-		PX4_DEBUG("SEM INIT FAIL: ret %d", ret);
+          ORB_DEBUG("SEM INIT FAIL: ret %d", ret);
 	}
 }
 
 CDev::~CDev()
 {
-	PX4_DEBUG("CDev::~CDev");
+  ORB_DEBUG("CDev::~CDev");
 
 	if (_registered) {
 		unregister_driver(_devname);
@@ -70,13 +73,13 @@ CDev::~CDev()
 		delete[](_pollset);
 	}
 
-	px4_sem_destroy(&_lock);
+	orb_sem_destroy(&_lock);
 }
 
 int
 CDev::register_class_devname(const char *class_devname)
 {
-	PX4_DEBUG("CDev::register_class_devname %s", class_devname);
+  ORB_DEBUG("CDev::register_class_devname %s", class_devname);
 
 	if (class_devname == nullptr) {
 		return -EINVAL;
@@ -107,7 +110,7 @@ CDev::register_class_devname(const char *class_devname)
 int
 CDev::unregister_class_devname(const char *class_devname, unsigned class_instance)
 {
-	PX4_DEBUG("CDev::unregister_class_devname");
+  ORB_DEBUG("CDev::unregister_class_devname");
 
 	char name[32];
 	snprintf(name, sizeof(name), "%s%u", class_devname, class_instance);
@@ -117,7 +120,7 @@ CDev::unregister_class_devname(const char *class_devname, unsigned class_instanc
 int
 CDev::init()
 {
-	PX4_DEBUG("CDev::init");
+  ORB_DEBUG("CDev::init");
 
 	int ret = ORB_OK;
 
@@ -139,7 +142,7 @@ CDev::init()
 int
 CDev::open(file_t *filep)
 {
-	PX4_DEBUG("CDev::open");
+  ORB_DEBUG("CDev::open");
 	int ret = ORB_OK;
 
 	lock();
@@ -164,7 +167,7 @@ CDev::open(file_t *filep)
 int
 CDev::close(file_t *filep)
 {
-	PX4_DEBUG("CDev::close");
+  ORB_DEBUG("CDev::close");
 	int ret = ORB_OK;
 
 	lock();
@@ -190,14 +193,14 @@ CDev::close(file_t *filep)
 int
 CDev::ioctl(file_t *filep, int cmd, unsigned long arg)
 {
-	PX4_DEBUG("CDev::ioctl");
+  ORB_DEBUG("CDev::ioctl");
 	return -ORB_ERROR;
 }
 
 int
-CDev::poll(file_t *filep, px4_pollfd_struct_t *fds, bool setup)
+CDev::poll(file_t *filep, orb_pollfd_struct_t *fds, bool setup)
 {
-	PX4_DEBUG("CDev::Poll %s", setup ? "setup" : "teardown");
+  ORB_DEBUG("CDev::Poll %s", setup ? "setup" : "teardown");
 	int ret;
 
 	if (setup) {
@@ -206,7 +209,7 @@ CDev::poll(file_t *filep, px4_pollfd_struct_t *fds, bool setup)
 		 * benefit.
 		 */
 		fds->priv = (void *)filep;
-		PX4_DEBUG("CDev::poll: fds->priv = %p", filep);
+                ORB_DEBUG("CDev::poll: fds->priv = %p", filep);
 
 		/*
 		 * Lock against poll_notify() and possibly other callers (protect _pollset).
@@ -226,16 +229,16 @@ CDev::poll(file_t *filep, px4_pollfd_struct_t *fds, bool setup)
 			}
 
 			const uint8_t new_count = _max_pollwaiters > 0 ? _max_pollwaiters * 2 : 1;
-			px4_pollfd_struct_t **prev_pollset = _pollset;
+			orb_pollfd_struct_t **prev_pollset = _pollset;
 
 #ifdef __PX4_NUTTX
 			// malloc uses a semaphore, we need to call it enabled IRQ's
-			px4_leave_critical_section(flags);
+			orb_leave_critical_section(flags);
 #endif
-			auto **new_pollset = new px4_pollfd_struct_t *[new_count];
+			auto **new_pollset = new orb_pollfd_struct_t *[new_count];
 
 #ifdef __PX4_NUTTX
-			flags = px4_enter_critical_section();
+			flags = orb_enter_critical_section();
 #endif
 
 			if (prev_pollset == _pollset) {
@@ -246,8 +249,8 @@ CDev::poll(file_t *filep, px4_pollfd_struct_t *fds, bool setup)
 				}
 
 				if (_max_pollwaiters > 0) {
-					memset(new_pollset + _max_pollwaiters, 0, sizeof(px4_pollfd_struct_t *) * (new_count - _max_pollwaiters));
-					memcpy(new_pollset, _pollset, sizeof(px4_pollfd_struct_t *) * _max_pollwaiters);
+					memset(new_pollset + _max_pollwaiters, 0, sizeof(orb_pollfd_struct_t *) * (new_count - _max_pollwaiters));
+					memcpy(new_pollset, _pollset, sizeof(orb_pollfd_struct_t *) * _max_pollwaiters);
 				}
 
 				_pollset = new_pollset;
@@ -256,7 +259,7 @@ CDev::poll(file_t *filep, px4_pollfd_struct_t *fds, bool setup)
 
 				// free the previous _pollset (we need to unlock here which is fine because we don't access _pollset anymore)
 #ifdef __PX4_NUTTX
-				px4_leave_critical_section(flags);
+				orb_leave_critical_section(flags);
 #endif
 
 				if (prev_pollset) {
@@ -264,7 +267,7 @@ CDev::poll(file_t *filep, px4_pollfd_struct_t *fds, bool setup)
 				}
 
 #ifdef __PX4_NUTTX
-				flags = px4_enter_critical_section();
+				flags = orb_enter_critical_section();
 #endif
 
 				// Success
@@ -273,12 +276,12 @@ CDev::poll(file_t *filep, px4_pollfd_struct_t *fds, bool setup)
 			}
 
 #ifdef __PX4_NUTTX
-			px4_leave_critical_section(flags);
+			orb_leave_critical_section(flags);
 #endif
 			// We have to retry
 			delete[] new_pollset;
 #ifdef __PX4_NUTTX
-			flags = px4_enter_critical_section();
+			flags = orb_enter_critical_section();
 #endif
 		}
 
@@ -292,7 +295,7 @@ CDev::poll(file_t *filep, px4_pollfd_struct_t *fds, bool setup)
 
 			/* yes? post the notification */
 			if (fds->revents != 0) {
-				px4_sem_post(fds->sem);
+				orb_sem_post(fds->sem);
 			}
 
 		}
@@ -314,7 +317,7 @@ CDev::poll(file_t *filep, px4_pollfd_struct_t *fds, bool setup)
 void
 CDev::poll_notify(pollevent_t events)
 {
-	PX4_DEBUG("CDev::poll_notify events = %0x", events);
+  ORB_DEBUG("CDev::poll_notify events = %0x", events);
 
 	/* lock against poll() as well as other wakeups */
 	ATOMIC_ENTER;
@@ -329,25 +332,25 @@ CDev::poll_notify(pollevent_t events)
 }
 
 void
-CDev::poll_notify_one(px4_pollfd_struct_t *fds, pollevent_t events)
+CDev::poll_notify_one(orb_pollfd_struct_t *fds, pollevent_t events)
 {
-	PX4_DEBUG("CDev::poll_notify_one");
+  ORB_DEBUG("CDev::poll_notify_one");
 
 	/* update the reported event set */
 	fds->revents |= fds->events & events;
 
-	PX4_DEBUG(" Events fds=%p %0x %0x %0x", fds, fds->revents, fds->events, events);
+        ORB_DEBUG(" Events fds=%p %0x %0x %0x", fds, fds->revents, fds->events, events);
 
 	if (fds->revents != 0) {
-		px4_sem_post(fds->sem);
+		orb_sem_post(fds->sem);
 	}
 }
 
 int
-CDev::store_poll_waiter(px4_pollfd_struct_t *fds)
+CDev::store_poll_waiter(orb_pollfd_struct_t *fds)
 {
 	// Look for a free slot.
-	PX4_DEBUG("CDev::store_poll_waiter");
+        ORB_DEBUG("CDev::store_poll_waiter");
 
 	for (unsigned i = 0; i < _max_pollwaiters; i++) {
 		if (nullptr == _pollset[i]) {
@@ -363,9 +366,9 @@ CDev::store_poll_waiter(px4_pollfd_struct_t *fds)
 }
 
 int
-CDev::remove_poll_waiter(px4_pollfd_struct_t *fds)
+CDev::remove_poll_waiter(orb_pollfd_struct_t *fds)
 {
-	PX4_DEBUG("CDev::remove_poll_waiter");
+  ORB_DEBUG("CDev::remove_poll_waiter");
 
 	for (unsigned i = 0; i < _max_pollwaiters; i++) {
 		if (fds == _pollset[i]) {
@@ -376,7 +379,7 @@ CDev::remove_poll_waiter(px4_pollfd_struct_t *fds)
 		}
 	}
 
-	PX4_DEBUG("poll: bad fd state");
+        ORB_DEBUG("poll: bad fd state");
 	return -EINVAL;
 }
 

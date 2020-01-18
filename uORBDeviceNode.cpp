@@ -110,7 +110,7 @@ uORB::DeviceNode::open(cdev::file_t *filp)
 		add_internal_subscriber();
 
 		if (ret != ORB_OK) {
-			PX4_ERR("CDev::open failed");
+                  ORB_ERR("CDev::open failed");
 			delete sd;
 		}
 
@@ -500,7 +500,7 @@ uORB::DeviceNode::poll_state(cdev::file_t *filp)
 }
 
 void
-uORB::DeviceNode::poll_notify_one(px4_pollfd_struct_t *fds, pollevent_t events)
+uORB::DeviceNode::poll_notify_one(orb_pollfd_struct_t *fds, pollevent_t events)
 {
 	SubscriberData *sd = filp_to_sd((cdev::file_t *)fds->priv);
 
@@ -548,7 +548,7 @@ uORB::DeviceNode::print_statistics(bool reset)
 
 	unlock();
 
-	PX4_INFO("%s: %i", _meta->o_name, lost_messages);
+        ORB_INFO("%s: %i", _meta->o_name, lost_messages);
 	return true;
 }
 
@@ -616,7 +616,7 @@ int16_t uORB::DeviceNode::process_received_message(int32_t length, uint8_t *data
 	int16_t ret = -1;
 
 	if (length != (int32_t)(_meta->o_size)) {
-		PX4_ERR("Received '%s' with DataLength[%d] != ExpectedLen[%d]", _meta->o_name, (int)length, (int)_meta->o_size);
+		ORB_ERR("Received '%s' with DataLength[%d] != ExpectedLen[%d]", _meta->o_name, (int)length, (int)_meta->o_size);
 		return ORB_ERROR;
 	}
 

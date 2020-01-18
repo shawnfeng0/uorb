@@ -1,17 +1,26 @@
 /**
- * @file px4_log.h
+ * @file orb_log.h
  * Platform dependant logging/debug implementation
  */
 
 #pragma once
 
+#if defined(ORB_DEBUG)
+
 #include "ulog/src/ulog.h"
 
-#define PX4_INFO(FMT, ...) LOG_INFO(FMT, ##__VA_ARGS__)
+#define ORB_INFO_RAW LOG_RAW
+#define ORB_ERR(FMT, ...) LOG_ERROR(FMT, ##__VA_ARGS__)
+#define ORB_WARN(FMT, ...) LOG_WARN(FMT, ##__VA_ARGS__)
+#define ORB_INFO(FMT, ...) LOG_INFO(FMT, ##__VA_ARGS__)
+#define ORB_DEBUG(FMT, ...) LOG_DEBUG(FMT, ##__VA_ARGS__)
 
-#define PX4_INFO_RAW  LOG_RAW
+#else
 
-#define PX4_PANIC(FMT, ...) LOG_FATAL(FMT, ##__VA_ARGS__)
-#define PX4_ERR(FMT, ...) LOG_ERROR(FMT, ##__VA_ARGS__)
-#define PX4_WARN(FMT, ...) LOG_WARN(FMT, ##__VA_ARGS__)
-#define PX4_DEBUG(FMT, ...) ((void)0)
+#define ORB_INFO_RAW(...) ((void)0)
+#define ORB_ERR(FMT, ...) ((void)0)
+#define ORB_WARN(FMT, ...) ((void)0)
+#define ORB_INFO(FMT, ...) ((void)0)
+#define ORB_DEBUG(FMT, ...) ((void)0)
+
+#endif

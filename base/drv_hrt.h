@@ -60,11 +60,6 @@ typedef uint64_t	hrt_abstime;
 __EXPORT extern hrt_abstime hrt_absolute_time(void);
 
 /**
- * Convert a timespec to absolute time.
- */
-__EXPORT extern hrt_abstime ts_to_abstime(const struct timespec *ts);
-
-/**
  * Compute the delta between a timestamp taken in the past
  * and now.
  *

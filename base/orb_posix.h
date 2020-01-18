@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file px4_posix.h
+ * @file orb_posix.h
  *
  * Includes POSIX-like functions for virtual character devices
  */
@@ -40,9 +40,6 @@
 #pragma once
 
 #include "visibility.h" // Many source files need this header file
-
-#include <stdint.h>
-
 #include "orb_sem.h"
 
 #define  PX4_F_RDONLY 1
@@ -75,17 +72,17 @@ typedef struct {
 	pollevent_t 	revents;  /* The output event flags */
 
 	/* Required for PX4 compatibility */
-	px4_sem_t   *sem;  	/* Pointer to semaphore used to post output event */
+	orb_sem_t   *sem;  	/* Pointer to semaphore used to post output event */
 	void   *priv;     	/* For use by drivers */
-} px4_pollfd_struct_t;
+} orb_pollfd_struct_t;
 
-__EXPORT int 		px4_open(const char *path, int flags, ...);
-__EXPORT int 		px4_close(int fd);
-__EXPORT ssize_t	px4_read(int fd, void *buffer, size_t buflen);
-__EXPORT ssize_t	px4_write(int fd, const void *buffer, size_t buflen);
-__EXPORT int		px4_ioctl(int fd, int cmd, unsigned long arg);
-__EXPORT int		px4_poll(px4_pollfd_struct_t *fds, nfds_t nfds, int timeout);
-__EXPORT int		px4_access(const char *pathname, int mode);
-__EXPORT void		px4_show_topics(void);
+__EXPORT int 		orb_open(const char *path, int flags, ...);
+__EXPORT int 		orb_close(int fd);
+__EXPORT ssize_t	orb_read(int fd, void *buffer, size_t buflen);
+__EXPORT ssize_t	orb_write(int fd, const void *buffer, size_t buflen);
+__EXPORT int		orb_ioctl(int fd, int cmd, unsigned long arg);
+__EXPORT int		orb_poll(orb_pollfd_struct_t *fds, nfds_t nfds, int timeout);
+__EXPORT int		orb_access(const char *pathname, int mode);
+__EXPORT void		orb_show_topics(void);
 
 __END_DECLS

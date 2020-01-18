@@ -236,7 +236,7 @@ protected:
 
 	pollevent_t poll_state(cdev::file_t *filp) override;
 
-	void poll_notify_one(px4_pollfd_struct_t *fds, pollevent_t events) override;
+	void poll_notify_one(orb_pollfd_struct_t *fds, pollevent_t events) override;
 
 private:
 
@@ -269,7 +269,7 @@ private:
 	const uint8_t _instance; /**< orb multi instance identifier */
 	uint8_t     *_data{nullptr};   /**< allocated object buffer */
 	hrt_abstime   _last_update{0}; /**< time the object was last updated */
-	px4::atomic<unsigned>  _generation{0};  /**< object generation count */
+	orb::atomic<unsigned>  _generation{0};  /**< object generation count */
 	List<uORB::SubscriptionCallback *>	_callbacks;
 	uint8_t   _priority;  /**< priority of the topic */
 	bool _advertised{false};  /**< has ever been advertised (not necessarily published data yet) */

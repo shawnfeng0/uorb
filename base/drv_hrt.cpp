@@ -46,20 +46,13 @@
  */
 hrt_abstime hrt_absolute_time()
 {
-	struct timespec ts{};
-	clock_gettime(CLOCK_MONOTONIC, &ts);
-	return ts_to_abstime(&ts);
-}
+  struct timespec ts{};
+  hrt_abstime	result;
 
-/*
- * Convert a timespec to absolute time.
- */
-hrt_abstime ts_to_abstime(const struct timespec *ts)
-{
-	hrt_abstime	result;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
 
-	result = (hrt_abstime)(ts->tv_sec) * 1000000;
-	result += ts->tv_nsec / 1000;
+  result = (hrt_abstime)(ts.tv_sec) * 1000000;
+  result += ts.tv_nsec / 1000;
 
-	return result;
+  return result;
 }

@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file px4_sem.hpp
+ * @file orb_sem.hpp
  *
  * C++ synchronization helpers
  */
@@ -46,22 +46,21 @@
  * takes the lock when created and releases the lock when the object goes out of
  * scope. Use like this:
  *
- *   px4_sem_t my_lock;
- *   int ret = px4_sem_init(&my_lock, 0, 1);
+ *   orb_sem_t my_lock;
+ *   int ret = orb_sem_init(&my_lock, 0, 1);
  *   ...
  *
  *   {
- *       SmartLock smart_lock(my_lock);
+ *       SemLock smart_lock(my_lock);
  *       //critical section start
  *       ...
  *       //critical section end
  *   }
  */
-class SmartLock
-{
+class SemLock {
 public:
-	SmartLock(px4_sem_t &sem) : _sem(sem) { do {} while (px4_sem_wait(&_sem) != 0); }
-	~SmartLock() { px4_sem_post(&_sem); }
+  SemLock(orb_sem_t &sem) : _sem(sem) { do {} while (orb_sem_wait(&_sem) != 0); }
+	~SemLock() { orb_sem_post(&_sem); }
 private:
-	px4_sem_t &_sem;
+	orb_sem_t &_sem;
 };
