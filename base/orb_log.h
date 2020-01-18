@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "../src/platforms/ulog/src/ulog.h"
+#include "ulog/src/ulog.h"
 
 #define PX4_INFO(FMT, ...) LOG_INFO(FMT, ##__VA_ARGS__)
 

@@ -34,11 +34,8 @@
 project(uORB)
 cmake_minimum_required(VERSION 3.15)
 
-add_compile_definitions(__PX4_POSIX)
-add_compile_definitions(__PX4_LINUX)
-
 file(GLOB UORB_SOURCE "${CMAKE_SOURCE_DIR}/*.[ch]pp" "${CMAKE_SOURCE_DIR}/*.[ch]")
-file(GLOB ULOG_SOURCE "${CMAKE_SOURCE_DIR}/src/platforms/ulog/src/*.[ch]")
+file(GLOB ULOG_SOURCE "${CMAKE_SOURCE_DIR}/base/ulog/src/*.c")
 file(GLOB EXTRA_SOURCE
         "${CMAKE_SOURCE_DIR}/base/*.cpp"
         "${CMAKE_SOURCE_DIR}/topic_source/*.cpp"
