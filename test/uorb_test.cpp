@@ -62,9 +62,7 @@ void* cpuload_update_poll(void* arg) {
       LOG_ERROR("Got no data within %d second", timeout_ms);
     } else {
       orb_copy(ORB_ID(cpuload), cpuload_sub, &cpu_loader);
-      LOG_TOKEN(cpu_loader.timestamp);
-      LOG_TOKEN(cpu_loader.load);
-      LOG_TOKEN(cpu_loader.ram_usage);
+      LOG_MULTI_TOKEN(cpu_loader.timestamp, cpu_loader.load, cpu_loader.ram_usage);
     }
   }
   return nullptr;
