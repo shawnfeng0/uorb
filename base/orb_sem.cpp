@@ -36,31 +36,15 @@
  *
  * PX4 Middleware Wrapper Linux Implementation
  */
-
-#include <pthread.h>
-
 #include "orb_log.h"
 #include "orb_posix.h"
 #include "orb_errno.h"
-
-#if !defined(ETIMEDOUT)
-#define	ETIMEDOUT	110	/* Connection timed out */
-#endif
 
 int orb_sem_init(orb_sem_t *s, int pshared, unsigned int value)
 {
 	// We do not used the process shared arg
 	(void)pshared;
 	s->value = value;
-	pthread_cond_init(&(s->wait), nullptr);
-#if !defined(__PX4_DARWIN)
-	// We want to use CLOCK_MONOTONIC if possible but we can't on macOS
-	// because it's not available.
-	pthread_condattr_t attr;
-	pthread_condattr_init(&attr);
-	pthread_condattr_setclock(&attr, CLOCK_MONOTONIC);
-	pthread_cond_init(&(s->wait), &attr);
-#endif
 	return 0;
 }
 
@@ -77,7 +61,7 @@ int orb_sem_wait(orb_sem_t *s)
 	s->value--;
 
 	if (s->value < 0) {
-		ret = pthread_cond_wait(&(s->wait), s->lock.native_handle());
+		ret = s->wait.wait(s->lock);
 
 	} else {
 		ret = 0;
@@ -116,7 +100,7 @@ int orb_sem_timedwait(orb_sem_t *s, const struct timespec *abstime)
   orb_errno = 0;
 
   if (s->value < 0) {
-    ret = pthread_cond_timedwait(&(s->wait), s->lock.native_handle(), abstime);
+    ret = s->wait.wait_until(s->lock, abstime);
 
   } else {
     ret = 0;
@@ -146,7 +130,7 @@ int orb_sem_post(orb_sem_t *s)
 	s->value++;
 
 	if (s->value <= 0) {
-		ret = pthread_cond_signal(&(s->wait));
+		ret = s->wait.notify_one();
 
 	} else {
 		ret = 0;
@@ -172,9 +156,6 @@ int orb_sem_getvalue(orb_sem_t *s, int *sval)
 
 int orb_sem_destroy(orb_sem_t *s)
 {
-  s->lock.lock();
-  pthread_cond_destroy(&(s->wait));
-  s->lock.unlock();
-
+  (void) s;
   return 0;
 }

@@ -41,6 +41,7 @@
 
 #include <pthread.h>
 
+#include "orb_condition_variable.hpp"
 #include "orb_mutex.hpp"
 
 #define SEM_PRIO_NONE             0
@@ -51,8 +52,10 @@ __BEGIN_DECLS
 
 typedef struct {
   uORB::mutex lock;
-	pthread_cond_t wait;
-	int value;
+  // We want to use CLOCK_MONOTONIC if possible but we can't on macOS
+  // because it's not available.
+  uORB::MonoClockCond wait;
+  int value;
 } orb_sem_t;
 
 __EXPORT int		orb_sem_init(orb_sem_t *s, int pshared, unsigned value);
