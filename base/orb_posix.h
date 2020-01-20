@@ -52,7 +52,6 @@ __BEGIN_DECLS
 #include <poll.h>
 #else
 typedef unsigned long int nfds_t;
-typedef long int ssize_t ;
 typedef long int off_t ;
 #if !defined(POLLIN)
 #define POLLIN		0x001		/* There is data to read.  */

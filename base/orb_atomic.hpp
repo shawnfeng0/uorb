@@ -58,6 +58,31 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+/*
+ * Clang and recent GCC both provide predefined macros for the memory
+ * orderings.  If we are using a compiler that doesn't define them, use the
+ * clang values - these will be ignored in the fallback path.
+ */
+
+#ifndef __ATOMIC_RELAXED
+#define __ATOMIC_RELAXED		0
+#endif
+#ifndef __ATOMIC_CONSUME
+#define __ATOMIC_CONSUME		1
+#endif
+#ifndef __ATOMIC_ACQUIRE
+#define __ATOMIC_ACQUIRE		2
+#endif
+#ifndef __ATOMIC_RELEASE
+#define __ATOMIC_RELEASE		3
+#endif
+#ifndef __ATOMIC_ACQ_REL
+#define __ATOMIC_ACQ_REL		4
+#endif
+#ifndef __ATOMIC_SEQ_CST
+#define __ATOMIC_SEQ_CST		5
+#endif
+
 namespace uORB {
 
 template <typename T>
