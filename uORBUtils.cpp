@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 #include "uORBUtils.hpp"
-#include <errno.h>
+#include "base/orb_errno.h"
 #include <stdio.h>
 
 #include "base/orb_defines.h"

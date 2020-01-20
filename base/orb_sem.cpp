@@ -41,13 +41,13 @@
 
 #include "orb_log.h"
 #include "orb_posix.h"
-#include <errno.h>
+#include "orb_errno.h"
 
 #if !defined(ETIMEDOUT)
 #define	ETIMEDOUT	110	/* Connection timed out */
 #endif
 
-int orb_sem_init(orb_sem_t *s, int pshared, unsigned value)
+int orb_sem_init(orb_sem_t *s, int pshared, unsigned int value)
 {
 	// We do not used the process shared arg
 	(void)pshared;
@@ -97,7 +97,7 @@ int orb_sem_trywait(orb_sem_t *s)
   int ret = 0;
 
   if (s->value <= 0) {
-    errno = EAGAIN;
+    orb_errno = EAGAIN;
     ret = -1;
 
   } else {
@@ -113,7 +113,7 @@ int orb_sem_timedwait(orb_sem_t *s, const struct timespec *abstime)
   int ret = 0;
 
   s->value--;
-  errno = 0;
+  orb_errno = 0;
 
   if (s->value < 0) {
     ret = pthread_cond_timedwait(&(s->wait), s->lock.native_handle(), abstime);
@@ -122,7 +122,7 @@ int orb_sem_timedwait(orb_sem_t *s, const struct timespec *abstime)
     ret = 0;
   }
 
-  errno = ret;
+  orb_errno = ret;
 
   if (ret != 0 && ret != ETIMEDOUT) {
 #if defined(__unix__)

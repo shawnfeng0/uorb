@@ -321,7 +321,7 @@ int orb_poll(orb_pollfd_struct_t *fds, nfds_t nfds, int timeout)
 
       if (ret < 0) {
         ORB_WARN("%s: orb_poll() error: %s",
-                 thread_name, strerror(errno));
+                 thread_name, strerror(orb_errno));
         break;
       }
 
@@ -351,8 +351,8 @@ int orb_poll(orb_pollfd_struct_t *fds, nfds_t nfds, int timeout)
 
       ret = orb_sem_timedwait(&sem, &ts);
 
-      if (ret && errno != ETIMEDOUT) {
-        ORB_WARN("%s: orb_poll() sem error: %s", thread_name, strerror(errno));
+      if (ret && orb_errno != ETIMEDOUT) {
+        ORB_WARN("%s: orb_poll() sem error: %s", thread_name, strerror(orb_errno));
       }
 
     } else if (timeout < 0) {
@@ -392,7 +392,7 @@ int orb_poll(orb_pollfd_struct_t *fds, nfds_t nfds, int timeout)
 int orb_access(const char *pathname, int mode)
 {
   if (mode != F_OK) {
-    errno = EINVAL;
+    orb_errno = EINVAL;
     return -1;
   }
 

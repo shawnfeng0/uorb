@@ -42,7 +42,7 @@
 
 #include "orb_defines.h"
 #include "orb_posix.h"
-#include <errno.h>
+#include "orb_errno.h"
 
 #ifdef __PX4_NUTTX
 #include "nuttx/cdev_platform.hpp"

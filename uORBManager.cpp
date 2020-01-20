@@ -36,6 +36,7 @@
 
 #include "base/orb_log.h"
 #include "base/orb_posix.h"
+#include "base/orb_errno.h"
 
 uORB::Manager *uORB::Manager::_Instance = nullptr;
 
@@ -89,7 +90,7 @@ uORB::DeviceMaster *uORB::Manager::get_device_master()
 
 		if (_device_master == nullptr) {
                   ORB_ERR("Failed to allocate DeviceMaster");
-			errno = ENOMEM;
+			orb_errno = ENOMEM;
 		}
 	}
 
@@ -126,7 +127,7 @@ int uORB::Manager::orb_exists(const struct orb_metadata *meta, int instance)
 	ret = uORB::Utils::node_mkpath(path, meta, &inst);
 
 	if (ret != ORB_OK) {
-		errno = -ret;
+		orb_errno = -ret;
 		return ORB_ERROR;
 	}
 
@@ -191,7 +192,7 @@ orb_advert_t uORB::Manager::orb_advertise_multi(const struct orb_metadata *meta,
 	int fd = node_open(meta, true, instance, priority);
 
 	if (fd == ORB_ERROR) {
-          ORB_ERR("%s advertise failed (%i)", meta->o_name, errno);
+          ORB_ERR("%s advertise failed (%i)", meta->o_name, orb_errno);
 		return nullptr;
 	}
 
@@ -284,7 +285,7 @@ int uORB::Manager::orb_copy(const struct orb_metadata *meta, int handle, void *b
 	}
 
 	if (ret != (int)meta->o_size) {
-		errno = EIO;
+		orb_errno = EIO;
 		return ORB_ERROR;
 	}
 
@@ -329,7 +330,7 @@ int uORB::Manager::node_advertise(const struct orb_metadata *meta, bool is_adver
 	}
 
 	/* it's ORB_OK if it already exists */
-	if ((ORB_OK != ret) && (EEXIST == errno)) {
+	if ((ORB_OK != ret) && (EEXIST == orb_errno)) {
 		ret = ORB_OK;
 	}
 
@@ -347,7 +348,7 @@ int uORB::Manager::node_open(const struct orb_metadata *meta, bool advertiser, i
 	 * known to the system.  We can't advertise/subscribe such a thing.
 	 */
 	if (nullptr == meta) {
-		errno = ENOENT;
+		orb_errno = ENOENT;
 		return ORB_ERROR;
 	}
 
@@ -360,7 +361,7 @@ int uORB::Manager::node_open(const struct orb_metadata *meta, bool advertiser, i
 		ret = uORB::Utils::node_mkpath(path, meta, instance);
 
 		if (ret != ORB_OK) {
-			errno = -ret;
+			orb_errno = -ret;
 			return ORB_ERROR;
 		}
 
@@ -382,7 +383,7 @@ int uORB::Manager::node_open(const struct orb_metadata *meta, bool advertiser, i
 			ret = uORB::Utils::node_mkpath(path, meta, instance);
 
 			if (ret != ORB_OK) {
-				errno = -ret;
+				orb_errno = -ret;
 				return ORB_ERROR;
 			}
 		}
@@ -405,7 +406,7 @@ int uORB::Manager::node_open(const struct orb_metadata *meta, bool advertiser, i
 	 */
 
 	if (fd < 0) {
-		errno = EIO;
+		orb_errno = EIO;
 		return ORB_ERROR;
 	}
 

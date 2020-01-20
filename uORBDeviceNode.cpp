@@ -38,11 +38,12 @@
 
 #include "SubscriptionCallback.hpp"
 
+#include "base/orb_log.h"
+#include "base/orb_errno.h"
+
 #ifdef ORB_COMMUNICATOR
 #include "uORBCommunicator.hpp"
 #endif /* ORB_COMMUNICATOR */
-
-#include "base/orb_log.h"
 
 uORB::DeviceNode::SubscriberData *uORB::DeviceNode::filp_to_sd(cdev::file_t *filp)
 {
@@ -394,13 +395,13 @@ uORB::DeviceNode::publish(const orb_metadata *meta, orb_advert_t handle, const v
 
 	/* check if the device handle is initialized and data is valid */
 	if ((devnode == nullptr) || (meta == nullptr) || (data == nullptr)) {
-		errno = EFAULT;
+		orb_errno = EFAULT;
 		return ORB_ERROR;
 	}
 
 	/* check if the orb meta data matches the publication */
 	if (devnode->_meta != meta) {
-		errno = EINVAL;
+		orb_errno = EINVAL;
 		return ORB_ERROR;
 	}
 
@@ -408,12 +409,12 @@ uORB::DeviceNode::publish(const orb_metadata *meta, orb_advert_t handle, const v
 	ret = devnode->write(nullptr, (const char *)data, meta->o_size);
 
 	if (ret < 0) {
-		errno = -ret;
+		orb_errno = -ret;
 		return ORB_ERROR;
 	}
 
 	if (ret != (int)meta->o_size) {
-		errno = EIO;
+		orb_errno = EIO;
 		return ORB_ERROR;
 	}
 
@@ -628,7 +629,7 @@ int16_t uORB::DeviceNode::process_received_message(int32_t length, uint8_t *data
 	}
 
 	if (ret != (int)_meta->o_size) {
-		errno = EIO;
+		orb_errno = EIO;
 		return ORB_ERROR;
 	}
 

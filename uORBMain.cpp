@@ -105,7 +105,7 @@ int uorb_main(int argc, char *argv[])
     g_dev = uORB::Manager::get_instance()->get_device_master();
 
     if (g_dev == nullptr) {
-      return -errno;
+      return -orb_errno;
     }
 
     return ORB_OK;
