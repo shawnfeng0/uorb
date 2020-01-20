@@ -269,7 +269,7 @@ private:
 	const uint8_t _instance; /**< orb multi instance identifier */
 	uint8_t     *_data{nullptr};   /**< allocated object buffer */
 	hrt_abstime   _last_update{0}; /**< time the object was last updated */
-	orb::atomic<unsigned>  _generation{0};  /**< object generation count */
+        uORB::atomic<unsigned>  _generation{0};  /**< object generation count */
 	List<uORB::SubscriptionCallback *>	_callbacks;
 	uint8_t   _priority;  /**< priority of the topic */
 	bool _advertised{false};  /**< has ever been advertised (not necessarily published data yet) */

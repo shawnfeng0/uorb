@@ -58,8 +58,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-namespace orb
-{
+namespace uORB {
 
 template <typename T>
 class atomic

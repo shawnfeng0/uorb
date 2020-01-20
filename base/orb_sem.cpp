@@ -53,8 +53,6 @@ int orb_sem_init(orb_sem_t *s, int pshared, unsigned value)
 	(void)pshared;
 	s->value = value;
 	pthread_cond_init(&(s->wait), nullptr);
-	pthread_mutex_init(&(s->lock), nullptr);
-
 #if !defined(__PX4_DARWIN)
 	// We want to use CLOCK_MONOTONIC if possible but we can't on macOS
 	// because it's not available.
@@ -63,7 +61,6 @@ int orb_sem_init(orb_sem_t *s, int pshared, unsigned value)
 	pthread_condattr_setclock(&attr, CLOCK_MONOTONIC);
 	pthread_cond_init(&(s->wait), &attr);
 #endif
-
 	return 0;
 }
 
@@ -74,16 +71,13 @@ int orb_sem_setprotocol(orb_sem_t *s, int protocol)
 
 int orb_sem_wait(orb_sem_t *s)
 {
-	int ret = pthread_mutex_lock(&(s->lock));
-
-	if (ret) {
-		return ret;
-	}
+  uORB::MutexGuard guard(s->lock);
+	int ret;
 
 	s->value--;
 
 	if (s->value < 0) {
-		ret = pthread_cond_wait(&(s->wait), &(s->lock));
+		ret = pthread_cond_wait(&(s->wait), s->lock.native_handle());
 
 	} else {
 		ret = 0;
@@ -93,75 +87,61 @@ int orb_sem_wait(orb_sem_t *s)
           ORB_WARN("orb_sem_wait failure");
 	}
 
-	int mret = pthread_mutex_unlock(&(s->lock));
-
-	return (ret) ? ret : mret;
+	return (ret);
 }
 
 int orb_sem_trywait(orb_sem_t *s)
 {
-	int ret = pthread_mutex_lock(&(s->lock));
+  uORB::MutexGuard guard(s->lock);
 
-	if (ret) {
-		return ret;
-	}
+  int ret = 0;
 
-	if (s->value <= 0) {
-		errno = EAGAIN;
-		ret = -1;
+  if (s->value <= 0) {
+    errno = EAGAIN;
+    ret = -1;
 
-	} else {
-		s->value--;
-	}
+  } else {
+    s->value--;
+  }
 
-	int mret = pthread_mutex_unlock(&(s->lock));
-
-	return (ret) ? ret : mret;
+  return (ret);
 }
 
 int orb_sem_timedwait(orb_sem_t *s, const struct timespec *abstime)
 {
-	int ret = pthread_mutex_lock(&(s->lock));
+  uORB::MutexGuard guard(s->lock);
+  int ret = 0;
 
-	if (ret) {
-		return ret;
-	}
+  s->value--;
+  errno = 0;
 
-	s->value--;
-	errno = 0;
+  if (s->value < 0) {
+    ret = pthread_cond_timedwait(&(s->wait), s->lock.native_handle(), abstime);
 
-	if (s->value < 0) {
-		ret = pthread_cond_timedwait(&(s->wait), &(s->lock), abstime);
+  } else {
+    ret = 0;
+  }
 
-	} else {
-		ret = 0;
-	}
+  errno = ret;
 
-	errno = ret;
+  if (ret != 0 && ret != ETIMEDOUT) {
+#if defined(__unix__)
+    const unsigned NAMELEN = 32;
+    char thread_name[NAMELEN] = {};
+    (void) pthread_getname_np(pthread_self(), thread_name, NAMELEN);
+#else
+    char thread_name[] = {"\"unknow name\""};
+#endif
+    ORB_WARN("%s: orb_sem_timedwait failure: ret: %d", thread_name, ret);
+  }
 
-	if (ret != 0 && ret != ETIMEDOUT) {
-		const unsigned NAMELEN = 32;
-		char thread_name[NAMELEN] = {};
-		(void)pthread_getname_np(pthread_self(), thread_name, NAMELEN);
-                ORB_WARN("%s: orb_sem_timedwait failure: ret: %d", thread_name, ret);
-	}
-
-	int mret = pthread_mutex_unlock(&(s->lock));
-
-	if (ret || mret) {
-		return -1;
-	}
-
-	return 0;
+  return ret ? -1 : 0;
 }
 
 int orb_sem_post(orb_sem_t *s)
 {
-	int ret = pthread_mutex_lock(&(s->lock));
-
-	if (ret) {
-		return ret;
-	}
+  uORB::MutexGuard guard(s->lock);
+	int ret = 0;
 
 	s->value++;
 
@@ -176,37 +156,25 @@ int orb_sem_post(orb_sem_t *s)
           ORB_WARN("orb_sem_post failure");
 	}
 
-	int mret = pthread_mutex_unlock(&(s->lock));
-
 	// return the cond signal failure if present,
 	// else return the mutex status
-	return (ret) ? ret : mret;
+	return ret;
 }
 
 int orb_sem_getvalue(orb_sem_t *s, int *sval)
 {
-	int ret = pthread_mutex_lock(&(s->lock));
+  uORB::MutexGuard guard(s->lock);
 
-	if (ret) {
-          ORB_WARN("orb_sem_getvalue failure");
-	}
+  *sval = s->value;
 
-	if (ret) {
-		return ret;
-	}
-
-	*sval = s->value;
-	ret = pthread_mutex_unlock(&(s->lock));
-
-	return ret;
+  return 0;
 }
 
 int orb_sem_destroy(orb_sem_t *s)
 {
-	pthread_mutex_lock(&(s->lock));
-	pthread_cond_destroy(&(s->wait));
-	pthread_mutex_unlock(&(s->lock));
-	pthread_mutex_destroy(&(s->lock));
+  s->lock.lock();
+  pthread_cond_destroy(&(s->wait));
+  s->lock.unlock();
 
-	return 0;
+  return 0;
 }

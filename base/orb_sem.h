@@ -41,6 +41,8 @@
 
 #include <pthread.h>
 
+#include "orb_mutex.hpp"
+
 #define SEM_PRIO_NONE             0
 #define SEM_PRIO_INHERIT          1
 #define SEM_PRIO_PROTECT          2
@@ -48,7 +50,7 @@
 __BEGIN_DECLS
 
 typedef struct {
-	pthread_mutex_t lock;
+  uORB::mutex lock;
 	pthread_cond_t wait;
 	int value;
 } orb_sem_t;
