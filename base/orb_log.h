@@ -5,15 +5,15 @@
 
 #pragma once
 
-#if defined(ORB_EBUG)
+#if defined(DEBUG_ORB)
 
-#include "../test/ulog/src/ulog.h"
+#include "../sample/ulog/src/ulog.h"
 
 #define ORB_INFO_RAW LOG_RAW
 #define ORB_ERR(FMT, ...) LOG_ERROR(FMT, ##__VA_ARGS__)
 #define ORB_WARN(FMT, ...) LOG_WARN(FMT, ##__VA_ARGS__)
 #define ORB_INFO(FMT, ...) LOG_INFO(FMT, ##__VA_ARGS__)
-#define ORB_DEBUG(FMT, ...) LOG_DEBUG(FMT, ##__VA_ARGS__)
+#define ORB_DEBUG(FMT, ...) ((void) 0)
 
 #else
 

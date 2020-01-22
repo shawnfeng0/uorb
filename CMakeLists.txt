@@ -42,6 +42,13 @@ aux_source_directory(${CMAKE_SOURCE_DIR}/sample SAMPLE_SOURCE)
 aux_source_directory(${CMAKE_SOURCE_DIR}/sample/topic_source SAMPLE_SOURCE)
 aux_source_directory(${CMAKE_SOURCE_DIR}/sample/ulog/src SAMPLE_SOURCE)
 
+aux_source_directory(${CMAKE_SOURCE_DIR}/test TEST_SOURCE)
+aux_source_directory(${CMAKE_SOURCE_DIR}/sample/ulog/src TEST_SOURCE)
+add_executable(uorb_test ${TEST_SOURCE} test/posix_task.cpp test/posix_task.h)
+target_link_libraries(uorb_test uorb)
+target_link_libraries(uorb_test pthread)
+add_definitions(-DDEBUG_ORB)
+
 add_executable(uorb_sample ${SAMPLE_SOURCE})
 target_link_libraries(uorb_sample uorb)
 target_link_libraries(uorb_sample pthread)

@@ -33,10 +33,13 @@
 
 #ifndef _uORBTest_UnitTest_hpp_
 #define _uORBTest_UnitTest_hpp_
-#include "../uORBCommon.hpp"
+#include "../base/orb_defines.h"
+#include "../base/orb_errno.h"
+#include "../base/orb_log.h"
 #include "../uORB.h"
-#include <px4_time.h>
-#include <px4_tasks.h>
+#include "../uORBCommon.hpp"
+#include "posix_task.h"
+
 #include <unistd.h>
 
 struct orb_test {
@@ -79,9 +82,8 @@ public:
 	~UnitTest() {}
 	int test();
 	template<typename S> int latency_test(orb_id_t T, bool print);
-	int info();
 
-private:
+      private:
 	UnitTest() : pubsubtest_passed(false), pubsubtest_print(false) {}
 
 	// Disallow copy
@@ -97,7 +99,7 @@ private:
 
 	bool pubsubtest_passed;
 	bool pubsubtest_print;
-	int pubsubtest_res = OK;
+	int pubsubtest_res = ORB_OK;
 
 	orb_advert_t _pfd[4]; ///< used for test_multi and test_multi_reversed
 
@@ -111,20 +113,17 @@ private:
 	int test_multi2();
 
 	/* queuing tests */
-	int test_queue();
+	static int test_queue();
 	static int pub_test_queue_entry(int argc, char *argv[]);
 	int pub_test_queue_main();
 	int test_queue_poll_notify();
 	volatile int _num_messages_sent = 0;
-
-	int test_fail(const char *fmt, ...);
-	int test_note(const char *fmt, ...);
 };
 
 template<typename S>
 int uORBTest::UnitTest::latency_test(orb_id_t T, bool print)
 {
-	test_note("---------------- LATENCY TEST ------------------");
+	ORB_INFO("---------------- LATENCY TEST ------------------");
 	S t;
 	t.val = 308;
 	t.time = hrt_absolute_time();
@@ -132,7 +131,8 @@ int uORBTest::UnitTest::latency_test(orb_id_t T, bool print)
 	orb_advert_t pfd0 = orb_advertise(T, &t);
 
 	if (pfd0 == nullptr) {
-		return test_fail("orb_advertise failed (%i)", errno);
+		ORB_ERR("orb_advertise failed (%i)", orb_errno);
+		return ORB_ERROR;
 	}
 
 	char *const args[1] = { nullptr };
@@ -145,7 +145,7 @@ int uORBTest::UnitTest::latency_test(orb_id_t T, bool print)
 	// Can't pass a pointer in args, must be a null terminated
 	// array of strings because the strings are copied to
 	// prevent access if the caller data goes out of scope
-	int pubsub_task = px4_task_spawn_cmd("uorb_latency",
+	pthread_t pubsub_task = px4_task_spawn_cmd("uorb_latency",
 					     SCHED_DEFAULT,
 					     SCHED_PRIORITY_MAX,
 					     2000,
@@ -157,16 +157,18 @@ int uORBTest::UnitTest::latency_test(orb_id_t T, bool print)
 		++t.val;
 		t.time = hrt_absolute_time();
 
-		if (PX4_OK != orb_publish(T, pfd0, &t)) {
-			return test_fail("mult. pub0 timing fail");
+		if (ORB_OK != orb_publish(T, pfd0, &t)) {
+			ORB_ERR("mult. pub0 timing fail");
+			return ORB_ERROR;
 		}
 
 		/* simulate >800 Hz system operation */
-		px4_usleep(1000);
+		usleep(1000);
 	}
 
 	if (pubsub_task < 0) {
-		return test_fail("failed launching task");
+		ORB_ERR("failed launching task");
+		return ORB_ERROR;
 	}
 
 	orb_unadvertise(pfd0);

@@ -31,28 +31,30 @@
  *
  ****************************************************************************/
 
-#include <string.h>
-#include "../uORBDeviceNode.hpp"
 #include "../uORB.h"
-#include "../uORBCommon.hpp"
+#include <pthread.h>
+#include <stdio.h>
+#include <string.h>
 
 #ifndef __PX4_QURT
+#include "../base/orb_log.h"
 #include "uORBTest_UnitTest.hpp"
 #endif
 
-extern "C" { __EXPORT int uorb_tests_main(int argc, char *argv[]); }
-
 static void usage()
 {
-	PX4_INFO("Usage: uorb_tests [latency_test]");
+	ORB_INFO("Usage: uorb_tests [latency_test]");
 }
 
-int
-uorb_tests_main(int argc, char *argv[])
+int uorb_main(int argc, char *argv[]);
+
+int main(int argc, char **argv)
 {
 
 #ifndef __PX4_QURT
-
+  // uorb initial
+  char *orb_start_args[] = {(char *) "orb", (char *) "start"};
+  uorb_main(sizeof(orb_start_args) / sizeof(orb_start_args[0]), orb_start_args);
 	/*
 	 * Test the driver/device.
 	 */
@@ -60,15 +62,14 @@ uorb_tests_main(int argc, char *argv[])
 		uORBTest::UnitTest &t = uORBTest::UnitTest::instance();
 		int rc = t.test();
 
-		if (rc == OK) {
-			fprintf(stdout, "  [uORBTest] \t\tPASS\n");
-			fflush(stdout);
-			return 0;
-
+		if (rc == ORB_OK) {
+                  fprintf(stdout, "  [uORBTest] \t\tPASS\n");
+                  fflush(stdout);
+                  pthread_exit(nullptr);
 		} else {
 			fprintf(stderr, "  [uORBTest] \t\tFAIL\n");
 			fflush(stderr);
-			return -1;
+                  pthread_exit(nullptr);
 		}
 	}
 
@@ -93,5 +94,4 @@ uorb_tests_main(int argc, char *argv[])
 #endif
 
 	usage();
-	return -EINVAL;
 }
