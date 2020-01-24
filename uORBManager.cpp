@@ -388,10 +388,8 @@ int uORB::Manager::node_open(const struct orb_metadata *meta, bool advertiser, i
 			}
 		}
 
-		/* on success, try to open again */
-		if (ret == ORB_OK) {
-			fd = orb_open(path, (advertiser) ? PX4_F_WRONLY : PX4_F_RDONLY);
-		}
+		/* try to open again */
+		fd = orb_open(path, (advertiser) ? PX4_F_WRONLY : PX4_F_RDONLY);
 	}
 
 	/*
