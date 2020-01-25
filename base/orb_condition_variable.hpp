@@ -54,34 +54,34 @@ public:
 
   int notify_all() noexcept { return __ORB_THREAD_COND_BROADCAST(&cond_); }
 
-  int wait(mutex&lock) noexcept {
+  int wait(Mutex &lock) noexcept {
     return __ORB_THREAD_COND_WAIT(&cond_, lock.native_handle());
   }
 
   template <typename _Predicate>
-  int wait(mutex&lock, _Predicate p) {
+  int wait(Mutex &lock, _Predicate p) {
     int ret = 0;
     while (!p()) ret = wait(lock);
     return ret;
   }
 
-  int wait_until(mutex&lock, const struct timespec&atime) {
+  int wait_until(Mutex &lock, const struct timespec&atime) {
     return __ORB_THREAD_COND_TIMEDWAIT(&cond_, lock.native_handle(), &atime);
   }
 
-  int wait_until(mutex&lock, const struct timespec *atime) {
+  int wait_until(Mutex &lock, const struct timespec *atime) {
     return __ORB_THREAD_COND_TIMEDWAIT(&cond_, lock.native_handle(), atime);
   }
 
   template <typename _Predicate>
-  bool wait_until(mutex&lock, const struct timespec&atime,
+  bool wait_until(Mutex &lock, const struct timespec&atime,
                   _Predicate p) {
     while (!p())
       if (wait_until(lock, atime) == ETIMEDOUT) return p();
     return true;
   }
 
-  int wait_for(mutex&lock, long usec) {
+  int wait_for(Mutex &lock, long usec) {
     struct timespec req {};
     clock_gettime(CLOCK_MONOTONIC, &req);
     req.tv_nsec += usec;

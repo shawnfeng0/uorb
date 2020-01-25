@@ -48,8 +48,8 @@ using namespace std;
 
 const cdev::orb_file_operations_t cdev::CDev::fops = {};
 
-static uORB::mutex devmutex;
-static uORB::mutex filemutex;
+static uORB::Mutex devmutex;
+static uORB::Mutex filemutex;
 
 #define PX4_MAX_FD 350
 static map<string, void *> devmap;

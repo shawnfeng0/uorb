@@ -39,7 +39,7 @@
 #include "base/orb_errno.h"
 
 uORB::Manager *uORB::Manager::_Instance;
-uORB::mutex uORB::Manager::_mutex_for_instance;
+uORB::Mutex uORB::Manager::_mutex_for_instance;
 
 bool uORB::Manager::initialize()
 {

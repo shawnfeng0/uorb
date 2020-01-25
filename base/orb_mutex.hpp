@@ -15,7 +15,7 @@ typedef pthread_mutex_t __orb_thread_mutex_t;
 #define __ORB_THREAD_MUTEX_UNLOCK pthread_mutex_unlock
 #define __ORB_THREAD_MUTEX_TRYLOCK pthread_mutex_trylock
 
-// Common base class for std::mutex and std::timed_mutex
+// Common base class for Mutex
 class __mutex_base
 {
 protected:
@@ -39,18 +39,18 @@ protected:
   __mutex_base& operator=(const __mutex_base&) = delete;
 };
 
-/// The standard mutex type.
-class mutex : private __mutex_base
+/// The standard Mutex type.
+class Mutex : private __mutex_base
 {
 public:
 #ifdef __ORB_THREAD_MUTEX_INITIALIZER
   constexpr
 #endif
-  mutex() noexcept = default;
-  ~mutex() = default;
+      Mutex() noexcept = default;
+  ~Mutex() = default;
 
-  mutex(const mutex&) = delete;
-  mutex& operator=(const mutex&) = delete;
+  Mutex(const Mutex &) = delete;
+  Mutex & operator=(const Mutex &) = delete;
 
   void
   lock()
@@ -80,28 +80,27 @@ public:
 
 /** @brief A simple scoped lock type.
  *
- * A lock_guard controls mutex ownership within a scope, releasing
+ * A LockGuard controls Mutex ownership within a scope, releasing
  * ownership in the destructor.
  */
 template<typename _Mutex>
-class lock_guard
-{
+class LockGuard {
 public:
-  typedef _Mutex mutex_type;
+  typedef _Mutex MutexType;
 
-  explicit lock_guard(mutex_type& __m) : _M_device(__m)
+  explicit LockGuard(MutexType & __m) : _M_device(__m)
   { _M_device.lock(); }
 
-  ~lock_guard()
+  ~LockGuard()
   { _M_device.unlock(); }
 
-  lock_guard(const lock_guard&) = delete;
-  lock_guard& operator=(const lock_guard&) = delete;
+  LockGuard(const LockGuard &) = delete;
+  LockGuard & operator=(const LockGuard &) = delete;
 
 private:
-  mutex_type&  _M_device;
+  MutexType &  _M_device;
 };
 
-typedef lock_guard<mutex> MutexGuard;
+typedef LockGuard<Mutex> MutexGuard;
 
 } // namespace orb

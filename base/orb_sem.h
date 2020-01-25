@@ -51,7 +51,7 @@
 __BEGIN_DECLS
 
 typedef struct {
-  uORB::mutex lock;
+  uORB::Mutex lock;
   // We want to use CLOCK_MONOTONIC if possible but we can't on macOS
   // because it's not available.
   uORB::MonoClockCond wait;

@@ -409,7 +409,7 @@ private: // class methods
 
 private: // data members
 	static Manager *_Instance;
-        static mutex _mutex_for_instance;
+        static Mutex _mutex_for_instance;
 
 #ifdef ORB_COMMUNICATOR
 	// the communicator channel instance.
