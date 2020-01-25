@@ -50,48 +50,41 @@ int uorb_main(int argc, char *argv[]);
 
 int main(int argc, char **argv)
 {
+  /*
+   * Test the driver/device.
+   */
+  if (argc == 1) {
+    uORBTest::UnitTest &t = uORBTest::UnitTest::instance();
+    int rc = t.test();
 
-#ifndef __PX4_QURT
-  // uorb initial
-  char *orb_start_args[] = {(char *) "orb", (char *) "start"};
-  uorb_main(sizeof(orb_start_args) / sizeof(orb_start_args[0]), orb_start_args);
-	/*
-	 * Test the driver/device.
-	 */
-	if (argc == 1) {
-		uORBTest::UnitTest &t = uORBTest::UnitTest::instance();
-		int rc = t.test();
+    if (rc == ORB_OK) {
+      fprintf(stdout, "  [uORBTest] \t\tPASS\n");
+      fflush(stdout);
+      pthread_exit(nullptr);
+    } else {
+      fprintf(stderr, "  [uORBTest] \t\tFAIL\n");
+      fflush(stderr);
+      pthread_exit(nullptr);
+    }
+  }
 
-		if (rc == ORB_OK) {
-                  fprintf(stdout, "  [uORBTest] \t\tPASS\n");
-                  fflush(stdout);
-                  pthread_exit(nullptr);
-		} else {
-			fprintf(stderr, "  [uORBTest] \t\tFAIL\n");
-			fflush(stderr);
-                  pthread_exit(nullptr);
-		}
-	}
+  /*
+   * Test the latency.
+   */
+  if (argc > 1 && !strcmp(argv[1], "latency_test")) {
 
-	/*
-	 * Test the latency.
-	 */
-	if (argc > 1 && !strcmp(argv[1], "latency_test")) {
+    uORBTest::UnitTest &t = uORBTest::UnitTest::instance();
 
-		uORBTest::UnitTest &t = uORBTest::UnitTest::instance();
+    if (argc > 2 && !strcmp(argv[2], "medium")) {
+      return t.latency_test<struct orb_test_medium>(ORB_ID(orb_test_medium), true);
 
-		if (argc > 2 && !strcmp(argv[2], "medium")) {
-			return t.latency_test<struct orb_test_medium>(ORB_ID(orb_test_medium), true);
+    } else if (argc > 2 && !strcmp(argv[2], "large")) {
+      return t.latency_test<struct orb_test_large>(ORB_ID(orb_test_large), true);
 
-		} else if (argc > 2 && !strcmp(argv[2], "large")) {
-			return t.latency_test<struct orb_test_large>(ORB_ID(orb_test_large), true);
+    } else {
+      return t.latency_test<struct orb_test>(ORB_ID(orb_test), true);
+    }
+  }
 
-		} else {
-			return t.latency_test<struct orb_test>(ORB_ID(orb_test), true);
-		}
-	}
-
-#endif
-
-	usage();
+  usage();
 }

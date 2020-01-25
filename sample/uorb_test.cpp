@@ -83,10 +83,6 @@ void uorb_sample() {
 int uorb_main(int argc, char *argv[]);
 
 int main(int argc, char *argv[]) {
-  // uorb initial
-  char *orb_start_args[] = {(char *) "orb", (char *) "start"};
-  uorb_main(sizeof(orb_start_args) / sizeof(orb_start_args[0]), orb_start_args);
-
   uorb_sample();
 
   // Wait for all threads to finish
