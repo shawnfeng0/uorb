@@ -38,15 +38,12 @@
 #include "base/orb_posix.h"
 #include "base/orb_errno.h"
 
-uORB::Manager *uORB::Manager::_Instance = nullptr;
+uORB::Manager *uORB::Manager::_Instance;
+uORB::mutex uORB::Manager::_mutex_for_instance;
 
 bool uORB::Manager::initialize()
 {
-	if (_Instance == nullptr) {
-		_Instance = new uORB::Manager();
-	}
-
-	return _Instance != nullptr;
+	return get_instance() != nullptr;
 }
 
 bool uORB::Manager::terminate()

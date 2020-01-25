@@ -34,18 +34,11 @@
 #ifndef _uORBManager_hpp_
 #define _uORBManager_hpp_
 
+#include "base/orb_mutex.hpp"
 #include "uORBCommon.hpp"
 #include "uORBDeviceMaster.hpp"
 
 #include <stdint.h>
-
-#ifdef __PX4_NUTTX
-#include "ORBSet.hpp"
-#else
-#include <string>
-#include <set>
-#define ORBSet std::set<std::string>
-#endif
 
 #ifdef ORB_COMMUNICATOR
 #include "uORBCommunicator.hpp"
@@ -83,10 +76,19 @@ public:
 
 	/**
 	 * Method to get the singleton instance for the uORB::Manager.
-	 * Make sure initialize() is called first.
 	 * @return uORB::Manager*
 	 */
-	static uORB::Manager *get_instance() { return _Instance; }
+	static uORB::Manager *get_instance() {
+          if (_Instance == nullptr) {
+            MutexGuard guard(_mutex_for_instance);
+            if (_Instance == nullptr) {
+              // Guaranteed to be assigned after the constructor is executed
+              auto item = new uORB::Manager();
+              _Instance = item;
+            }
+          }
+	  return _Instance;
+	}
 
 	/**
 	 * Get the DeviceMaster. If it does not exist,
@@ -407,6 +409,7 @@ private: // class methods
 
 private: // data members
 	static Manager *_Instance;
+        static mutex _mutex_for_instance;
 
 #ifdef ORB_COMMUNICATOR
 	// the communicator channel instance.
