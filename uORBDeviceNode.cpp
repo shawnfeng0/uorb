@@ -134,10 +134,8 @@ uORB::DeviceNode::close(cdev::file_t *filp)
 
 		if (sd != nullptr) {
 			remove_internal_subscriber();
-
 			delete sd;
-			sd = nullptr;
-		}
+                }
 	}
 
 	return CDev::close(filp);
@@ -234,7 +232,7 @@ uORB::DeviceNode::read(cdev::file_t *filp, char *buffer, size_t buflen)
 }
 
 ssize_t
-uORB::DeviceNode::write(cdev::file_t *filp, const char *buffer, size_t buflen)
+uORB::DeviceNode::write(const char *buffer, size_t buflen)
 {
 	/*
 	 * Writes are legal from interrupt context as long as the
@@ -406,7 +404,7 @@ uORB::DeviceNode::publish(const orb_metadata *meta, orb_advert_t handle, const v
 	}
 
 	/* call the devnode write method with no file pointer */
-	ret = devnode->write(nullptr, (const char *)data, meta->o_size);
+	ret = devnode->write((const char *)data, meta->o_size);
 
 	if (ret < 0) {
 		orb_errno = -ret;

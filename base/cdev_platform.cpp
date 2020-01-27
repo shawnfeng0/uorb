@@ -46,8 +46,6 @@
 
 using namespace std;
 
-const cdev::orb_file_operations_t cdev::CDev::fops = {};
-
 static uORB::Mutex devmutex;
 static uORB::Mutex filemutex;
 
@@ -89,8 +87,7 @@ static cdev::CDev *get_vdev(int fd)
   return dev;
 }
 
-int register_driver(const char *name, const cdev::orb_file_operations_t *fops, cdev::mode_t mode, void *data)
-{
+int register_driver(const char *name, void *data) {
   ORB_DEBUG("CDev::register_driver %s", name);
   int ret = 0;
 
@@ -239,7 +236,7 @@ ssize_t orb_write(int fd, const void *buffer, size_t buflen)
 
   if (dev) {
     ORB_DEBUG("orb_write fd = %d", fd);
-    ret = dev->write(&filemap[fd], (const char *)buffer, buflen);
+    ret = dev->write((const char *)buffer, buflen);
 
   } else {
     ret = -EINVAL;

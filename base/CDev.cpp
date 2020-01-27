@@ -42,9 +42,7 @@
 #include "orb_log.h"
 #include "orb_posix.h"
 
-#include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 
 namespace cdev
 {
@@ -77,47 +75,6 @@ CDev::~CDev()
 }
 
 int
-CDev::register_class_devname(const char *class_devname)
-{
-  ORB_DEBUG("CDev::register_class_devname %s", class_devname);
-
-	if (class_devname == nullptr) {
-		return -EINVAL;
-	}
-
-	int class_instance = 0;
-	int ret = -ENOSPC;
-
-	while (class_instance < 4) {
-		char name[32];
-		snprintf(name, sizeof(name), "%s%d", class_devname, class_instance);
-		ret = register_driver(name, &fops, 0666, (void *)this);
-
-		if (ret == ORB_OK) {
-			break;
-		}
-
-		class_instance++;
-	}
-
-	if (class_instance == 4) {
-		return ret;
-	}
-
-	return class_instance;
-}
-
-int
-CDev::unregister_class_devname(const char *class_devname, unsigned class_instance)
-{
-  ORB_DEBUG("CDev::unregister_class_devname");
-
-	char name[32];
-	snprintf(name, sizeof(name), "%s%u", class_devname, class_instance);
-	return unregister_driver(name);
-}
-
-int
 CDev::init()
 {
   ORB_DEBUG("CDev::init");
@@ -126,7 +83,7 @@ CDev::init()
 
 	// now register the driver
 	if (_devname != nullptr) {
-		ret = register_driver(_devname, &fops, 0666, (void *)this);
+		ret = register_driver(_devname, (void *)this);
 
 		if (ret == ORB_OK) {
 			_registered = true;

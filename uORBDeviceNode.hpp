@@ -91,8 +91,6 @@ public:
 	/**
 	 * writes the published data to the internal buffer to be read by
 	 * subscribers later.
-	 * @param filp
-	 *   the subscriber; this is not used.
 	 * @param buffer
 	 *   The buffer for the input data
 	 * @param buflen
@@ -100,7 +98,7 @@ public:
 	 * @return ssize_t
 	 *   The number of bytes that are written
 	 */
-	ssize_t write(cdev::file_t *filp, const char *buffer, size_t buflen) override;
+	ssize_t write(const char *buffer, size_t buflen) override;
 
 	/**
 	 * IOCTL control for the subscriber.

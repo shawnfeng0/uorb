@@ -110,37 +110,24 @@ public:
 	 *
 	 * The default implementation returns -ENOSYS.
 	 *
-	 * @param filep		Pointer to the NuttX file structure.
 	 * @param buffer	Pointer to the buffer from which data should be read.
 	 * @param buflen	The number of bytes to be written.
 	 * @return		The number of bytes written or -errno otherwise.
 	 */
-	virtual ssize_t	write(file_t *filep, const char *buffer, size_t buflen) { return -ENOSYS; }
+	virtual ssize_t	write(const char *buffer, size_t buflen) { return -ENOSYS; }
 
-	/**
-	 * Perform a logical seek operation on the device.
-	 *
-	 * The default implementation returns -ENOSYS.
-	 *
-	 * @param filep		Pointer to the NuttX file structure.
-	 * @param offset	The new file position relative to whence.
-	 * @param whence	SEEK_OFS, SEEK_CUR or SEEK_END.
-	 * @return		The previous offset, or -errno otherwise.
-	 */
-	virtual off_t	seek(file_t *filep, off_t offset, int whence) { return -ENOSYS; }
-
-	/**
-	 * Perform an ioctl operation on the device.
-	 *
-	 * The default implementation handles DIOC_GETPRIV, and otherwise
-	 * returns -ENOTTY. Subclasses should call the default implementation
-	 * for any command they do not handle themselves.
-	 *
-	 * @param filep		Pointer to the NuttX file structure.
-	 * @param cmd		The ioctl command value.
-	 * @param arg		The ioctl argument value.
-	 * @return		ORB_OK on success, or -errno otherwise.
-	 */
+        /**
+         * Perform an ioctl operation on the device.
+         *
+         * The default implementation handles DIOC_GETPRIV, and otherwise
+         * returns -ENOTTY. Subclasses should call the default implementation
+         * for any command they do not handle themselves.
+         *
+         * @param filep		Pointer to the NuttX file structure.
+         * @param cmd		The ioctl command value.
+         * @param arg		The ioctl argument value.
+         * @return		ORB_OK on success, or -errno otherwise.
+         */
 	virtual int	ioctl(file_t *filep, int cmd, unsigned long arg);
 
 	/**
@@ -164,24 +151,19 @@ public:
 	const char	*get_devname() const { return _devname; }
 
 protected:
-	/**
-	 * Pointer to the default cdev file operations table; useful for
-	 * registering clone devices etc.
-	 */
-	static const orb_file_operations_t	fops;
-
-	/**
-	 * Check the current state of the device for poll events from the
-	 * perspective of the file.
-	 *
-	 * This function is called by the default poll() implementation when
-	 * a poll is set up to determine whether the poll should return immediately.
-	 *
-	 * The default implementation returns no events.
-	 *
-	 * @param filep		The file that's interested.
-	 * @return		The current set of poll events.
-	 */
+        /**
+         * Check the current state of the device for poll events from the
+         * perspective of the file.
+         *
+         * This function is called by the default poll() implementation when
+         * a poll is set up to determine whether the poll should return
+         * immediately.
+         *
+         * The default implementation returns no events.
+         *
+         * @param filep		The file that's interested.
+         * @return		The current set of poll events.
+         */
 	virtual pollevent_t poll_state(file_t *filep) { return 0; }
 
 	/**
@@ -228,34 +210,15 @@ protected:
 	 */
 	virtual int	close_last(file_t *filep) { return ORB_OK; }
 
-	/**
-	 * Register a class device name, automatically adding device
-	 * class instance suffix if need be.
-	 *
-	 * @param class_devname   Device class name
-	 * @return class_instamce Class instance created, or -errno on failure
-	 */
-	virtual int register_class_devname(const char *class_devname);
-
-	/**
-	 * Register a class device name, automatically adding device
-	 * class instance suffix if need be.
-	 *
-	 * @param class_devname   Device class name
-	 * @param class_instance  Device class instance from register_class_devname()
-	 * @return		  ORB_OK on success, -errno otherwise
-	 */
-	virtual int unregister_class_devname(const char *class_devname, unsigned class_instance);
-
-	/**
-	 * Take the driver lock.
-	 *
-	 * Each driver instance has its own lock/semaphore.
-	 *
-	 * Note that we must loop as the wait may be interrupted by a signal.
-	 *
-	 * Careful: lock() calls cannot be nested!
-	 */
+        /**
+         * Take the driver lock.
+         *
+         * Each driver instance has its own lock/semaphore.
+         *
+         * Note that we must loop as the wait may be interrupted by a signal.
+         *
+         * Careful: lock() calls cannot be nested!
+         */
 	void		lock() { do {} while (orb_sem_wait(&_lock) != 0); }
 
 	/**
