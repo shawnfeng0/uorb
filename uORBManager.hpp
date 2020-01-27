@@ -172,7 +172,7 @@ public:
 	 * @param handle  handle returned by orb_advertise or orb_advertise_multi.
 	 * @return 0 on success
 	 */
-	int orb_unadvertise(orb_advert_t handle);
+	static int orb_unadvertise(orb_advert_t handle);
 
 	/**
 	 * Publish new data to a topic.
@@ -187,7 +187,7 @@ public:
 	 * @param data    A pointer to the data to be published.
 	 * @return    ORB_OK on success, ORB_ERROR otherwise with errno set accordingly.
 	 */
-	int  orb_publish(const struct orb_metadata *meta, orb_advert_t handle, const void *data);
+	static int  orb_publish(const struct orb_metadata *meta, orb_advert_t handle, const void *data);
 
 	/**
 	 * Subscribe to a topic.
@@ -263,7 +263,7 @@ public:
 	 * @param handle  A handle returned from orb_subscribe.
 	 * @return    ORB_OK on success, ORB_ERROR otherwise with errno set accordingly.
 	 */
-	int  orb_unsubscribe(int handle);
+	static int  orb_unsubscribe(int handle);
 
 	/**
 	 * Fetch data from a topic.
@@ -281,7 +281,7 @@ public:
 	 *      using the data.
 	 * @return    ORB_OK on success, ORB_ERROR otherwise with errno set accordingly.
 	 */
-	int  orb_copy(const struct orb_metadata *meta, int handle, void *buffer);
+	static int  orb_copy(const struct orb_metadata *meta, int handle, void *buffer);
 
 	/**
 	 * Check whether a topic has been published to since the last orb_copy.
@@ -301,7 +301,7 @@ public:
 	 * @return    ORB_OK if the check was successful, ORB_ERROR otherwise with
 	 *      errno set accordingly.
 	 */
-	int  orb_check(int handle, bool *updated);
+	static int  orb_check(int handle, bool *updated);
 
 	/**
 	 * Return the last time that the topic was updated. If a queue is used, it returns
@@ -312,7 +312,7 @@ public:
 	 *      never been updated. Time is measured in microseconds.
 	 * @return    ORB_OK on success, ORB_ERROR otherwise with errno set accordingly.
 	 */
-	int  orb_stat(int handle, uint64_t *time);
+	static int  orb_stat(int handle, uint64_t *time);
 
 	/**
 	 * Check if a topic has already been created and published (advertised)
@@ -333,7 +333,7 @@ public:
 	 *      independent of the startup order of the associated publishers.
 	 * @return    ORB_OK on success, ORB_ERROR otherwise with errno set accordingly.
 	 */
-	int  orb_priority(int handle, int32_t *priority);
+	static int  orb_priority(int handle, int32_t *priority);
 
 	/**
 	 * Set the minimum interval between which updates are seen for a subscription.
@@ -353,7 +353,7 @@ public:
 	 * @param interval  An interval period in milliseconds.
 	 * @return    ORB_OK on success, ORB_ERROR otherwise with ERRNO set accordingly.
 	 */
-	int  orb_set_interval(int handle, unsigned interval);
+	static int  orb_set_interval(int handle, unsigned interval);
 
 
 	/**
@@ -365,7 +365,7 @@ public:
 	 * @param interval  The returned interval period in milliseconds.
 	 * @return    ORB_OK on success, ORB_ERROR otherwise with ERRNO set accordingly.
 	 */
-	int	orb_get_interval(int handle, unsigned *interval);
+	static int	orb_get_interval(int handle, unsigned *interval);
 
 #ifdef ORB_COMMUNICATOR
 	/**
@@ -419,7 +419,7 @@ private: // data members
 	ORBSet _remote_topics;
 #endif /* ORB_COMMUNICATOR */
 
-	DeviceMaster *_device_master{nullptr};
+	DeviceMaster _device_master {};
 
 private: //class methods
 	Manager();

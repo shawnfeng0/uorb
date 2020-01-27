@@ -75,23 +75,11 @@ uORB::Manager::Manager()
 
 }
 
-uORB::Manager::~Manager()
-{
-	delete _device_master;
-}
+uORB::Manager::~Manager() = default;
 
 uORB::DeviceMaster *uORB::Manager::get_device_master()
 {
-	if (!_device_master) {
-		_device_master = new DeviceMaster();
-
-		if (_device_master == nullptr) {
-                  ORB_ERR("Failed to allocate DeviceMaster");
-			orb_errno = ENOMEM;
-		}
-	}
-
-	return _device_master;
+	return &_device_master;
 }
 
 int uORB::Manager::orb_exists(const struct orb_metadata *meta, int instance)
@@ -103,15 +91,13 @@ int uORB::Manager::orb_exists(const struct orb_metadata *meta, int instance)
 		return ret;
 	}
 
-	if (get_device_master()) {
-		uORB::DeviceNode *node = _device_master->getDeviceNode(meta, instance);
+	uORB::DeviceNode *node = _device_master.getDeviceNode(meta, instance);
 
-		if (node != nullptr) {
-			if (node->is_advertised()) {
-				return ORB_OK;
-			}
-		}
-	}
+	if (node != nullptr) {
+          if (node->is_advertised()) {
+            return ORB_OK;
+          }
+        }
 
 #ifdef ORB_COMMUNICATOR
 
@@ -320,11 +306,7 @@ int uORB::Manager::orb_get_interval(int handle, unsigned *interval)
 
 int uORB::Manager::node_advertise(const struct orb_metadata *meta, bool is_advertiser, int *instance, int priority)
 {
-	int ret = ORB_ERROR;
-
-	if (get_device_master()) {
-		ret = _device_master->advertise(meta, is_advertiser, instance, priority);
-	}
+	int ret = _device_master.advertise(meta, is_advertiser, instance, priority);
 
 	/* it's ORB_OK if it already exists */
 	if ((ORB_OK != ret) && (EEXIST == orb_errno)) {
@@ -338,7 +320,7 @@ int uORB::Manager::node_open(const struct orb_metadata *meta, bool advertiser, i
 {
 	char path[orb_maxpath];
 	int fd = -1;
-	int ret = ORB_ERROR;
+	int ret;
 
 	/*
 	 * If meta is null, the object was not defined, i.e. it is not
