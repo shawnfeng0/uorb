@@ -44,39 +44,43 @@
 #endif
 
 #if !defined(_IO)
-#define _IO(x,y) (x+y)
+#define _IO(x, y) (x + y)
 #endif
 
 // NuttX _IOC is equivalent to Linux _IO
-#define _PX4_IOC(x,y) _IO(x,y)
+#define _PX4_IOC(x, y) _IO(x, y)
 
-#define _ORBIOCBASE		(0x2600)
-#define _ORBIOC(_n)		(_PX4_IOC(_ORBIOCBASE, _n))
+#define _ORBIOCBASE (0x2600)
+#define _ORBIOC(_n) (_PX4_IOC(_ORBIOCBASE, _n))
 
 /*
  * IOCTLs for individual topics.
  */
 
 /** Fetch the time at which the topic was last updated into *(uint64_t *)arg */
-#define ORBIOCLASTUPDATE	_ORBIOC(10)
+#define ORBIOCLASTUPDATE _ORBIOC(10)
 
-/** Check whether the topic has been updated since it was last read, sets *(bool *)arg */
-#define ORBIOCUPDATED		_ORBIOC(11)
+/** Check whether the topic has been updated since it was last read, sets *(bool
+ * *)arg */
+#define ORBIOCUPDATED _ORBIOC(11)
 
-/** Set the minimum interval at which the topic can be seen to be updated for this subscription */
-#define ORBIOCSETINTERVAL	_ORBIOC(12)
+/** Set the minimum interval at which the topic can be seen to be updated for
+ * this subscription */
+#define ORBIOCSETINTERVAL _ORBIOC(12)
 
 /** Get the global advertiser handle for the topic */
-#define ORBIOCGADVERTISER	_ORBIOC(13)
+#define ORBIOCGADVERTISER _ORBIOC(13)
 
 /** Get the priority for the topic */
-#define ORBIOCGPRIORITY		_ORBIOC(14)
+#define ORBIOCGPRIORITY _ORBIOC(14)
 
 /** Set the queue size of the topic */
-#define ORBIOCSETQUEUESIZE	_ORBIOC(15)
+#define ORBIOCSETQUEUESIZE _ORBIOC(15)
 
-/** Get the minimum interval at which the topic can be seen to be updated for this subscription */
-#define ORBIOCGETINTERVAL	_ORBIOC(16)
+/** Get the minimum interval at which the topic can be seen to be updated for
+ * this subscription */
+#define ORBIOCGETINTERVAL _ORBIOC(16)
 
-/** Check whether the topic is advertised, sets *(unsigned long *)arg to 1 if advertised, 0 otherwise */
-#define ORBIOCISADVERTISED	_ORBIOC(17)
+/** Check whether the topic is advertised, sets *(unsigned long *)arg to 1 if
+ * advertised, 0 otherwise */
+#define ORBIOCISADVERTISED _ORBIOC(17)

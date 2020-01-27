@@ -34,19 +34,18 @@
 #ifndef _uORBCommon_hpp_
 #define _uORBCommon_hpp_
 
-#include "uORB.h"
 #include "base/drv_hrt.h"
 #include "base/orb_dev.h"
+#include "uORB.h"
 
-namespace uORB
-{
+namespace uORB {
 static constexpr unsigned orb_maxpath = 64;
 
 struct orb_advertdata {
-	const struct orb_metadata *meta;
-	int *instance;
-	int priority;
+  const struct orb_metadata *meta;
+  int *instance;
+  int priority;
 };
 
-}
-#endif // _uORBCommon_hpp_
+}  // namespace uORB
+#endif  // _uORBCommon_hpp_

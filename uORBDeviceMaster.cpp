@@ -32,6 +32,7 @@
  ****************************************************************************/
 
 #include "uORBDeviceMaster.hpp"
+
 #include "uORBDeviceNode.hpp"
 #include "uORBManager.hpp"
 #include "uORBUtils.hpp"
@@ -40,416 +41,424 @@
 #include "uORBCommunicator.hpp"
 #endif /* ORB_COMMUNICATOR */
 
-#include "base/orb_log.h"
 #include "base/SemLockGuard.hpp"
+#include "base/orb_log.h"
 
-uORB::DeviceMaster::DeviceMaster()
-{
-	orb_sem_init(&_lock, 0, 1);
-	_last_statistics_output = hrt_absolute_time();
+uORB::DeviceMaster::DeviceMaster() {
+  orb_sem_init(&_lock, 0, 1);
+  _last_statistics_output = hrt_absolute_time();
 }
 
-uORB::DeviceMaster::~DeviceMaster()
-{
-	orb_sem_destroy(&_lock);
-}
+uORB::DeviceMaster::~DeviceMaster() { orb_sem_destroy(&_lock); }
 
 /* Duplicate S, returning an identical string assigned using "new". */
-static inline char *strdup_with_new(const char *__s)
-{
+static inline char *strdup_with_new(const char *__s) {
   const char *__old = (__s);
-  size_t __len = strlen (__old) + 1;
+  size_t __len = strlen(__old) + 1;
   char *__new = new char[__len];
   // Possibility of allocation failure in microcontroller
-  if (__new == nullptr)
-    return __new;
-  return (char *) memcpy(__new, __old, __len);
+  if (__new == nullptr) return __new;
+  return (char *)memcpy(__new, __old, __len);
 }
 
-int
-uORB::DeviceMaster::advertise(const struct orb_metadata *meta, bool is_advertiser, int *instance, int priority)
-{
-	int ret = ORB_ERROR;
+int uORB::DeviceMaster::advertise(const struct orb_metadata *meta,
+                                  bool is_advertiser, int *instance,
+                                  int priority) {
+  int ret = ORB_ERROR;
 
-	char nodepath[orb_maxpath];
+  char nodepath[orb_maxpath];
 
-	/* construct a path to the node - this also checks the node name */
-	ret = uORB::Utils::node_mkpath(nodepath, meta, instance);
+  /* construct a path to the node - this also checks the node name */
+  ret = uORB::Utils::node_mkpath(nodepath, meta, instance);
 
-	if (ret != ORB_OK) {
-		return ret;
-	}
+  if (ret != ORB_OK) {
+    return ret;
+  }
 
-	ret = ORB_ERROR;
+  ret = ORB_ERROR;
 
-	/* try for topic groups */
-	const unsigned max_group_tries = (instance != nullptr) ? ORB_MULTI_MAX_INSTANCES : 1;
-	unsigned group_tries = 0;
+  /* try for topic groups */
+  const unsigned max_group_tries =
+      (instance != nullptr) ? ORB_MULTI_MAX_INSTANCES : 1;
+  unsigned group_tries = 0;
 
-	if (instance) {
-		/* for an advertiser, this will be 0, but a for subscriber that requests a certain instance,
-		 * we do not want to start with 0, but with the instance the subscriber actually requests.
-		 */
-		group_tries = *instance;
+  if (instance) {
+    /* for an advertiser, this will be 0, but a for subscriber that requests a
+     * certain instance, we do not want to start with 0, but with the instance
+     * the subscriber actually requests.
+     */
+    group_tries = *instance;
 
-		if (group_tries >= max_group_tries) {
-			return -ENOMEM;
-		}
-	}
+    if (group_tries >= max_group_tries) {
+      return -ENOMEM;
+    }
+  }
 
-        SemLock smart_lock(_lock);
+  SemLock smart_lock(_lock);
 
-	do {
-		/* if path is modifyable change try index */
-		if (instance != nullptr) {
-			/* replace the number at the end of the string */
-			nodepath[strlen(nodepath) - 1] = '0' + group_tries;
-			*instance = group_tries;
-		}
+  do {
+    /* if path is modifyable change try index */
+    if (instance != nullptr) {
+      /* replace the number at the end of the string */
+      nodepath[strlen(nodepath) - 1] = '0' + group_tries;
+      *instance = group_tries;
+    }
 
-		/* driver wants a permanent copy of the path, so make one here */
-                char *devpath = strdup_with_new(nodepath);
+    /* driver wants a permanent copy of the path, so make one here */
+    char *devpath = strdup_with_new(nodepath);
 
-		if (devpath == nullptr) {
-			return -ENOMEM;
-		}
+    if (devpath == nullptr) {
+      return -ENOMEM;
+    }
 
-		/* construct the new node, passing the ownership of path to it */
-		auto *node = new uORB::DeviceNode(meta, group_tries, devpath, priority);
+    /* construct the new node, passing the ownership of path to it */
+    auto *node = new uORB::DeviceNode(meta, group_tries, devpath, priority);
 
-		/* if we didn't get a device, that's bad, free the path too */
-		if (node == nullptr) {
-			delete[] devpath;
-			return -ENOMEM;
-		}
+    /* if we didn't get a device, that's bad, free the path too */
+    if (node == nullptr) {
+      delete[] devpath;
+      return -ENOMEM;
+    }
 
-		/* initialise the node - this may fail if e.g. a node with this name already exists */
-		ret = node->init();
+    /* initialise the node - this may fail if e.g. a node with this name already
+     * exists */
+    ret = node->init();
 
-		/* if init failed, discard the node and its name */
-		if (ret != ORB_OK) {
-			delete node;
+    /* if init failed, discard the node and its name */
+    if (ret != ORB_OK) {
+      delete node;
 
-			if (ret == -EEXIST) {
-				/* if the node exists already, get the existing one and check if it's advertised. */
-				uORB::DeviceNode *existing_node = getDeviceNodeLocked(meta, group_tries);
+      if (ret == -EEXIST) {
+        /* if the node exists already, get the existing one and check if it's
+         * advertised. */
+        uORB::DeviceNode *existing_node =
+            getDeviceNodeLocked(meta, group_tries);
 
-				/*
-				 * We can claim an existing node in these cases:
-				 * - The node is not advertised (yet). It means there is already one or more subscribers or it was
-				 *   unadvertised.
-				 * - We are a single-instance advertiser requesting the first instance.
-				 *   (Usually we don't end up here, but we might in case of a race condition between 2
-				 *   advertisers).
-				 * - We are a subscriber requesting a certain instance.
-				 *   (Also we usually don't end up in that case, but we might in case of a race condtion
-				 *   between an advertiser and subscriber).
-				 */
-				bool is_single_instance_advertiser = is_advertiser && !instance;
+        /*
+         * We can claim an existing node in these cases:
+         * - The node is not advertised (yet). It means there is already one or
+         * more subscribers or it was unadvertised.
+         * - We are a single-instance advertiser requesting the first instance.
+         *   (Usually we don't end up here, but we might in case of a race
+         * condition between 2 advertisers).
+         * - We are a subscriber requesting a certain instance.
+         *   (Also we usually don't end up in that case, but we might in case of
+         * a race condtion between an advertiser and subscriber).
+         */
+        bool is_single_instance_advertiser = is_advertiser && !instance;
 
-				if (existing_node != nullptr &&
-				    (!existing_node->is_advertised() || is_single_instance_advertiser || !is_advertiser)) {
-					if (is_advertiser) {
-						existing_node->set_priority(priority);
-						/* Set as advertised to avoid race conditions (otherwise 2 multi-instance advertisers
-						 * could get the same instance).
-						 */
-						existing_node->mark_as_advertised();
-					}
+        if (existing_node != nullptr &&
+            (!existing_node->is_advertised() || is_single_instance_advertiser ||
+             !is_advertiser)) {
+          if (is_advertiser) {
+            existing_node->set_priority(priority);
+            /* Set as advertised to avoid race conditions (otherwise 2
+             * multi-instance advertisers could get the same instance).
+             */
+            existing_node->mark_as_advertised();
+          }
 
-					ret = ORB_OK;
+          ret = ORB_OK;
 
-				} else {
-					/* otherwise: already advertised, keep looking */
-				}
-			}
+        } else {
+          /* otherwise: already advertised, keep looking */
+        }
+      }
 
-		} else {
-			if (is_advertiser) {
-				node->mark_as_advertised();
-			}
+    } else {
+      if (is_advertiser) {
+        node->mark_as_advertised();
+      }
 
-			// add to the node map.
-			_node_list.add(node);
-		}
+      // add to the node map.
+      _node_list.add(node);
+    }
 
-		group_tries++;
+    group_tries++;
 
-	} while (ret != ORB_OK && (group_tries < max_group_tries));
+  } while (ret != ORB_OK && (group_tries < max_group_tries));
 
-	if (ret != ORB_OK && group_tries >= max_group_tries) {
-		ret = -ENOMEM;
-	}
+  if (ret != ORB_OK && group_tries >= max_group_tries) {
+    ret = -ENOMEM;
+  }
 
-	return ret;
+  return ret;
 }
 
-void uORB::DeviceMaster::printStatistics(bool reset)
-{
-	hrt_abstime current_time = hrt_absolute_time();
-        ORB_INFO("Statistics, since last output (%i ms):", (int)((current_time - _last_statistics_output) / 1000));
-	_last_statistics_output = current_time;
+void uORB::DeviceMaster::printStatistics(bool reset) {
+  hrt_abstime current_time = hrt_absolute_time();
+  ORB_INFO("Statistics, since last output (%i ms):",
+           (int)((current_time - _last_statistics_output) / 1000));
+  _last_statistics_output = current_time;
 
-        ORB_INFO("TOPIC, NR LOST MSGS");
-	bool had_print = false;
+  ORB_INFO("TOPIC, NR LOST MSGS");
+  bool had_print = false;
 
-	/* Add all nodes to a list while locked, and then print them in unlocked state, to avoid potential
-	 * dead-locks (where printing blocks) */
-	lock();
-	DeviceNodeStatisticsData *first_node = nullptr;
-	DeviceNodeStatisticsData *cur_node = nullptr;
-	size_t max_topic_name_length = 0;
-	int num_topics = 0;
-	int ret = addNewDeviceNodes(&first_node, num_topics, max_topic_name_length, nullptr, 0);
-	unlock();
+  /* Add all nodes to a list while locked, and then print them in unlocked
+   * state, to avoid potential dead-locks (where printing blocks) */
+  lock();
+  DeviceNodeStatisticsData *first_node = nullptr;
+  DeviceNodeStatisticsData *cur_node = nullptr;
+  size_t max_topic_name_length = 0;
+  int num_topics = 0;
+  int ret = addNewDeviceNodes(&first_node, num_topics, max_topic_name_length,
+                              nullptr, 0);
+  unlock();
 
-	if (ret != 0) {
-          ORB_ERR("addNewDeviceNodes failed (%i)", ret);
-	}
+  if (ret != 0) {
+    ORB_ERR("addNewDeviceNodes failed (%i)", ret);
+  }
 
-	cur_node = first_node;
+  cur_node = first_node;
 
-	while (cur_node) {
-		if (cur_node->node->print_statistics(reset)) {
-			had_print = true;
-		}
+  while (cur_node) {
+    if (cur_node->node->print_statistics(reset)) {
+      had_print = true;
+    }
 
-		DeviceNodeStatisticsData *prev = cur_node;
-		cur_node = cur_node->next;
-		delete prev;
-	}
+    DeviceNodeStatisticsData *prev = cur_node;
+    cur_node = cur_node->next;
+    delete prev;
+  }
 
-	if (!had_print) {
-          ORB_INFO("No lost messages");
-	}
+  if (!had_print) {
+    ORB_INFO("No lost messages");
+  }
 }
 
-int uORB::DeviceMaster::addNewDeviceNodes(DeviceNodeStatisticsData **first_node, int &num_topics,
-		size_t &max_topic_name_length, char **topic_filter, int num_filters)
-{
-	DeviceNodeStatisticsData *cur_node = nullptr;
-	num_topics = 0;
-	DeviceNodeStatisticsData *last_node = *first_node;
+int uORB::DeviceMaster::addNewDeviceNodes(DeviceNodeStatisticsData **first_node,
+                                          int &num_topics,
+                                          size_t &max_topic_name_length,
+                                          char **topic_filter,
+                                          int num_filters) {
+  DeviceNodeStatisticsData *cur_node = nullptr;
+  num_topics = 0;
+  DeviceNodeStatisticsData *last_node = *first_node;
 
-	if (last_node) {
-		while (last_node->next) {
-			last_node = last_node->next;
-		}
-	}
+  if (last_node) {
+    while (last_node->next) {
+      last_node = last_node->next;
+    }
+  }
 
-	for (const auto &node : _node_list) {
+  for (const auto &node : _node_list) {
+    ++num_topics;
 
-		++num_topics;
+    // check if already added
+    cur_node = *first_node;
 
-		//check if already added
-		cur_node = *first_node;
+    while (cur_node && cur_node->node != node) {
+      cur_node = cur_node->next;
+    }
 
-		while (cur_node && cur_node->node != node) {
-			cur_node = cur_node->next;
-		}
+    if (cur_node) {
+      continue;
+    }
 
-		if (cur_node) {
-			continue;
-		}
+    if (num_filters > 0 && topic_filter) {
+      bool matched = false;
 
-		if (num_filters > 0 && topic_filter) {
-			bool matched = false;
+      for (int i = 0; i < num_filters; ++i) {
+        if (strstr(node->get_meta()->o_name, topic_filter[i])) {
+          matched = true;
+        }
+      }
 
-			for (int i = 0; i < num_filters; ++i) {
-				if (strstr(node->get_meta()->o_name, topic_filter[i])) {
-					matched = true;
-				}
-			}
+      if (!matched) {
+        continue;
+      }
+    }
 
-			if (!matched) {
-				continue;
-			}
-		}
+    if (last_node) {
+      last_node->next = new DeviceNodeStatisticsData();
+      last_node = last_node->next;
 
-		if (last_node) {
-			last_node->next = new DeviceNodeStatisticsData();
-			last_node = last_node->next;
+    } else {
+      *first_node = last_node = new DeviceNodeStatisticsData();
+    }
 
-		} else {
-			*first_node = last_node = new DeviceNodeStatisticsData();
-		}
+    if (!last_node) {
+      return -ENOMEM;
+    }
 
-		if (!last_node) {
-			return -ENOMEM;
-		}
+    last_node->node = node;
 
-		last_node->node = node;
+    size_t name_length = strlen(last_node->node->get_meta()->o_name);
 
-		size_t name_length = strlen(last_node->node->get_meta()->o_name);
+    if (name_length > max_topic_name_length) {
+      max_topic_name_length = name_length;
+    }
 
-		if (name_length > max_topic_name_length) {
-			max_topic_name_length = name_length;
-		}
+    last_node->last_lost_msg_count = last_node->node->lost_message_count();
+    last_node->last_pub_msg_count = last_node->node->published_message_count();
+  }
 
-		last_node->last_lost_msg_count = last_node->node->lost_message_count();
-		last_node->last_pub_msg_count = last_node->node->published_message_count();
-	}
-
-	return 0;
+  return 0;
 }
 
 #define CLEAR_LINE "\033[K"
 
-void uORB::DeviceMaster::showTop(char **topic_filter, int num_filters)
-{
-	bool print_active_only = true;
-	bool only_once = false; // if true, run only once, then exit
+void uORB::DeviceMaster::showTop(char **topic_filter, int num_filters) {
+  bool print_active_only = true;
+  bool only_once = false;  // if true, run only once, then exit
 
-	if (topic_filter && num_filters > 0) {
-		bool show_all = false;
+  if (topic_filter && num_filters > 0) {
+    bool show_all = false;
 
-		for (int i = 0; i < num_filters; ++i) {
-			if (!strcmp("-a", topic_filter[i])) {
-				show_all = true;
+    for (int i = 0; i < num_filters; ++i) {
+      if (!strcmp("-a", topic_filter[i])) {
+        show_all = true;
 
-			} else if (!strcmp("-1", topic_filter[i])) {
-				only_once = true;
-			}
-		}
+      } else if (!strcmp("-1", topic_filter[i])) {
+        only_once = true;
+      }
+    }
 
-		print_active_only = only_once ? (num_filters == 1) : false; // print non-active if -a or some filter given
+    print_active_only =
+        only_once ? (num_filters == 1)
+                  : false;  // print non-active if -a or some filter given
 
-		if (show_all || print_active_only) {
-			num_filters = 0;
-		}
-	}
+    if (show_all || print_active_only) {
+      num_filters = 0;
+    }
+  }
 
-        ORB_INFO_RAW("\033[2J\n"); //clear screen
+  ORB_INFO_RAW("\033[2J\n");  // clear screen
 
-	lock();
+  lock();
 
-	if (_node_list.empty()) {
-		unlock();
-                ORB_INFO("no active topics");
-		return;
-	}
+  if (_node_list.empty()) {
+    unlock();
+    ORB_INFO("no active topics");
+    return;
+  }
 
-	DeviceNodeStatisticsData *first_node = nullptr;
-	DeviceNodeStatisticsData *cur_node = nullptr;
-	size_t max_topic_name_length = 0;
-	int num_topics = 0;
-	int ret = addNewDeviceNodes(&first_node, num_topics, max_topic_name_length, topic_filter, num_filters);
+  DeviceNodeStatisticsData *first_node = nullptr;
+  DeviceNodeStatisticsData *cur_node = nullptr;
+  size_t max_topic_name_length = 0;
+  int num_topics = 0;
+  int ret = addNewDeviceNodes(&first_node, num_topics, max_topic_name_length,
+                              topic_filter, num_filters);
 
-	/* a DeviceNode is never deleted, so it's save to unlock here and still access the DeviceNodes */
-	unlock();
+  /* a DeviceNode is never deleted, so it's save to unlock here and still access
+   * the DeviceNodes */
+  unlock();
 
-	if (ret != 0) {
-          ORB_ERR("addNewDeviceNodes failed (%i)", ret);
-	}
+  if (ret != 0) {
+    ORB_ERR("addNewDeviceNodes failed (%i)", ret);
+  }
 
-	only_once = true; // For full platform use, so only output once
+  only_once = true;  // For full platform use, so only output once
 
-	bool quit = false;
+  bool quit = false;
 
-	hrt_abstime start_time = hrt_absolute_time();
+  hrt_abstime start_time = hrt_absolute_time();
 
-	while (!quit) {
-		if (!quit) {
+  while (!quit) {
+    if (!quit) {
+      // update the stats
+      hrt_abstime current_time = hrt_absolute_time();
+      float dt = (current_time - start_time) / 1.e6f;
+      cur_node = first_node;
 
-			//update the stats
-			hrt_abstime current_time = hrt_absolute_time();
-			float dt = (current_time - start_time) / 1.e6f;
-			cur_node = first_node;
+      while (cur_node) {
+        uint32_t num_lost = cur_node->node->lost_message_count();
+        unsigned int num_msgs = cur_node->node->published_message_count();
+        cur_node->pub_msg_delta =
+            (num_msgs - cur_node->last_pub_msg_count) / dt;
+        cur_node->lost_msg_delta =
+            (num_lost - cur_node->last_lost_msg_count) / dt;
+        cur_node->last_lost_msg_count = num_lost;
+        cur_node->last_pub_msg_count = num_msgs;
+        cur_node = cur_node->next;
+      }
 
-			while (cur_node) {
-				uint32_t num_lost = cur_node->node->lost_message_count();
-				unsigned int num_msgs = cur_node->node->published_message_count();
-				cur_node->pub_msg_delta = (num_msgs - cur_node->last_pub_msg_count) / dt;
-				cur_node->lost_msg_delta = (num_lost - cur_node->last_lost_msg_count) / dt;
-				cur_node->last_lost_msg_count = num_lost;
-				cur_node->last_pub_msg_count = num_msgs;
-				cur_node = cur_node->next;
-			}
+      start_time = current_time;
 
-			start_time = current_time;
+      ORB_INFO_RAW("\033[H");  // move cursor home and clear screen
+      ORB_INFO_RAW(CLEAR_LINE "update: 1s, num topics: %i\n", num_topics);
+      ORB_INFO_RAW(CLEAR_LINE "%-*s INST #SUB #MSG #LOST #QSIZE\n",
+                   (int)max_topic_name_length - 2, "TOPIC NAME");
+      cur_node = first_node;
 
-                        ORB_INFO_RAW("\033[H"); // move cursor home and clear screen
-                        ORB_INFO_RAW(CLEAR_LINE "update: 1s, num topics: %i\n", num_topics);
-                        ORB_INFO_RAW(CLEAR_LINE "%-*s INST #SUB #MSG #LOST #QSIZE\n", (int)max_topic_name_length - 2, "TOPIC NAME");
-			cur_node = first_node;
+      while (cur_node) {
+        if (!print_active_only || cur_node->pub_msg_delta > 0) {
+          ORB_INFO_RAW(
+              CLEAR_LINE "%-*s %2i %4i %4i %5i %i\n",
+              (int)max_topic_name_length, cur_node->node->get_meta()->o_name,
+              (int)cur_node->node->get_instance(),
+              (int)cur_node->node->subscriber_count(), cur_node->pub_msg_delta,
+              (int)cur_node->lost_msg_delta, cur_node->node->get_queue_size());
+        }
 
-			while (cur_node) {
+        cur_node = cur_node->next;
+      }
 
-				if (!print_active_only || cur_node->pub_msg_delta > 0) {
-                                  ORB_INFO_RAW(CLEAR_LINE "%-*s %2i %4i %4i %5i %i\n", (int)max_topic_name_length,
-						     cur_node->node->get_meta()->o_name, (int)cur_node->node->get_instance(),
-						     (int)cur_node->node->subscriber_count(), cur_node->pub_msg_delta,
-						     (int)cur_node->lost_msg_delta, cur_node->node->get_queue_size());
-				}
+      lock();
+      ret = addNewDeviceNodes(&first_node, num_topics, max_topic_name_length,
+                              topic_filter, num_filters);
+      unlock();
 
-				cur_node = cur_node->next;
-			}
+      if (ret != 0) {
+        ORB_ERR("addNewDeviceNodes failed (%i)", ret);
+      }
+    }
 
-			lock();
-			ret = addNewDeviceNodes(&first_node, num_topics, max_topic_name_length, topic_filter, num_filters);
-			unlock();
+    if (only_once) {
+      quit = true;
+    }
+  }
 
-			if (ret != 0) {
-                          ORB_ERR("addNewDeviceNodes failed (%i)", ret);
-			}
+  // cleanup
+  cur_node = first_node;
 
-		}
-
-		if (only_once) {
-			quit = true;
-		}
-	}
-
-	//cleanup
-	cur_node = first_node;
-
-	while (cur_node) {
-		DeviceNodeStatisticsData *next_node = cur_node->next;
-		delete cur_node;
-		cur_node = next_node;
-	}
+  while (cur_node) {
+    DeviceNodeStatisticsData *next_node = cur_node->next;
+    delete cur_node;
+    cur_node = next_node;
+  }
 }
 
 #undef CLEAR_LINE
 
-uORB::DeviceNode *uORB::DeviceMaster::getDeviceNode(const char *nodepath)
-{
-	lock();
+uORB::DeviceNode *uORB::DeviceMaster::getDeviceNode(const char *nodepath) {
+  lock();
 
-	for (uORB::DeviceNode *node : _node_list) {
-		if (strcmp(node->get_devname(), nodepath) == 0) {
-			unlock();
-			return node;
-		}
-	}
+  for (uORB::DeviceNode *node : _node_list) {
+    if (strcmp(node->get_devname(), nodepath) == 0) {
+      unlock();
+      return node;
+    }
+  }
 
-	unlock();
+  unlock();
 
-	return nullptr;
+  return nullptr;
 }
 
-uORB::DeviceNode *uORB::DeviceMaster::getDeviceNode(const struct orb_metadata *meta, const uint8_t instance)
-{
-	if (meta == nullptr) {
-		return nullptr;
-	}
+uORB::DeviceNode *uORB::DeviceMaster::getDeviceNode(
+    const struct orb_metadata *meta, const uint8_t instance) {
+  if (meta == nullptr) {
+    return nullptr;
+  }
 
-	lock();
-	uORB::DeviceNode *node = getDeviceNodeLocked(meta, instance);
-	unlock();
+  lock();
+  uORB::DeviceNode *node = getDeviceNodeLocked(meta, instance);
+  unlock();
 
-	//We can safely return the node that can be used by any thread, because
-	//a DeviceNode never gets deleted.
-	return node;
+  // We can safely return the node that can be used by any thread, because
+  // a DeviceNode never gets deleted.
+  return node;
 }
 
-uORB::DeviceNode *uORB::DeviceMaster::getDeviceNodeLocked(const struct orb_metadata *meta, const uint8_t instance)
-{
-	for (uORB::DeviceNode *node : _node_list) {
-		if ((strcmp(node->get_name(), meta->o_name) == 0) && (node->get_instance() == instance)) {
-			return node;
-		}
-	}
+uORB::DeviceNode *uORB::DeviceMaster::getDeviceNodeLocked(
+    const struct orb_metadata *meta, const uint8_t instance) {
+  for (uORB::DeviceNode *node : _node_list) {
+    if ((strcmp(node->get_name(), meta->o_name) == 0) &&
+        (node->get_instance() == instance)) {
+      return node;
+    }
+  }
 
-	return nullptr;
+  return nullptr;
 }

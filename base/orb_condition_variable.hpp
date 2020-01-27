@@ -14,12 +14,12 @@ typedef pthread_cond_t __orb_thread_cond_t;
 #endif
 #define __ORB_THREAD_COND_INIT(x) pthread_cond_init((x), nullptr)
 #define __ORB_THREAD_COND_INIT_CLOCK(x, clock_id) \
-do { \
-	pthread_condattr_t attr; \
-	pthread_condattr_init(&attr); \
-	pthread_condattr_setclock(&attr, (clock_id)); \
-	pthread_cond_init((x), &attr); \
-} while (0)
+  do {                                            \
+    pthread_condattr_t attr;                      \
+    pthread_condattr_init(&attr);                 \
+    pthread_condattr_setclock(&attr, (clock_id)); \
+    pthread_cond_init((x), &attr);                \
+  } while (0)
 #define __ORB_THREAD_COND_DESTROY pthread_cond_destroy
 #define __ORB_THREAD_COND_SIGNAL pthread_cond_signal
 #define __ORB_THREAD_COND_BROADCAST pthread_cond_broadcast
@@ -29,26 +29,23 @@ do { \
 /// condition_variable
 template <int clock_id>
 class ConditionVariable {
-
 #ifdef __ORB_THREAD_COND_INITIAIZER
   __orb_thread_cond_t cond_ = __ORB_THREAD_COND_INITIALIZER;
   condition_variable() noexcept = default;
 #else
   __orb_thread_cond_t cond_{};
 
-public:
+ public:
   ConditionVariable() noexcept {
     __ORB_THREAD_COND_INIT_CLOCK(&cond_, clock_id);
   }
 
-  ~ConditionVariable() noexcept {
-    __ORB_THREAD_COND_DESTROY(&cond_);
-  }
+  ~ConditionVariable() noexcept { __ORB_THREAD_COND_DESTROY(&cond_); }
 #endif
 
  public:
-   ConditionVariable(const ConditionVariable &) = delete;
-   ConditionVariable & operator=(const ConditionVariable &) = delete;
+  ConditionVariable(const ConditionVariable &) = delete;
+  ConditionVariable &operator=(const ConditionVariable &) = delete;
 
   int notify_one() noexcept { return __ORB_THREAD_COND_SIGNAL(&cond_); }
 
@@ -65,7 +62,7 @@ public:
     return ret;
   }
 
-  int wait_until(Mutex &lock, const struct timespec&atime) {
+  int wait_until(Mutex &lock, const struct timespec &atime) {
     return __ORB_THREAD_COND_TIMEDWAIT(&cond_, lock.native_handle(), &atime);
   }
 
@@ -74,8 +71,7 @@ public:
   }
 
   template <typename _Predicate>
-  bool wait_until(Mutex &lock, const struct timespec&atime,
-                  _Predicate p) {
+  bool wait_until(Mutex &lock, const struct timespec &atime, _Predicate p) {
     while (!p())
       if (wait_until(lock, atime) == ETIMEDOUT) return p();
     return true;
@@ -89,7 +85,7 @@ public:
     return wait_until(lock, req);
   }
 
-  __orb_thread_cond_t* native_handle() { return &cond_; }
+  __orb_thread_cond_t *native_handle() { return &cond_; }
 };
 
 typedef ConditionVariable<CLOCK_MONOTONIC> MonoClockCond;

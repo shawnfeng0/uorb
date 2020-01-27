@@ -32,43 +32,43 @@
  ****************************************************************************/
 
 #include "uORBUtils.hpp"
-#include "base/orb_errno.h"
+
 #include <stdio.h>
 
 #include "base/orb_defines.h"
+#include "base/orb_errno.h"
 
-int uORB::Utils::node_mkpath(char *buf, const struct orb_metadata *meta, const int *instance)
-{
-	unsigned len;
+int uORB::Utils::node_mkpath(char *buf, const struct orb_metadata *meta,
+                             const int *instance) {
+  unsigned len;
 
-	unsigned index = 0;
+  unsigned index = 0;
 
-	if (instance != nullptr) {
-		index = *instance;
-	}
+  if (instance != nullptr) {
+    index = *instance;
+  }
 
-	len = snprintf(buf, orb_maxpath, "/%s/%s%d", "obj", meta->o_name, index);
+  len = snprintf(buf, orb_maxpath, "/%s/%s%d", "obj", meta->o_name, index);
 
-	if (len >= orb_maxpath) {
-		return -ENAMETOOLONG;
-	}
+  if (len >= orb_maxpath) {
+    return -ENAMETOOLONG;
+  }
 
-	return ORB_OK;
+  return ORB_OK;
 }
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-int uORB::Utils::node_mkpath(char *buf, const char *orbMsgName)
-{
-	unsigned len;
+int uORB::Utils::node_mkpath(char *buf, const char *orbMsgName) {
+  unsigned len;
 
-	unsigned index = 0;
+  unsigned index = 0;
 
-	len = snprintf(buf, orb_maxpath, "/%s/%s%d", "obj", orbMsgName, index);
+  len = snprintf(buf, orb_maxpath, "/%s/%s%d", "obj", orbMsgName, index);
 
-	if (len >= orb_maxpath) {
-		return -ENAMETOOLONG;
-	}
+  if (len >= orb_maxpath) {
+    return -ENAMETOOLONG;
+  }
 
-	return ORB_OK;
+  return ORB_OK;
 }

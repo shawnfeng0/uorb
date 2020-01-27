@@ -36,46 +36,40 @@
  *
  * PX4 Middleware Wrapper Linux Implementation
  */
+#include "orb_errno.h"
 #include "orb_log.h"
 #include "orb_posix.h"
-#include "orb_errno.h"
 
-int orb_sem_init(orb_sem_t *s, int pshared, unsigned int value)
-{
-	// We do not used the process shared arg
-	(void)pshared;
-	s->value = value;
-	return 0;
+int orb_sem_init(orb_sem_t *s, int pshared, unsigned int value) {
+  // We do not used the process shared arg
+  (void)pshared;
+  s->value = value;
+  return 0;
 }
 
-int orb_sem_setprotocol(orb_sem_t *s, int protocol)
-{
-	return 0;
-}
+int orb_sem_setprotocol(orb_sem_t *s, int protocol) { return 0; }
 
-int orb_sem_wait(orb_sem_t *s)
-{
+int orb_sem_wait(orb_sem_t *s) {
   uORB::MutexGuard guard(s->lock);
-	int ret;
+  int ret;
 
-	s->value--;
+  s->value--;
 
-	if (s->value < 0) {
-		ret = s->wait.wait(s->lock);
+  if (s->value < 0) {
+    ret = s->wait.wait(s->lock);
 
-	} else {
-		ret = 0;
-	}
+  } else {
+    ret = 0;
+  }
 
-	if (ret) {
-          ORB_WARN("orb_sem_wait failure");
-	}
+  if (ret) {
+    ORB_WARN("orb_sem_wait failure");
+  }
 
-	return (ret);
+  return (ret);
 }
 
-int orb_sem_trywait(orb_sem_t *s)
-{
+int orb_sem_trywait(orb_sem_t *s) {
   uORB::MutexGuard guard(s->lock);
 
   int ret = 0;
@@ -91,8 +85,7 @@ int orb_sem_trywait(orb_sem_t *s)
   return (ret);
 }
 
-int orb_sem_timedwait(orb_sem_t *s, const struct timespec *abstime)
-{
+int orb_sem_timedwait(orb_sem_t *s, const struct timespec *abstime) {
   uORB::MutexGuard guard(s->lock);
   int ret = 0;
 
@@ -112,7 +105,7 @@ int orb_sem_timedwait(orb_sem_t *s, const struct timespec *abstime)
 #if defined(__unix__)
     const unsigned NAMELEN = 32;
     char thread_name[NAMELEN] = {};
-    (void) pthread_getname_np(pthread_self(), thread_name, NAMELEN);
+    (void)pthread_getname_np(pthread_self(), thread_name, NAMELEN);
 #else
     char thread_name[] = {"\"unknow name\""};
 #endif
@@ -122,31 +115,29 @@ int orb_sem_timedwait(orb_sem_t *s, const struct timespec *abstime)
   return ret ? -1 : 0;
 }
 
-int orb_sem_post(orb_sem_t *s)
-{
+int orb_sem_post(orb_sem_t *s) {
   uORB::MutexGuard guard(s->lock);
-	int ret = 0;
+  int ret = 0;
 
-	s->value++;
+  s->value++;
 
-	if (s->value <= 0) {
-		ret = s->wait.notify_one();
+  if (s->value <= 0) {
+    ret = s->wait.notify_one();
 
-	} else {
-		ret = 0;
-	}
+  } else {
+    ret = 0;
+  }
 
-	if (ret) {
-          ORB_WARN("orb_sem_post failure");
-	}
+  if (ret) {
+    ORB_WARN("orb_sem_post failure");
+  }
 
-	// return the cond signal failure if present,
-	// else return the mutex status
-	return ret;
+  // return the cond signal failure if present,
+  // else return the mutex status
+  return ret;
 }
 
-int orb_sem_getvalue(orb_sem_t *s, int *sval)
-{
+int orb_sem_getvalue(orb_sem_t *s, int *sval) {
   uORB::MutexGuard guard(s->lock);
 
   *sval = s->value;
@@ -154,8 +145,7 @@ int orb_sem_getvalue(orb_sem_t *s, int *sval)
   return 0;
 }
 
-int orb_sem_destroy(orb_sem_t *s)
-{
-  (void) s;
+int orb_sem_destroy(orb_sem_t *s) {
+  (void)s;
   return 0;
 }

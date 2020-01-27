@@ -44,10 +44,9 @@
 /*
  * Get absolute time.
  */
-hrt_abstime hrt_absolute_time()
-{
-  struct timespec ts{};
-  hrt_abstime	result;
+hrt_abstime hrt_absolute_time() {
+  struct timespec ts {};
+  hrt_abstime result;
 
   clock_gettime(CLOCK_MONOTONIC, &ts);
 

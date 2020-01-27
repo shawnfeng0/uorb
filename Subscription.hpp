@@ -40,142 +40,137 @@
 
 #include "base/orb_defines.h"
 #include "uORB.h"
-
 #include "uORBDeviceNode.hpp"
 #include "uORBManager.hpp"
 #include "uORBUtils.hpp"
 
-namespace uORB
-{
+namespace uORB {
 
 class SubscriptionCallback;
 
 // Base subscription wrapper class
-class Subscription
-{
-public:
+class Subscription {
+ public:
+  /**
+   * Constructor
+   *
+   * @param meta The uORB metadata (usually from the ORB_ID() macro) for the
+   * topic.
+   * @param instance The instance for multi sub.
+   */
+  Subscription(const orb_metadata *meta, uint8_t instance = 0)
+      : _meta(meta), _instance(instance) {
+    subscribe();
+  }
 
-	/**
-	 * Constructor
-	 *
-	 * @param meta The uORB metadata (usually from the ORB_ID() macro) for the topic.
-	 * @param instance The instance for multi sub.
-	 */
-	Subscription(const orb_metadata *meta, uint8_t instance = 0) : _meta(meta), _instance(instance)
-	{
-		subscribe();
-	}
+  ~Subscription() { unsubscribe(); }
 
-	~Subscription()
-	{
-		unsubscribe();
-	}
+  bool subscribe();
+  void unsubscribe();
 
-	bool subscribe();
-	void unsubscribe();
+  bool valid() const { return _node != nullptr; }
+  bool advertised() {
+    if (valid()) {
+      return _node->is_advertised();
+    }
 
-	bool valid() const { return _node != nullptr; }
-	bool advertised()
-	{
-		if (valid()) {
-			return _node->is_advertised();
-		}
+    // try to initialize
+    if (init()) {
+      // check again if valid
+      if (valid()) {
+        return _node->is_advertised();
+      }
+    }
 
-		// try to initialize
-		if (init()) {
-			// check again if valid
-			if (valid()) {
-				return _node->is_advertised();
-			}
-		}
+    return false;
+  }
 
-		return false;
-	}
+  /**
+   * Check if there is a new update.
+   * */
+  bool updated() {
+    return advertised() ? (_node->published_message_count() != _last_generation)
+                        : false;
+  }
 
-	/**
-	 * Check if there is a new update.
-	 * */
-	bool updated() { return advertised() ? (_node->published_message_count() != _last_generation) : false; }
+  /**
+   * Update the struct
+   * @param data The uORB message struct we are updating.
+   */
+  bool update(void *dst) { return updated() ? copy(dst) : false; }
 
-	/**
-	 * Update the struct
-	 * @param data The uORB message struct we are updating.
-	 */
-	bool update(void *dst) { return updated() ? copy(dst) : false; }
+  /**
+   * Check if subscription updated based on timestamp.
+   *
+   * @return true only if topic was updated based on a timestamp and
+   * copied to buffer successfully.
+   * If topic was not updated since last check it will return false but
+   * still copy the data.
+   * If no data available data buffer will be filled with zeros.
+   */
+  bool update(uint64_t *time, void *dst);
 
-	/**
-	 * Check if subscription updated based on timestamp.
-	 *
-	 * @return true only if topic was updated based on a timestamp and
-	 * copied to buffer successfully.
-	 * If topic was not updated since last check it will return false but
-	 * still copy the data.
-	 * If no data available data buffer will be filled with zeros.
-	 */
-	bool update(uint64_t *time, void *dst);
+  /**
+   * Copy the struct
+   * @param data The uORB message struct we are updating.
+   */
+  bool copy(void *dst) {
+    return advertised() ? _node->copy(dst, _last_generation) : false;
+  }
 
-	/**
-	 * Copy the struct
-	 * @param data The uORB message struct we are updating.
-	 */
-	bool copy(void *dst) { return advertised() ? _node->copy(dst, _last_generation) : false; }
+  uint8_t get_instance() const { return _instance; }
+  orb_id_t get_topic() const { return _meta; }
 
-	uint8_t		get_instance() const { return _instance; }
-	orb_id_t	get_topic() const { return _meta; }
+ protected:
+  friend class SubscriptionCallback;
 
-protected:
+  DeviceNode *get_node() { return _node; }
 
-	friend class SubscriptionCallback;
+  bool init();
 
-	DeviceNode		*get_node() { return _node; }
+  DeviceNode *_node{nullptr};
+  const orb_metadata *_meta{nullptr};
 
-	bool			init();
-
-	DeviceNode		*_node{nullptr};
-	const orb_metadata	*_meta{nullptr};
-
-	/**
-	 * Subscription's latest data generation.
-	 * Also used to track (and rate limit) subscription
-	 * attempts if the topic has not yet been published.
-	 */
-	unsigned		_last_generation{0};
-	uint8_t			_instance{0};
+  /**
+   * Subscription's latest data generation.
+   * Also used to track (and rate limit) subscription
+   * attempts if the topic has not yet been published.
+   */
+  unsigned _last_generation{0};
+  uint8_t _instance{0};
 };
 
 // Subscription wrapper class with data
-template<class T>
-class SubscriptionData : public Subscription
-{
-public:
-	/**
-	 * Constructor
-	 *
-	 * @param meta The uORB metadata (usually from the ORB_ID() macro) for the topic.
-	 * @param instance The instance for multi sub.
-	 */
-	SubscriptionData(const orb_metadata *meta, uint8_t instance = 0) :
-		Subscription(meta, instance)
-	{
-		copy(&_data);
-	}
+template <class T>
+class SubscriptionData : public Subscription {
+ public:
+  /**
+   * Constructor
+   *
+   * @param meta The uORB metadata (usually from the ORB_ID() macro) for the
+   * topic.
+   * @param instance The instance for multi sub.
+   */
+  SubscriptionData(const orb_metadata *meta, uint8_t instance = 0)
+      : Subscription(meta, instance) {
+    copy(&_data);
+  }
 
-	~SubscriptionData() = default;
+  ~SubscriptionData() = default;
 
-	// no copy, assignment, move, move assignment
-	SubscriptionData(const SubscriptionData &) = delete;
-	SubscriptionData &operator=(const SubscriptionData &) = delete;
-	SubscriptionData(SubscriptionData &&) = delete;
-	SubscriptionData &operator=(SubscriptionData &&) = delete;
+  // no copy, assignment, move, move assignment
+  SubscriptionData(const SubscriptionData &) = delete;
+  SubscriptionData &operator=(const SubscriptionData &) = delete;
+  SubscriptionData(SubscriptionData &&) = delete;
+  SubscriptionData &operator=(SubscriptionData &&) = delete;
 
-	// update the embedded struct.
-	bool update() { return Subscription::update((void *)(&_data)); }
+  // update the embedded struct.
+  bool update() { return Subscription::update((void *)(&_data)); }
 
-	const T &get() const { return _data; }
+  const T &get() const { return _data; }
 
-private:
-
-	T _data{};
+ private:
+  T _data{};
 };
 
-} // namespace uORB
+}  // namespace uORB

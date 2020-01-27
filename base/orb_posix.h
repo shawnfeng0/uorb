@@ -39,48 +39,48 @@
 
 #pragma once
 
-#include "visibility.h" // Many source files need this header file
 #include "orb_sem.h"
+#include "visibility.h"  // Many source files need this header file
 
-#define  PX4_F_RDONLY 1
-#define  PX4_F_WRONLY 2
+#define PX4_F_RDONLY 1
+#define PX4_F_WRONLY 2
 
 __BEGIN_DECLS
 /* Type used for the number of file descriptors.  */
 #if defined(__unix__)
-#include <unistd.h>
 #include <poll.h>
+#include <unistd.h>
 #else
 typedef unsigned long int nfds_t;
-typedef long int off_t ;
+typedef long int off_t;
 #if !defined(POLLIN)
-#define POLLIN		0x001		/* There is data to read.  */
-#endif // POLLIN
+#define POLLIN 0x001 /* There is data to read.  */
+#endif               // POLLIN
 #endif
 
 typedef unsigned short pollevent_t;
 
 #if !defined(F_OK)
-#define	F_OK	0		/* Test for existence.  */
+#define F_OK 0 /* Test for existence.  */
 #endif
 
 typedef struct {
-	/* This part of the struct is POSIX-like */
-	int		fd;       /* The descriptor being polled */
-	pollevent_t 	events;   /* The input event flags */
-	pollevent_t 	revents;  /* The output event flags */
+  /* This part of the struct is POSIX-like */
+  int fd;              /* The descriptor being polled */
+  pollevent_t events;  /* The input event flags */
+  pollevent_t revents; /* The output event flags */
 
-	/* Required for PX4 compatibility */
-	orb_sem_t   *sem;  	/* Pointer to semaphore used to post output event */
-	void   *priv;     	/* For use by drivers */
+  /* Required for PX4 compatibility */
+  orb_sem_t *sem; /* Pointer to semaphore used to post output event */
+  void *priv;     /* For use by drivers */
 } orb_pollfd_struct_t;
 
-__EXPORT int 		orb_open(const char *path, int flags, ...);
-__EXPORT int 		orb_close(int fd);
-__EXPORT ssize_t	orb_read(int fd, void *buffer, size_t buflen);
-__EXPORT int		orb_ioctl(int fd, int cmd, unsigned long arg);
-__EXPORT int		orb_poll(orb_pollfd_struct_t *fds, nfds_t nfds, int timeout);
-__EXPORT int		orb_access(const char *pathname, int mode);
-__EXPORT void		orb_show_topics(void);
+__EXPORT int orb_open(const char *path, int flags, ...);
+__EXPORT int orb_close(int fd);
+__EXPORT ssize_t orb_read(int fd, void *buffer, size_t buflen);
+__EXPORT int orb_ioctl(int fd, int cmd, unsigned long arg);
+__EXPORT int orb_poll(orb_pollfd_struct_t *fds, nfds_t nfds, int timeout);
+__EXPORT int orb_access(const char *pathname, int mode);
+__EXPORT void orb_show_topics(void);
 
 __END_DECLS

@@ -13,7 +13,7 @@
 #define ORB_ERR(FMT, ...) LOG_ERROR(FMT, ##__VA_ARGS__)
 #define ORB_WARN(FMT, ...) LOG_WARN(FMT, ##__VA_ARGS__)
 #define ORB_INFO(FMT, ...) LOG_INFO(FMT, ##__VA_ARGS__)
-#define ORB_DEBUG(FMT, ...) ((void) 0)
+#define ORB_DEBUG(FMT, ...) ((void)0)
 
 #else
 

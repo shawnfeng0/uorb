@@ -43,10 +43,11 @@
 
 #include "orb_condition_variable.hpp"
 #include "orb_mutex.hpp"
+#include "visibility.h"
 
-#define SEM_PRIO_NONE             0
-#define SEM_PRIO_INHERIT          1
-#define SEM_PRIO_PROTECT          2
+#define SEM_PRIO_NONE 0
+#define SEM_PRIO_INHERIT 1
+#define SEM_PRIO_PROTECT 2
 
 __BEGIN_DECLS
 
@@ -58,13 +59,13 @@ typedef struct {
   int value;
 } orb_sem_t;
 
-__EXPORT int		orb_sem_init(orb_sem_t *s, int pshared, unsigned value);
-__EXPORT int		orb_sem_setprotocol(orb_sem_t *s, int protocol);
-__EXPORT int		orb_sem_wait(orb_sem_t *s);
-__EXPORT int		orb_sem_trywait(orb_sem_t *sem);
-__EXPORT int		orb_sem_timedwait(orb_sem_t *sem, const struct timespec *abstime);
-__EXPORT int		orb_sem_post(orb_sem_t *s);
-__EXPORT int		orb_sem_getvalue(orb_sem_t *s, int *sval);
-__EXPORT int		orb_sem_destroy(orb_sem_t *s);
+__EXPORT int orb_sem_init(orb_sem_t *s, int pshared, unsigned value);
+__EXPORT int orb_sem_setprotocol(orb_sem_t *s, int protocol);
+__EXPORT int orb_sem_wait(orb_sem_t *s);
+__EXPORT int orb_sem_trywait(orb_sem_t *sem);
+__EXPORT int orb_sem_timedwait(orb_sem_t *sem, const struct timespec *abstime);
+__EXPORT int orb_sem_post(orb_sem_t *s);
+__EXPORT int orb_sem_getvalue(orb_sem_t *s, int *sval);
+__EXPORT int orb_sem_destroy(orb_sem_t *s);
 
 __END_DECLS

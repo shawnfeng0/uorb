@@ -41,65 +41,60 @@
 #include "SubscriptionInterval.hpp"
 #include "base/List.hpp"
 
-namespace uORB
-{
+namespace uORB {
 
 // Subscription wrapper class with callbacks on new publications
-class SubscriptionCallback : public SubscriptionInterval, public ListNode<SubscriptionCallback *>
-{
-public:
-	/**
-	 * Constructor
-	 *
-	 * @param meta The uORB metadata (usually from the ORB_ID() macro) for the topic.
-	 * @param interval_ms The requested maximum update interval in milliseconds.
-	 * @param instance The instance for multi sub.
-	 */
-	SubscriptionCallback(const orb_metadata *meta, uint8_t interval_ms = 0, uint8_t instance = 0) :
-		SubscriptionInterval(meta, interval_ms, instance)
-	{
-	}
+class SubscriptionCallback : public SubscriptionInterval,
+                             public ListNode<SubscriptionCallback *> {
+ public:
+  /**
+   * Constructor
+   *
+   * @param meta The uORB metadata (usually from the ORB_ID() macro) for the
+   * topic.
+   * @param interval_ms The requested maximum update interval in milliseconds.
+   * @param instance The instance for multi sub.
+   */
+  SubscriptionCallback(const orb_metadata *meta, uint8_t interval_ms = 0,
+                       uint8_t instance = 0)
+      : SubscriptionInterval(meta, interval_ms, instance) {}
 
-	virtual ~SubscriptionCallback()
-	{
-		unregisterCallback();
-	};
+  virtual ~SubscriptionCallback() { unregisterCallback(); };
 
-	bool registerCallback()
-	{
-		bool ret = false;
+  bool registerCallback() {
+    bool ret = false;
 
-		if (_subscription.get_node() && _subscription.get_node()->register_callback(this)) {
-			// registered
-			ret = true;
+    if (_subscription.get_node() &&
+        _subscription.get_node()->register_callback(this)) {
+      // registered
+      ret = true;
 
-		} else {
-			// force topic creation by subscribing with old API
-			int fd = orb_subscribe_multi(_subscription.get_topic(), _subscription.get_instance());
+    } else {
+      // force topic creation by subscribing with old API
+      int fd = orb_subscribe_multi(_subscription.get_topic(),
+                                   _subscription.get_instance());
 
-			// try to register callback again
-			if (_subscription.subscribe()) {
-				if (_subscription.get_node() && _subscription.get_node()->register_callback(this)) {
-					ret = true;
-				}
-			}
+      // try to register callback again
+      if (_subscription.subscribe()) {
+        if (_subscription.get_node() &&
+            _subscription.get_node()->register_callback(this)) {
+          ret = true;
+        }
+      }
 
-			orb_unsubscribe(fd);
-		}
+      orb_unsubscribe(fd);
+    }
 
+    return ret;
+  }
 
-		return ret;
-	}
+  void unregisterCallback() {
+    if (_subscription.get_node()) {
+      _subscription.get_node()->unregister_callback(this);
+    }
+  }
 
-	void unregisterCallback()
-	{
-		if (_subscription.get_node()) {
-			_subscription.get_node()->unregister_callback(this);
-		}
-	}
-
-	virtual void call() = 0;
-
+  virtual void call() = 0;
 };
 
-} // namespace uORB
+}  // namespace uORB

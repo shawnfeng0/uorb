@@ -39,8 +39,8 @@
  * API for the uORB lightweight object broker.
  */
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "base/visibility.h"
 
@@ -48,10 +48,11 @@
  * Object metadata.
  */
 struct orb_metadata {
-	const char *o_name;		/**< unique object name */
-	const uint16_t o_size;		/**< object size */
-	const uint16_t o_size_no_padding;	/**< object size w/o padding at the end (for logger) */
-	const char *o_fields;		/**< semicolon separated list of fields (with type) */
+  const char *o_name;    /**< unique object name */
+  const uint16_t o_size; /**< object size */
+  const uint16_t
+      o_size_no_padding; /**< object size w/o padding at the end (for logger) */
+  const char *o_fields;  /**< semicolon separated list of fields (with type) */
 };
 
 typedef const struct orb_metadata *orb_id_t;
@@ -59,20 +60,22 @@ typedef const struct orb_metadata *orb_id_t;
 /**
  * Maximum number of multi topic instances
  */
-#define ORB_MULTI_MAX_INSTANCES	4 // This must be < 10 (because it's the last char of the node path)
+#define ORB_MULTI_MAX_INSTANCES \
+  4  // This must be < 10 (because it's the last char of the node path)
 
 /**
  * Topic priority.
  * Relevant for multi-topics / topic groups
  */
 enum ORB_PRIO {
-	ORB_PRIO_MIN = 1, // leave 0 free for other purposes, eg. marking an uninitialized value
-	ORB_PRIO_VERY_LOW = 25,
-	ORB_PRIO_LOW = 50,
-	ORB_PRIO_DEFAULT = 75,
-	ORB_PRIO_HIGH = 100,
-	ORB_PRIO_VERY_HIGH = 125,
-	ORB_PRIO_MAX = 255
+  ORB_PRIO_MIN =
+      1,  // leave 0 free for other purposes, eg. marking an uninitialized value
+  ORB_PRIO_VERY_LOW = 25,
+  ORB_PRIO_LOW = 50,
+  ORB_PRIO_DEFAULT = 75,
+  ORB_PRIO_HIGH = 100,
+  ORB_PRIO_VERY_HIGH = 125,
+  ORB_PRIO_MAX = 255
 };
 
 /**
@@ -84,7 +87,7 @@ enum ORB_PRIO {
  *
  * @param _name		The name of the topic.
  */
-#define ORB_ID(_name)		&__orb_##_name
+#define ORB_ID(_name) &__orb_##_name
 
 /**
  * Declare (prototype) the uORB metadata for a topic (used by code generators).
@@ -92,9 +95,11 @@ enum ORB_PRIO {
  * @param _name		The name of the topic.
  */
 #if defined(__cplusplus)
-# define ORB_DECLARE(_name)		extern "C" const struct orb_metadata __orb_##_name __EXPORT
+#define ORB_DECLARE(_name) \
+  extern "C" const struct orb_metadata __orb_##_name __EXPORT
 #else
-# define ORB_DECLARE(_name)		extern const struct orb_metadata __orb_##_name __EXPORT
+#define ORB_DECLARE(_name) \
+  extern const struct orb_metadata __orb_##_name __EXPORT
 #endif
 
 /**
@@ -109,15 +114,13 @@ enum ORB_PRIO {
  * @param _name		The name of the topic.
  * @param _struct	The structure the topic provides.
  * @param _size_no_padding	Struct size w/o padding at the end
- * @param _fields	All fields in a semicolon separated list e.g: "float[3] position;bool armed"
+ * @param _fields	All fields in a semicolon separated list e.g: "float[3]
+ * position;bool armed"
  */
-#define ORB_DEFINE(_name, _struct, _size_no_padding, _fields)		\
-	const struct orb_metadata __orb_##_name = {	\
-		#_name,					\
-		sizeof(_struct),		\
-		_size_no_padding,			\
-		_fields					\
-	}; struct hack
+#define ORB_DEFINE(_name, _struct, _size_no_padding, _fields)            \
+  const struct orb_metadata __orb_##_name = {#_name, sizeof(_struct),    \
+                                             _size_no_padding, _fields}; \
+  struct hack
 
 __BEGIN_DECLS
 
@@ -131,30 +134,35 @@ __BEGIN_DECLS
  * a file-descriptor-based handle would not otherwise be in scope for the
  * publisher.
  */
-typedef void 	*orb_advert_t;
+typedef void *orb_advert_t;
 
 /**
  * @see uORB::Manager::orb_advertise()
  */
-extern orb_advert_t orb_advertise(const struct orb_metadata *meta, const void *data) __EXPORT;
+extern orb_advert_t orb_advertise(const struct orb_metadata *meta,
+                                  const void *data) __EXPORT;
 
 /**
  * @see uORB::Manager::orb_advertise()
  */
-extern orb_advert_t orb_advertise_queue(const struct orb_metadata *meta, const void *data,
-					unsigned int queue_size) __EXPORT;
+extern orb_advert_t orb_advertise_queue(const struct orb_metadata *meta,
+                                        const void *data,
+                                        unsigned int queue_size) __EXPORT;
 
 /**
  * @see uORB::Manager::orb_advertise_multi()
  */
-extern orb_advert_t orb_advertise_multi(const struct orb_metadata *meta, const void *data, int *instance,
-					int priority) __EXPORT;
+extern orb_advert_t orb_advertise_multi(const struct orb_metadata *meta,
+                                        const void *data, int *instance,
+                                        int priority) __EXPORT;
 
 /**
  * @see uORB::Manager::orb_advertise_multi()
  */
-extern orb_advert_t orb_advertise_multi_queue(const struct orb_metadata *meta, const void *data, int *instance,
-		int priority, unsigned int queue_size) __EXPORT;
+extern orb_advert_t orb_advertise_multi_queue(const struct orb_metadata *meta,
+                                              const void *data, int *instance,
+                                              int priority,
+                                              unsigned int queue_size) __EXPORT;
 
 /**
  * @see uORB::Manager::orb_unadvertise()
@@ -164,7 +172,8 @@ extern int orb_unadvertise(orb_advert_t handle) __EXPORT;
 /**
  * @see uORB::Manager::orb_publish()
  */
-extern int	orb_publish(const struct orb_metadata *meta, orb_advert_t handle, const void *data) __EXPORT;
+extern int orb_publish(const struct orb_metadata *meta, orb_advert_t handle,
+                       const void *data) __EXPORT;
 
 /**
  * Advertise as the publisher of a topic.
@@ -172,60 +181,62 @@ extern int	orb_publish(const struct orb_metadata *meta, orb_advert_t handle, con
  * This performs the initial advertisement of a topic; it creates the topic
  * node in /obj if required and publishes the initial data.
  *
- * @see uORB::Manager::orb_advertise_multi() for meaning of the individual parameters
+ * @see uORB::Manager::orb_advertise_multi() for meaning of the individual
+ * parameters
  */
-static inline int orb_publish_auto(const struct orb_metadata *meta, orb_advert_t *handle, const void *data,
-				   int *instance,
-				   int priority)
-{
-	if (!*handle) {
-		*handle = orb_advertise_multi(meta, data, instance, priority);
+static inline int orb_publish_auto(const struct orb_metadata *meta,
+                                   orb_advert_t *handle, const void *data,
+                                   int *instance, int priority) {
+  if (!*handle) {
+    *handle = orb_advertise_multi(meta, data, instance, priority);
 
-		if (*handle) {
-			return 0;
-		}
+    if (*handle) {
+      return 0;
+    }
 
-	} else {
-		return orb_publish(meta, *handle, data);
-	}
+  } else {
+    return orb_publish(meta, *handle, data);
+  }
 
-	return -1;
+  return -1;
 }
 
 /**
  * @see uORB::Manager::orb_subscribe()
  */
-extern int	orb_subscribe(const struct orb_metadata *meta) __EXPORT;
+extern int orb_subscribe(const struct orb_metadata *meta) __EXPORT;
 
 /**
  * @see uORB::Manager::orb_subscribe_multi()
  */
-extern int	orb_subscribe_multi(const struct orb_metadata *meta, unsigned instance) __EXPORT;
+extern int orb_subscribe_multi(const struct orb_metadata *meta,
+                               unsigned instance) __EXPORT;
 
 /**
  * @see uORB::Manager::orb_unsubscribe()
  */
-extern int	orb_unsubscribe(int handle) __EXPORT;
+extern int orb_unsubscribe(int handle) __EXPORT;
 
 /**
  * @see uORB::Manager::orb_copy()
  */
-extern int	orb_copy(const struct orb_metadata *meta, int handle, void *buffer) __EXPORT;
+extern int orb_copy(const struct orb_metadata *meta, int handle,
+                    void *buffer) __EXPORT;
 
 /**
  * @see uORB::Manager::orb_check()
  */
-extern int	orb_check(int handle, bool *updated) __EXPORT;
+extern int orb_check(int handle, bool *updated) __EXPORT;
 
 /**
  * @see uORB::Manager::orb_stat()
  */
-extern int	orb_stat(int handle, uint64_t *time) __EXPORT;
+extern int orb_stat(int handle, uint64_t *time) __EXPORT;
 
 /**
  * @see uORB::Manager::orb_exists()
  */
-extern int	orb_exists(const struct orb_metadata *meta, int instance) __EXPORT;
+extern int orb_exists(const struct orb_metadata *meta, int instance) __EXPORT;
 
 /**
  * Get the number of published instances of a topic group
@@ -233,27 +244,27 @@ extern int	orb_exists(const struct orb_metadata *meta, int instance) __EXPORT;
  * @param meta    ORB topic metadata.
  * @return    The number of published instances of this topic
  */
-extern int	orb_group_count(const struct orb_metadata *meta) __EXPORT;
+extern int orb_group_count(const struct orb_metadata *meta) __EXPORT;
 
 /**
  * @see uORB::Manager::orb_priority()
  */
-extern int	orb_priority(int handle, int32_t *priority) __EXPORT;
+extern int orb_priority(int handle, int32_t *priority) __EXPORT;
 
 /**
  * @see uORB::Manager::orb_set_interval()
  */
-extern int	orb_set_interval(int handle, unsigned interval) __EXPORT;
+extern int orb_set_interval(int handle, unsigned interval) __EXPORT;
 
 /**
  * @see uORB::Manager::orb_get_interval()
  */
-extern int	orb_get_interval(int handle, unsigned *interval) __EXPORT;
+extern int orb_get_interval(int handle, unsigned *interval) __EXPORT;
 
 __END_DECLS
 
-/* Diverse uORB header defines */ //XXX: move to better location
-#define ORB_ID_VEHICLE_ATTITUDE_CONTROLS    ORB_ID(actuator_controls_0)
+/* Diverse uORB header defines */  // XXX: move to better location
+#define ORB_ID_VEHICLE_ATTITUDE_CONTROLS ORB_ID(actuator_controls_0)
 typedef uint8_t arming_state_t;
 typedef uint8_t main_state_t;
 typedef uint8_t hil_state_t;

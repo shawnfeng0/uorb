@@ -34,21 +34,23 @@
 /**
  * @file orb_atomic.h
  *
- * Provides atomic integers and counters. Each method is executed atomically and thus
- * can be used to prevent data races and add memory synchronization between threads.
+ * Provides atomic integers and counters. Each method is executed atomically and
+ * thus can be used to prevent data races and add memory synchronization between
+ * threads.
  *
- * In addition to the atomicity, each method serves as a memory barrier (sequential
- * consistent ordering). This means all operations that happen before and could
- * potentially have visible side-effects in other threads will happen before
- * the method is executed.
+ * In addition to the atomicity, each method serves as a memory barrier
+ * (sequential consistent ordering). This means all operations that happen
+ * before and could potentially have visible side-effects in other threads will
+ * happen before the method is executed.
  *
- * The implementation uses the built-in methods from GCC (supported by Clang as well).
+ * The implementation uses the built-in methods from GCC (supported by Clang as
+ * well).
  * @see https://gcc.gnu.org/onlinedocs/gcc/_005f_005fatomic-Builtins.html.
  *
- * @note: on ARM, the instructions LDREX and STREX might be emitted. To ensure correct
- * behavior, the exclusive monitor needs to be cleared on a task switch (via CLREX).
- * This happens automatically e.g. on ARMv7-M as part of an exception entry or exit
- * sequence.
+ * @note: on ARM, the instructions LDREX and STREX might be emitted. To ensure
+ * correct behavior, the exclusive monitor needs to be cleared on a task switch
+ * (via CLREX). This happens automatically e.g. on ARMv7-M as part of an
+ * exception entry or exit sequence.
  */
 
 #pragma once
@@ -65,138 +67,128 @@
  */
 
 #ifndef __ATOMIC_RELAXED
-#define __ATOMIC_RELAXED		0
+#define __ATOMIC_RELAXED 0
 #endif
 #ifndef __ATOMIC_CONSUME
-#define __ATOMIC_CONSUME		1
+#define __ATOMIC_CONSUME 1
 #endif
 #ifndef __ATOMIC_ACQUIRE
-#define __ATOMIC_ACQUIRE		2
+#define __ATOMIC_ACQUIRE 2
 #endif
 #ifndef __ATOMIC_RELEASE
-#define __ATOMIC_RELEASE		3
+#define __ATOMIC_RELEASE 3
 #endif
 #ifndef __ATOMIC_ACQ_REL
-#define __ATOMIC_ACQ_REL		4
+#define __ATOMIC_ACQ_REL 4
 #endif
 #ifndef __ATOMIC_SEQ_CST
-#define __ATOMIC_SEQ_CST		5
+#define __ATOMIC_SEQ_CST 5
 #endif
 
 namespace uORB {
 
 template <typename T>
-class atomic
-{
-public:
-
+class atomic {
+ public:
 #ifdef __PX4_NUTTX
-	// Ensure that all operations are lock-free, so that 'atomic' can be used from
-	// IRQ handlers. This might not be required everywhere though.
-	static_assert(__atomic_always_lock_free(sizeof(T), 0), "atomic is not lock-free for the given type T");
+  // Ensure that all operations are lock-free, so that 'atomic' can be used from
+  // IRQ handlers. This might not be required everywhere though.
+  static_assert(__atomic_always_lock_free(sizeof(T), 0),
+                "atomic is not lock-free for the given type T");
 #endif
 
+  explicit atomic(T value) : _value(value) {}
 
-	explicit atomic(T value) : _value(value) {}
-
-	/**
-	 * Atomically read the current value
-	 */
-	inline T load() const
-	{
+  /**
+   * Atomically read the current value
+   */
+  inline T load() const {
 #ifdef __PX4_QURT
-		return _value;
+    return _value;
 #else
-		return __atomic_load_n(&_value, __ATOMIC_SEQ_CST);
+    return __atomic_load_n(&_value, __ATOMIC_SEQ_CST);
 #endif
-	}
+  }
 
-	/**
-	 * Atomically store a value
-	 */
-	inline void store(T value)
-	{
+  /**
+   * Atomically store a value
+   */
+  inline void store(T value) {
 #ifdef __PX4_QURT
-		_value = value;
+    _value = value;
 #else
-		__atomic_store(&_value, &value, __ATOMIC_SEQ_CST);
+    __atomic_store(&_value, &value, __ATOMIC_SEQ_CST);
 #endif
-	}
+  }
 
-	/**
-	 * Atomically add a number and return the previous value.
-	 * @return value prior to the addition
-	 */
-	inline T fetch_add(T num)
-	{
-		return __atomic_fetch_add(&_value, num, __ATOMIC_SEQ_CST);
-	}
+  /**
+   * Atomically add a number and return the previous value.
+   * @return value prior to the addition
+   */
+  inline T fetch_add(T num) {
+    return __atomic_fetch_add(&_value, num, __ATOMIC_SEQ_CST);
+  }
 
-	/**
-	 * Atomically substract a number and return the previous value.
-	 * @return value prior to the substraction
-	 */
-	inline T fetch_sub(T num)
-	{
-		return __atomic_fetch_sub(&_value, num, __ATOMIC_SEQ_CST);
-	}
+  /**
+   * Atomically substract a number and return the previous value.
+   * @return value prior to the substraction
+   */
+  inline T fetch_sub(T num) {
+    return __atomic_fetch_sub(&_value, num, __ATOMIC_SEQ_CST);
+  }
 
-	/**
-	 * Atomic AND with a number
-	 * @return value prior to the operation
-	 */
-	inline T fetch_and(T num)
-	{
-		return __atomic_fetch_and(&_value, num, __ATOMIC_SEQ_CST);
-	}
+  /**
+   * Atomic AND with a number
+   * @return value prior to the operation
+   */
+  inline T fetch_and(T num) {
+    return __atomic_fetch_and(&_value, num, __ATOMIC_SEQ_CST);
+  }
 
-	/**
-	 * Atomic XOR with a number
-	 * @return value prior to the operation
-	 */
-	inline T fetch_xor(T num)
-	{
-		return __atomic_fetch_xor(&_value, num, __ATOMIC_SEQ_CST);
-	}
+  /**
+   * Atomic XOR with a number
+   * @return value prior to the operation
+   */
+  inline T fetch_xor(T num) {
+    return __atomic_fetch_xor(&_value, num, __ATOMIC_SEQ_CST);
+  }
 
-	/**
-	 * Atomic OR with a number
-	 * @return value prior to the operation
-	 */
-	inline T fetch_or(T num)
-	{
-		return __atomic_fetch_or(&_value, num, __ATOMIC_SEQ_CST);
-	}
+  /**
+   * Atomic OR with a number
+   * @return value prior to the operation
+   */
+  inline T fetch_or(T num) {
+    return __atomic_fetch_or(&_value, num, __ATOMIC_SEQ_CST);
+  }
 
-	/**
-	 * Atomic NAND (~(_value & num)) with a number
-	 * @return value prior to the operation
-	 */
-	inline T fetch_nand(T num)
-	{
-		return __atomic_fetch_nand(&_value, num, __ATOMIC_SEQ_CST);
-	}
+  /**
+   * Atomic NAND (~(_value & num)) with a number
+   * @return value prior to the operation
+   */
+  inline T fetch_nand(T num) {
+    return __atomic_fetch_nand(&_value, num, __ATOMIC_SEQ_CST);
+  }
 
-	/**
-	 * Atomic compare and exchange operation.
-	 * This compares the contents of _value with the contents of *expected. If
-	 * equal, the operation is a read-modify-write operation that writes desired
-	 * into _value. If they are not equal, the operation is a read and the current
-	 * contents of _value are written into *expected.
-	 * @return If desired is written into _value then true is returned
-	 */
-	inline bool compare_exchange(T *expected, T num)
-	{
-		return __atomic_compare_exchange(&_value, expected, num, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
-	}
+  /**
+   * Atomic compare and exchange operation.
+   * This compares the contents of _value with the contents of *expected. If
+   * equal, the operation is a read-modify-write operation that writes desired
+   * into _value. If they are not equal, the operation is a read and the current
+   * contents of _value are written into *expected.
+   * @return If desired is written into _value then true is returned
+   */
+  inline bool compare_exchange(T *expected, T num) {
+    return __atomic_compare_exchange(&_value, expected, num, false,
+                                     __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+  }
 
-private:
+ private:
 #ifdef __PX4_QURT
-	// It seems that __atomic_store  and __atomic_load are not supported on Qurt,
-	// so the best that we can do is to use volatile.
-	volatile T _value;
+  // It seems that __atomic_store  and __atomic_load are not supported on Qurt,
+  // so the best that we can do is to use volatile.
+  volatile T _value;
 #else
-	T _value;
+  T _value;
 #endif
 };
 
@@ -204,6 +196,6 @@ using atomic_int = atomic<int>;
 using atomic_int32_t = atomic<int32_t>;
 using atomic_bool = atomic<bool>;
 
-} /* namespace orb */
+}  // namespace uORB
 
 #endif /* __cplusplus */

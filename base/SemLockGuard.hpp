@@ -58,9 +58,13 @@
  *   }
  */
 class SemLock {
-public:
-  explicit SemLock(orb_sem_t &sem) : _sem(sem) { do {} while (orb_sem_wait(&_sem) != 0); }
-	~SemLock() { orb_sem_post(&_sem); }
-private:
-	orb_sem_t &_sem;
+ public:
+  explicit SemLock(orb_sem_t &sem) : _sem(sem) {
+    do {
+    } while (orb_sem_wait(&_sem) != 0);
+  }
+  ~SemLock() { orb_sem_post(&_sem); }
+
+ private:
+  orb_sem_t &_sem;
 };

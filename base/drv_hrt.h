@@ -39,8 +39,8 @@
 
 #pragma once
 
-#include <stdbool.h>
 #include <inttypes.h>
+#include <stdbool.h>
 
 #include "visibility.h"
 
@@ -52,7 +52,7 @@ __BEGIN_DECLS
  * Absolute time is measured from some arbitrary epoch shortly after
  * system startup.  It should never wrap or go backwards.
  */
-typedef uint64_t	hrt_abstime;
+typedef uint64_t hrt_abstime;
 
 /**
  * Get absolute time in [us] (does not wrap).
@@ -65,34 +65,29 @@ __EXPORT extern hrt_abstime hrt_absolute_time(void);
  *
  * This function is not interrupt save.
  */
-static inline hrt_abstime hrt_elapsed_time(const hrt_abstime *then)
-{
-	return hrt_absolute_time() - *then;
+static inline hrt_abstime hrt_elapsed_time(const hrt_abstime *then) {
+  return hrt_absolute_time() - *then;
 }
 
 __END_DECLS
 
-#ifdef	__cplusplus
+#ifdef __cplusplus
 
-namespace time_literals
-{
+namespace time_literals {
 
 // User-defined integer literals for different time units.
 // The base unit is hrt_abstime in microseconds
 
-constexpr hrt_abstime operator "" _s(unsigned long long seconds)
-{
-	return hrt_abstime(seconds * 1000000ULL);
+constexpr hrt_abstime operator"" _s(unsigned long long seconds) {
+  return hrt_abstime(seconds * 1000000ULL);
 }
 
-constexpr hrt_abstime operator "" _ms(unsigned long long seconds)
-{
-	return hrt_abstime(seconds * 1000ULL);
+constexpr hrt_abstime operator"" _ms(unsigned long long seconds) {
+  return hrt_abstime(seconds * 1000ULL);
 }
 
-constexpr hrt_abstime operator "" _us(unsigned long long seconds)
-{
-	return hrt_abstime(seconds);
+constexpr hrt_abstime operator"" _us(unsigned long long seconds) {
+  return hrt_abstime(seconds);
 }
 
 } /* namespace time_literals */

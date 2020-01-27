@@ -34,15 +34,15 @@
 
 #include "cdev_platform.hpp"
 
-#include "CDev.hpp"
-
-#include "orb_log.h"
-#include "orb_posix.h"
-#include "orb_mutex.hpp"
-
-#include <string>
-#include <map>
 #include <string.h>
+
+#include <map>
+#include <string>
+
+#include "CDev.hpp"
+#include "orb_log.h"
+#include "orb_mutex.hpp"
+#include "orb_posix.h"
 
 using namespace std;
 
@@ -55,8 +55,7 @@ static cdev::file_t filemap[PX4_MAX_FD] = {};
 
 extern "C" {
 
-static cdev::CDev *getDev(const char *path)
-{
+static cdev::CDev *getDev(const char *path) {
   ORB_DEBUG("CDev::getDev");
 
   uORB::MutexGuard guard(devmutex);
@@ -70,8 +69,7 @@ static cdev::CDev *getDev(const char *path)
   return nullptr;
 }
 
-static cdev::CDev *get_vdev(int fd)
-{
+static cdev::CDev *get_vdev(int fd) {
   uORB::MutexGuard guard(filemutex);
 
   bool valid = (fd < PX4_MAX_FD && fd >= 0 && filemap[fd].vdev);
@@ -110,8 +108,7 @@ int register_driver(const char *name, void *data) {
   return ret;
 }
 
-int unregister_driver(const char *name)
-{
+int unregister_driver(const char *name) {
   ORB_DEBUG("CDev::unregister_driver %s", name);
   int ret = -EINVAL;
 
@@ -129,15 +126,13 @@ int unregister_driver(const char *name)
   return ret;
 }
 
-int orb_open(const char *path, int flags, ...)
-{
+int orb_open(const char *path, int flags, ...) {
   ORB_DEBUG("orb_open");
   cdev::CDev *dev = getDev(path);
   int ret = 0;
   int i = 0;
 
   if (dev) {
-
     {
       uORB::MutexGuard guard(filemutex);
       for (i = 0; i < PX4_MAX_FD; ++i) {
@@ -152,7 +147,6 @@ int orb_open(const char *path, int flags, ...)
       ret = dev->open(&filemap[i]);
 
     } else {
-
 #if defined(__unix__)
       const unsigned NAMELEN = 32;
       char thread_name[NAMELEN] = {};
@@ -183,8 +177,7 @@ int orb_open(const char *path, int flags, ...)
   return i;
 }
 
-int orb_close(int fd)
-{
+int orb_close(int fd) {
   int ret;
 
   cdev::CDev *dev = get_vdev(fd);
@@ -207,8 +200,7 @@ int orb_close(int fd)
   return ret;
 }
 
-ssize_t orb_read(int fd, void *buffer, size_t buflen)
-{
+ssize_t orb_read(int fd, void *buffer, size_t buflen) {
   int ret;
 
   cdev::CDev *dev = get_vdev(fd);
@@ -228,8 +220,7 @@ ssize_t orb_read(int fd, void *buffer, size_t buflen)
   return ret;
 }
 
-int orb_ioctl(int fd, int cmd, unsigned long arg)
-{
+int orb_ioctl(int fd, int cmd, unsigned long arg) {
   ORB_DEBUG("orb_ioctl fd = %d", fd);
   int ret = 0;
 
@@ -248,8 +239,7 @@ int orb_ioctl(int fd, int cmd, unsigned long arg)
   return ret;
 }
 
-int orb_poll(orb_pollfd_struct_t *fds, nfds_t nfds, int timeout)
-{
+int orb_poll(orb_pollfd_struct_t *fds, nfds_t nfds, int timeout) {
   if (nfds == 0) {
     ORB_WARN("orb_poll with no fds");
     return -1;
@@ -270,7 +260,7 @@ int orb_poll(orb_pollfd_struct_t *fds, nfds_t nfds, int timeout)
     ORB_WARN("failed getting thread name");
   }
 #else
-    char thread_name[] = {"\"unknow name\""};
+  char thread_name[] = {"\"unknow name\""};
 #endif
 
   ORB_DEBUG("Called orb_poll timeout = %d", timeout);
@@ -284,9 +274,9 @@ int orb_poll(orb_pollfd_struct_t *fds, nfds_t nfds, int timeout)
   bool fd_pollable = false;
 
   for (i = 0; i < nfds; ++i) {
-    fds[i].sem     = &sem;
+    fds[i].sem = &sem;
     fds[i].revents = 0;
-    fds[i].priv    = nullptr;
+    fds[i].priv = nullptr;
 
     cdev::CDev *dev = get_vdev(fds[i].fd);
 
@@ -296,8 +286,7 @@ int orb_poll(orb_pollfd_struct_t *fds, nfds_t nfds, int timeout)
       ret = dev->poll(&filemap[fds[i].fd], &fds[i], true);
 
       if (ret < 0) {
-        ORB_WARN("%s: orb_poll() error: %s",
-                 thread_name, strerror(orb_errno));
+        ORB_WARN("%s: orb_poll() error: %s", thread_name, strerror(orb_errno));
         break;
       }
 
@@ -311,9 +300,8 @@ int orb_poll(orb_pollfd_struct_t *fds, nfds_t nfds, int timeout)
   // check for new data
   if (fd_pollable) {
     if (timeout > 0) {
-
       // Get the current time
-      struct timespec ts{};
+      struct timespec ts {};
       // Note, we can't actually use CLOCK_MONOTONIC on macOS
       // but that's hidden and implemented in orb_clock_gettime.
       clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -328,7 +316,8 @@ int orb_poll(orb_pollfd_struct_t *fds, nfds_t nfds, int timeout)
       ret = orb_sem_timedwait(&sem, &ts);
 
       if (ret && orb_errno != ETIMEDOUT) {
-        ORB_WARN("%s: orb_poll() sem error: %s", thread_name, strerror(orb_errno));
+        ORB_WARN("%s: orb_poll() sem error: %s", thread_name,
+                 strerror(orb_errno));
       }
 
     } else if (timeout < 0) {
@@ -338,12 +327,12 @@ int orb_poll(orb_pollfd_struct_t *fds, nfds_t nfds, int timeout)
     // We have waited now (or not, depending on timeout),
     // go through all fds and count how many have data
     for (i = 0; i < nfds; ++i) {
-
       cdev::CDev *dev = get_vdev(fds[i].fd);
 
       // If fd is valid
       if (dev) {
-        ORB_DEBUG("%s: orb_poll: CDev->poll(teardown) %d", thread_name, fds[i].fd);
+        ORB_DEBUG("%s: orb_poll: CDev->poll(teardown) %d", thread_name,
+                  fds[i].fd);
         ret = dev->poll(&filemap[fds[i].fd], &fds[i], false);
 
         if (ret < 0) {
@@ -365,8 +354,7 @@ int orb_poll(orb_pollfd_struct_t *fds, nfds_t nfds, int timeout)
   return (count) ? count : ret;
 }
 
-int orb_access(const char *pathname, int mode)
-{
+int orb_access(const char *pathname, int mode) {
   if (mode != F_OK) {
     orb_errno = EINVAL;
     return -1;
@@ -376,8 +364,7 @@ int orb_access(const char *pathname, int mode)
   return (dev != nullptr) ? 0 : -1;
 }
 
-void orb_show_topics()
-{
+void orb_show_topics() {
   ORB_INFO("Devices:");
 
   uORB::MutexGuard guard(devmutex);
@@ -389,4 +376,4 @@ void orb_show_topics()
   }
 }
 
-} // extern "C"
+}  // extern "C"
