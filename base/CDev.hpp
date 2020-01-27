@@ -65,7 +65,7 @@ public:
 	 * @param name		Driver name
 	 * @param devname	Device node name
 	 */
-	CDev(const char *devname);
+	explicit CDev(const char *devname);
 
 	virtual ~CDev();
 
@@ -80,7 +80,7 @@ public:
 	 * @param filep		Pointer to the NuttX file structure.
 	 * @return		ORB_OK if the open is allowed, -errno otherwise.
 	 */
-	virtual int	open(file_t *filep);
+	virtual int	open(file_t *filep) = 0;
 
 	/**
 	 * Handle a close of the device.
@@ -91,7 +91,7 @@ public:
 	 * @param filep		Pointer to the NuttX file structure.
 	 * @return		ORB_OK if the close was successful, -errno otherwise.
 	 */
-	virtual int	close(file_t *filep);
+	virtual int	close(file_t *filep) = 0;
 
 	/**
 	 * Perform a read from the device.
@@ -103,7 +103,7 @@ public:
 	 * @param buflen	The number of bytes to be read.
 	 * @return		The number of bytes read or -errno otherwise.
 	 */
-	virtual ssize_t	read(file_t *filep, char *buffer, size_t buflen) { return -ENOSYS; }
+	virtual ssize_t	read(file_t *filep, char *buffer, size_t buflen) = 0;
 
 	/**
 	 * Perform a write to the device.
@@ -114,7 +114,7 @@ public:
 	 * @param buflen	The number of bytes to be written.
 	 * @return		The number of bytes written or -errno otherwise.
 	 */
-	virtual ssize_t	write(const char *buffer, size_t buflen) { return -ENOSYS; }
+	virtual ssize_t	write(const char *buffer, size_t buflen) = 0;
 
         /**
          * Perform an ioctl operation on the device.
@@ -128,7 +128,7 @@ public:
          * @param arg		The ioctl argument value.
          * @return		ORB_OK on success, or -errno otherwise.
          */
-	virtual int	ioctl(file_t *filep, int cmd, unsigned long arg);
+	virtual int	ioctl(file_t *filep, int cmd, unsigned long arg) = 0;
 
 	/**
 	 * Perform a poll setup/teardown operation.
@@ -184,32 +184,6 @@ protected:
 	 */
 	virtual void	poll_notify_one(orb_pollfd_struct_t *fds, pollevent_t events);
 
-	/**
-	 * Notification of the first open.
-	 *
-	 * This function is called when the device open count transitions from zero
-	 * to one.  The driver lock is held for the duration of the call.
-	 *
-	 * The default implementation returns ORB_OK.
-	 *
-	 * @param filep		Pointer to the NuttX file structure.
-	 * @return		ORB_OK if the open should proceed, -errno otherwise.
-	 */
-	virtual int	open_first(file_t *filep) { return ORB_OK; }
-
-	/**
-	 * Notification of the last close.
-	 *
-	 * This function is called when the device open count transitions from
-	 * one to zero.  The driver lock is held for the duration of the call.
-	 *
-	 * The default implementation returns ORB_OK.
-	 *
-	 * @param filep		Pointer to the NuttX file structure.
-	 * @return		ORB_OK if the open should return ORB_OK, -errno otherwise.
-	 */
-	virtual int	close_last(file_t *filep) { return ORB_OK; }
-
         /**
          * Take the driver lock.
          *
@@ -247,7 +221,6 @@ private:
 	bool		_registered{false};		/**< true if device name was registered */
 
 	uint8_t		_max_pollwaiters{0};		/**< size of the _pollset array */
-	uint16_t	_open_count{0};			/**< number of successful opens */
 
 	/**
 	 * Store a pollwaiter in a slot where we can find it later.
@@ -267,7 +240,6 @@ private:
 
 	/* do not allow copying this class */
 	CDev(const CDev &);
-	CDev operator=(const CDev &);
 };
 
 } // namespace cdev

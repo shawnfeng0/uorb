@@ -43,7 +43,7 @@ class Utils;
 class uORB::Utils
 {
 public:
-	static int node_mkpath(char *buf, const struct orb_metadata *meta, int *instance = nullptr);
+	static int node_mkpath(char *buf, const struct orb_metadata *meta, const int *instance = nullptr);
 
 	/**
 	 * same as above except this generators the path based on the string.

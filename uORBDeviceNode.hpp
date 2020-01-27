@@ -54,7 +54,7 @@ class SubscriptionCallback;
 class uORB::DeviceNode : public cdev::CDev, public ListNode<uORB::DeviceNode *>
 {
 public:
-	DeviceNode(const struct orb_metadata *meta, const uint8_t instance, const char *path, uint8_t priority,
+	DeviceNode(const struct orb_metadata *meta, uint8_t instance, const char *path, uint8_t priority,
 		   uint8_t queue_size = 1);
 	~DeviceNode() override;
 

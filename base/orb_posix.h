@@ -58,7 +58,7 @@ typedef long int off_t ;
 #endif // POLLIN
 #endif
 
-typedef short pollevent_t;
+typedef unsigned short pollevent_t;
 
 #if !defined(F_OK)
 #define	F_OK	0		/* Test for existence.  */
@@ -78,7 +78,6 @@ typedef struct {
 __EXPORT int 		orb_open(const char *path, int flags, ...);
 __EXPORT int 		orb_close(int fd);
 __EXPORT ssize_t	orb_read(int fd, void *buffer, size_t buflen);
-__EXPORT ssize_t	orb_write(int fd, const void *buffer, size_t buflen);
 __EXPORT int		orb_ioctl(int fd, int cmd, unsigned long arg);
 __EXPORT int		orb_poll(orb_pollfd_struct_t *fds, nfds_t nfds, int timeout);
 __EXPORT int		orb_access(const char *pathname, int mode);

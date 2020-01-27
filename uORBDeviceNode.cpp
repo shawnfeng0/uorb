@@ -87,7 +87,7 @@ uORB::DeviceNode::open(cdev::file_t *filp)
 		unlock();
 
 		/* now complete the open */
-		return CDev::open(filp);
+		return ORB_OK;
 	}
 
 	/* is this a new subscriber? */
@@ -106,20 +106,9 @@ uORB::DeviceNode::open(cdev::file_t *filp)
 
 		filp->f_priv = (void *)sd;
 
-		int ret = CDev::open(filp);
-
 		add_internal_subscriber();
 
-		if (ret != ORB_OK) {
-                  ORB_ERR("CDev::open failed");
-			delete sd;
-		}
-
-		return ret;
-	}
-
-	if (filp->f_oflags == 0) {
-		return CDev::open(filp);
+                return ORB_OK;
 	}
 
 	/* can only be pub or sub, not both */
@@ -138,7 +127,7 @@ uORB::DeviceNode::close(cdev::file_t *filp)
                 }
 	}
 
-	return CDev::close(filp);
+	return ORB_OK;
 }
 
 bool
@@ -380,8 +369,8 @@ uORB::DeviceNode::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
 		return ORB_OK;
 
 	default:
-		/* give it to the superclass */
-		return CDev::ioctl(filp, cmd, arg);
+		/* Unknown operation*/
+		return ORB_ERROR;
 	}
 }
 

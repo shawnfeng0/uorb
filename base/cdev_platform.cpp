@@ -228,27 +228,6 @@ ssize_t orb_read(int fd, void *buffer, size_t buflen)
   return ret;
 }
 
-ssize_t orb_write(int fd, const void *buffer, size_t buflen)
-{
-  int ret;
-
-  cdev::CDev *dev = get_vdev(fd);
-
-  if (dev) {
-    ORB_DEBUG("orb_write fd = %d", fd);
-    ret = dev->write((const char *)buffer, buflen);
-
-  } else {
-    ret = -EINVAL;
-  }
-
-  if (ret < 0) {
-    ret = ORB_ERROR;
-  }
-
-  return ret;
-}
-
 int orb_ioctl(int fd, int cmd, unsigned long arg)
 {
   ORB_DEBUG("orb_ioctl fd = %d", fd);

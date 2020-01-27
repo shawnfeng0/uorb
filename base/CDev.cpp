@@ -97,64 +97,6 @@ CDev::init()
  * Default implementations of the character device interface
  */
 int
-CDev::open(file_t *filep)
-{
-  ORB_DEBUG("CDev::open");
-	int ret = ORB_OK;
-
-	lock();
-	/* increment the open count */
-	_open_count++;
-
-	if (_open_count == 1) {
-
-		/* first-open callback may decline the open */
-		ret = open_first(filep);
-
-		if (ret != ORB_OK) {
-			_open_count--;
-		}
-	}
-
-	unlock();
-
-	return ret;
-}
-
-int
-CDev::close(file_t *filep)
-{
-  ORB_DEBUG("CDev::close");
-	int ret = ORB_OK;
-
-	lock();
-
-	if (_open_count > 0) {
-		/* decrement the open count */
-		_open_count--;
-
-		/* callback cannot decline the close */
-		if (_open_count == 0) {
-			ret = close_last(filep);
-		}
-
-	} else {
-		ret = -EBADF;
-	}
-
-	unlock();
-
-	return ret;
-}
-
-int
-CDev::ioctl(file_t *filep, int cmd, unsigned long arg)
-{
-  ORB_DEBUG("CDev::ioctl");
-	return -ORB_ERROR;
-}
-
-int
 CDev::poll(file_t *filep, orb_pollfd_struct_t *fds, bool setup)
 {
   ORB_DEBUG("CDev::Poll %s", setup ? "setup" : "teardown");

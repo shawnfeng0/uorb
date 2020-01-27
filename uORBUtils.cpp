@@ -37,7 +37,7 @@
 
 #include "base/orb_defines.h"
 
-int uORB::Utils::node_mkpath(char *buf, const struct orb_metadata *meta, int *instance)
+int uORB::Utils::node_mkpath(char *buf, const struct orb_metadata *meta, const int *instance)
 {
 	unsigned len;
 
