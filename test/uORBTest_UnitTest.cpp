@@ -32,8 +32,8 @@
  ****************************************************************************/
 
 #include "uORBTest_UnitTest.hpp"
-#include "../base/CDev.hpp"
 #include "../base/orb_log.h"
+#include "../base/orb_posix.h"
 #include "../uORBCommon.hpp"
 #include <math.h>
 #include <poll.h>

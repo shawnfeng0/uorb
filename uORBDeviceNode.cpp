@@ -58,18 +58,38 @@ uORB::DeviceNode::SubscriberData *uORB::DeviceNode::filp_to_sd(
 uORB::DeviceNode::DeviceNode(const struct orb_metadata *meta,
                              const uint8_t instance, const char *path,
                              uint8_t priority, uint8_t queue_size)
-    : CDev(path),
+    : _devname(path),
       _meta(meta),
       _instance(instance),
       _priority(priority),
-      _queue_size(queue_size) {}
+      _queue_size(queue_size) {
+
+  ORB_DEBUG("CDev::CDev");
+
+  int ret = orb_sem_init(&_lock, 0, 1);
+
+  if (ret != 0) {
+    ORB_DEBUG("SEM INIT FAIL: ret %d", ret);
+  }
+}
 
 uORB::DeviceNode::~DeviceNode() {
   if (_data != nullptr) {
     delete[] _data;
   }
+  unregister_driver_and_memory();
 
-  CDev::unregister_driver_and_memory();
+  ORB_DEBUG("CDev::~CDev");
+
+  if (_registered) {
+    unregister_driver(_devname);
+  }
+
+  if (_pollset) {
+    delete[](_pollset);
+  }
+
+  orb_sem_destroy(&_lock);
 }
 
 int uORB::DeviceNode::open(cdev::file_t *filp) {
@@ -477,7 +497,17 @@ void uORB::DeviceNode::poll_notify_one(orb_pollfd_struct_t *fds,
    * If the topic looks updated to the subscriber, go ahead and notify them.
    */
   if (appears_updated(sd)) {
-    CDev::poll_notify_one(fds, events);
+     ORB_DEBUG("CDev::poll_notify_one");
+
+    /* update the reported event set */
+    fds->revents |= fds->events & events;
+
+    ORB_DEBUG(" Events fds=%p %0x %0x %0x", fds, fds->revents, fds->events,
+              events);
+
+    if (fds->revents != 0) {
+      orb_sem_post(fds->sem);
+    }
   }
 }
 
@@ -645,4 +675,209 @@ void uORB::DeviceNode::unregister_callback(
   ATOMIC_ENTER;
   _callbacks.remove(callback_sub);
   ATOMIC_LEAVE;
+}
+
+
+void uORB::DeviceNode::poll_notify(pollevent_t events) {
+  ORB_DEBUG("CDev::poll_notify events = %0x", events);
+
+  /* lock against poll() as well as other wakeups */
+  ATOMIC_ENTER;
+
+  for (unsigned i = 0; i < _max_pollwaiters; i++) {
+    if (nullptr != _pollset[i]) {
+      poll_notify_one(_pollset[i], events);
+    }
+  }
+
+  ATOMIC_LEAVE;
+}
+
+int uORB::DeviceNode::store_poll_waiter(orb_pollfd_struct_t *fds) {
+  // Look for a free slot.
+  ORB_DEBUG("CDev::store_poll_waiter");
+
+  for (unsigned i = 0; i < _max_pollwaiters; i++) {
+    if (nullptr == _pollset[i]) {
+      /* save the pollfd */
+      _pollset[i] = fds;
+
+      return ORB_OK;
+    }
+  }
+
+  return -ENFILE;
+}
+
+int uORB::DeviceNode::remove_poll_waiter(orb_pollfd_struct_t *fds) {
+  ORB_DEBUG("CDev::remove_poll_waiter");
+
+  for (unsigned i = 0; i < _max_pollwaiters; i++) {
+    if (fds == _pollset[i]) {
+      _pollset[i] = nullptr;
+      return ORB_OK;
+    }
+  }
+
+  ORB_DEBUG("poll: bad fd state");
+  return -EINVAL;
+}
+
+int uORB::DeviceNode::unregister_driver_and_memory() {
+  int retval = ORB_OK;
+
+  if (_registered) {
+    unregister_driver(_devname);
+    _registered = false;
+
+  } else {
+    retval = -ENODEV;
+  }
+
+  if (_devname != nullptr) {
+    delete[] _devname;
+    _devname = nullptr;
+
+  } else {
+    retval = -ENODEV;
+  }
+
+  return retval;
+}
+
+/*
+ * Default implementations of the character device interface
+ */
+int uORB::DeviceNode::poll(cdev::file_t *filep, orb_pollfd_struct_t *fds, bool setup) {
+  ORB_DEBUG("CDev::Poll %s", setup ? "setup" : "teardown");
+  int ret;
+
+  if (setup) {
+    /*
+     * Save the file pointer in the pollfd for the subclass'
+     * benefit.
+     */
+    fds->priv = (void *)filep;
+    ORB_DEBUG("CDev::poll: fds->priv = %p", filep);
+
+    /*
+     * Lock against poll_notify() and possibly other callers (protect _pollset).
+     */
+    ATOMIC_ENTER;
+
+    /*
+     * Try to store the fds for later use and handle array resizing.
+     */
+    while ((ret = store_poll_waiter(fds)) == -ENFILE) {
+      // No free slot found. Resize the pollset. This is expensive, but it's
+      // only needed initially.
+
+      if (_max_pollwaiters >= 256 / 2) {  //_max_pollwaiters is uint8_t
+        ret = -ENOMEM;
+        break;
+      }
+
+      const uint8_t new_count = _max_pollwaiters > 0 ? _max_pollwaiters * 2 : 1;
+      orb_pollfd_struct_t **prev_pollset = _pollset;
+
+#ifdef __PX4_NUTTX
+      // malloc uses a semaphore, we need to call it enabled IRQ's
+      orb_leave_critical_section(flags);
+#endif
+      auto **new_pollset = new orb_pollfd_struct_t *[new_count];
+
+#ifdef __PX4_NUTTX
+      flags = orb_enter_critical_section();
+#endif
+
+      if (prev_pollset == _pollset) {
+        // no one else updated the _pollset meanwhile, so we're good to go
+        if (!new_pollset) {
+          ret = -ENOMEM;
+          break;
+        }
+
+        if (_max_pollwaiters > 0) {
+          memset(
+              new_pollset + _max_pollwaiters, 0,
+              sizeof(orb_pollfd_struct_t *) * (new_count - _max_pollwaiters));
+          memcpy(new_pollset, _pollset,
+                 sizeof(orb_pollfd_struct_t *) * _max_pollwaiters);
+        }
+
+        _pollset = new_pollset;
+        _pollset[_max_pollwaiters] = fds;
+        _max_pollwaiters = new_count;
+
+        // free the previous _pollset (we need to unlock here which is fine
+        // because we don't access _pollset anymore)
+#ifdef __PX4_NUTTX
+        orb_leave_critical_section(flags);
+#endif
+
+        if (prev_pollset) {
+          delete[](prev_pollset);
+        }
+
+#ifdef __PX4_NUTTX
+        flags = orb_enter_critical_section();
+#endif
+
+        // Success
+        ret = ORB_OK;
+        break;
+      }
+
+#ifdef __PX4_NUTTX
+      orb_leave_critical_section(flags);
+#endif
+      // We have to retry
+      delete[] new_pollset;
+#ifdef __PX4_NUTTX
+      flags = orb_enter_critical_section();
+#endif
+    }
+
+    if (ret == ORB_OK) {
+      /*
+       * Check to see whether we should send a poll notification
+       * immediately.
+       */
+      fds->revents |= fds->events & poll_state(filep);
+
+      /* yes? post the notification */
+      if (fds->revents != 0) {
+        orb_sem_post(fds->sem);
+      }
+    }
+
+    ATOMIC_LEAVE;
+
+  } else {
+    ATOMIC_ENTER;
+    /*
+     * Handle a teardown request.
+     */
+    ret = remove_poll_waiter(fds);
+    ATOMIC_LEAVE;
+  }
+
+  return ret;
+}
+
+int uORB::DeviceNode::init() {
+  ORB_DEBUG("CDev::init");
+
+  int ret = ORB_OK;
+
+  // now register the driver
+  if (_devname != nullptr) {
+    ret = register_driver(_devname, (void *)this);
+
+    if (ret == ORB_OK) {
+      _registered = true;
+    }
+  }
+
+  return ret;
 }

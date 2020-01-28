@@ -39,8 +39,9 @@
 #include <map>
 #include <string>
 
-#include "CDev.hpp"
+#include "../uORBDeviceNode.hpp"
 #include "orb_log.h"
+#include "orb_defines.h"
 #include "orb_mutex.hpp"
 #include "orb_posix.h"
 
@@ -55,7 +56,7 @@ static cdev::file_t filemap[PX4_MAX_FD] = {};
 
 extern "C" {
 
-static cdev::CDev *getDev(const char *path) {
+static uORB::DeviceNode *getDev(const char *path) {
   ORB_DEBUG("CDev::getDev");
 
   uORB::MutexGuard guard(devmutex);
@@ -63,20 +64,20 @@ static cdev::CDev *getDev(const char *path) {
   auto item = devmap.find(path);
 
   if (item != devmap.end()) {
-    return (cdev::CDev *)item->second;
+    return (uORB::DeviceNode *)item->second;
   }
 
   return nullptr;
 }
 
-static cdev::CDev *get_vdev(int fd) {
+static uORB::DeviceNode *get_vdev(int fd) {
   uORB::MutexGuard guard(filemutex);
 
   bool valid = (fd < PX4_MAX_FD && fd >= 0 && filemap[fd].vdev);
-  cdev::CDev *dev;
+  uORB::DeviceNode *dev;
 
   if (valid) {
-    dev = (cdev::CDev *)(filemap[fd].vdev);
+    dev = (uORB::DeviceNode *)(filemap[fd].vdev);
 
   } else {
     dev = nullptr;
@@ -128,7 +129,7 @@ int unregister_driver(const char *name) {
 
 int orb_open(const char *path, int flags, ...) {
   ORB_DEBUG("orb_open");
-  cdev::CDev *dev = getDev(path);
+  uORB::DeviceNode *dev = getDev(path);
   int ret = 0;
   int i = 0;
 
@@ -180,7 +181,7 @@ int orb_open(const char *path, int flags, ...) {
 int orb_close(int fd) {
   int ret;
 
-  cdev::CDev *dev = get_vdev(fd);
+  uORB::DeviceNode *dev = get_vdev(fd);
 
   if (dev) {
     uORB::MutexGuard guard(filemutex);
@@ -203,7 +204,7 @@ int orb_close(int fd) {
 ssize_t orb_read(int fd, void *buffer, size_t buflen) {
   int ret;
 
-  cdev::CDev *dev = get_vdev(fd);
+  uORB::DeviceNode *dev = get_vdev(fd);
 
   if (dev) {
     ORB_DEBUG("orb_read fd = %d", fd);
@@ -224,7 +225,7 @@ int orb_ioctl(int fd, int cmd, unsigned long arg) {
   ORB_DEBUG("orb_ioctl fd = %d", fd);
   int ret = 0;
 
-  cdev::CDev *dev = get_vdev(fd);
+  uORB::DeviceNode *dev = get_vdev(fd);
 
   if (dev) {
     ret = dev->ioctl(&filemap[fd], cmd, arg);
@@ -278,7 +279,7 @@ int orb_poll(orb_pollfd_struct_t *fds, nfds_t nfds, int timeout) {
     fds[i].revents = 0;
     fds[i].priv = nullptr;
 
-    cdev::CDev *dev = get_vdev(fds[i].fd);
+    uORB::DeviceNode *dev = get_vdev(fds[i].fd);
 
     // If fd is valid
     if (dev) {
@@ -327,7 +328,7 @@ int orb_poll(orb_pollfd_struct_t *fds, nfds_t nfds, int timeout) {
     // We have waited now (or not, depending on timeout),
     // go through all fds and count how many have data
     for (i = 0; i < nfds; ++i) {
-      cdev::CDev *dev = get_vdev(fds[i].fd);
+      uORB::DeviceNode *dev = get_vdev(fds[i].fd);
 
       // If fd is valid
       if (dev) {
@@ -360,7 +361,7 @@ int orb_access(const char *pathname, int mode) {
     return -1;
   }
 
-  cdev::CDev *dev = getDev(pathname);
+  uORB::DeviceNode *dev = getDev(pathname);
   return (dev != nullptr) ? 0 : -1;
 }
 

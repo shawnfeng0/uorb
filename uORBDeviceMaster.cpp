@@ -37,6 +37,8 @@
 #include "uORBManager.hpp"
 #include "uORBUtils.hpp"
 
+#include "base/orb_defines.h"
+
 #ifdef ORB_COMMUNICATOR
 #include "uORBCommunicator.hpp"
 #endif /* ORB_COMMUNICATOR */

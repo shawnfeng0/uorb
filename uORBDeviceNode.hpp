@@ -33,8 +33,8 @@
 
 #pragma once
 
-#include "base/CDev.hpp"
 #include "base/List.hpp"
+#include "base/cdev_platform.hpp"
 #include "base/orb_atomic.hpp"
 #include "uORBCommon.hpp"
 #include "uORBDeviceMaster.hpp"
@@ -49,29 +49,31 @@ class SubscriptionCallback;
 /**
  * Per-object device instance.
  */
-class uORB::DeviceNode : public cdev::CDev,
-                         public ListNode<uORB::DeviceNode *> {
+class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
  public:
   DeviceNode(const struct orb_metadata *meta, uint8_t instance,
              const char *path, uint8_t priority, uint8_t queue_size = 1);
-  ~DeviceNode() override;
+  ~DeviceNode();
 
+  /* do not allow copying this class */
   // no copy, assignment, move, move assignment
   DeviceNode(const DeviceNode &) = delete;
   DeviceNode &operator=(const DeviceNode &) = delete;
   DeviceNode(DeviceNode &&) = delete;
   DeviceNode &operator=(DeviceNode &&) = delete;
 
+  int init();
+
   /**
    * Method to create a subscriber instance and return the struct
    * pointing to the subscriber as a file pointer.
    */
-  int open(cdev::file_t *filp) override;
+  int open(cdev::file_t *filp) ;
 
   /**
    * Method to close a subscriber for this topic.
    */
-  int close(cdev::file_t *filp) override;
+  int close(cdev::file_t *filp) ;
 
   /**
    * reads data from a subscriber node to the buffer provided.
@@ -84,7 +86,7 @@ class uORB::DeviceNode : public cdev::CDev,
    * @return
    *   ssize_t the number of bytes read.
    */
-  ssize_t read(cdev::file_t *filp, char *buffer, size_t buflen) override;
+  ssize_t read(cdev::file_t *filp, char *buffer, size_t buflen) ;
 
   /**
    * writes the published data to the internal buffer to be read by
@@ -96,12 +98,42 @@ class uORB::DeviceNode : public cdev::CDev,
    * @return ssize_t
    *   The number of bytes that are written
    */
-  ssize_t write(const char *buffer, size_t buflen) override;
+  ssize_t write(const char *buffer, size_t buflen) ;
 
   /**
    * IOCTL control for the subscriber.
+   * Perform an ioctl operation on the device.
+   *
+   * The default implementation handles DIOC_GETPRIV, and otherwise
+   * returns -ENOTTY. Subclasses should call the default implementation
+   * for any command they do not handle themselves.
+   *
+   * @param filep		Pointer to the NuttX file structure.
+   * @param cmd		The ioctl command value.
+   * @param arg		The ioctl argument value.
+   * @return		ORB_OK on success, or -errno otherwise.
    */
-  int ioctl(cdev::file_t *filp, int cmd, unsigned long arg) override;
+  int ioctl(cdev::file_t *filp, int cmd, unsigned long arg) ;
+
+  /**
+   * Perform a poll setup/teardown operation.
+   *
+   * This is handled internally and should not normally be overridden.
+   *
+   * @param filep		Pointer to the internal file structure.
+   * @param fds		Poll descriptor being waited on.
+   * @param setup		True if this is establishing a request, false if
+   *			it is being torn down.
+   * @return		ORB_OK on success, or -errno otherwise.
+   */
+  int poll(cdev::file_t *filep, orb_pollfd_struct_t *fds, bool setup) ;
+
+  /**
+   * Get the device name.
+   *
+   * @return the file system string of the device handle
+   */
+  const char *get_devname() const  { return _devname; }
 
   /**
    * Method to publish a data to this node.
@@ -230,9 +262,38 @@ class uORB::DeviceNode : public cdev::CDev,
   void unregister_callback(SubscriptionCallback *callback_sub);
 
  protected:
-  pollevent_t poll_state(cdev::file_t *filp) override;
+    /**
+   * Check the current state of the device for poll events from the
+   * perspective of the file.
+   *
+   * This function is called by the default poll() implementation when
+   * a poll is set up to determine whether the poll should return
+   * immediately.
+   *
+   * The default implementation returns no events.
+   *
+   * @param filep		The file that's interested.
+   * @return		The current set of poll events.
+   */
+  pollevent_t poll_state(cdev::file_t *filp) ;
 
-  void poll_notify_one(orb_pollfd_struct_t *fds, pollevent_t events) override;
+  /**
+   * Report new poll events.
+   *
+   * This function should be called anytime the state of the device changes
+   * in a fashion that might be interesting to a poll waiter.
+   *
+   * @param events	The new event(s) being announced.
+   */
+  void poll_notify(pollevent_t events) ;
+
+  /**
+   * Internal implementation of poll_notify.
+   *
+   * @param fds		A poll waiter to notify.
+   * @param events	The event(s) to send to the waiter.
+   */
+  void poll_notify_one(orb_pollfd_struct_t *fds, pollevent_t events) ;
 
  private:
   /**
@@ -283,6 +344,17 @@ class uORB::DeviceNode : public cdev::CDev,
       0; /**< nr of lost messages for all subscribers. If two subscribers lose
             the same message, it is counted as two. */
 
+  orb_sem_t _lock; /**< lock to protect access to all class members (also for
+                      derived classes) */
+
+  const char *_devname{nullptr}; /**< device node name */
+
+  orb_pollfd_struct_t **_pollset{nullptr};
+
+  bool _registered{false}; /**< true if device name was registered */
+
+  uint8_t _max_pollwaiters{0}; /**< size of the _pollset array */
+
   inline static SubscriberData *filp_to_sd(cdev::file_t *filp);
 
   /**
@@ -294,4 +366,50 @@ class uORB::DeviceNode : public cdev::CDev,
    * @return    True if the topic should appear updated to the subscriber
    */
   bool appears_updated(SubscriberData *sd);
+
+  /**
+   * Take the driver lock.
+   *
+   * Each driver instance has its own lock/semaphore.
+   *
+   * Note that we must loop as the wait may be interrupted by a signal.
+   *
+   * Careful: lock() calls cannot be nested!
+   */
+  void lock() {
+    do {
+    } while (orb_sem_wait(&_lock) != 0);
+  }
+
+  /**
+   * Release the driver lock.
+   */
+  void unlock()  { orb_sem_post(&_lock); }
+
+  /**
+ * Store a pollwaiter in a slot where we can find it later.
+ *
+ * Expands the pollset as required.  Must be called with the driver locked.
+ *
+ * @return		ORB_OK, or -errno on error.
+ */
+  inline int store_poll_waiter(orb_pollfd_struct_t *fds) ;
+
+  /**
+   * Remove a poll waiter.
+   *
+   * @return		ORB_OK, or -errno on error.
+   */
+  inline int remove_poll_waiter(orb_pollfd_struct_t *fds) ;
+
+    /**
+   * First, unregisters the driver. Next, free the memory for the devname,
+   * in case it was expected to have ownership. Sets devname to nullptr.
+   *
+   * This is only needed if the ownership of the devname was passed to the CDev,
+   * otherwise ~CDev handles it.
+   *
+   * @return  ORB_OK on success, -ENODEV if the devname is already nullptr
+   */
+  int unregister_driver_and_memory();
 };

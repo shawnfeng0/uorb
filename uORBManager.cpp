@@ -35,6 +35,7 @@
 #include "base/orb_errno.h"
 #include "base/orb_log.h"
 #include "base/orb_posix.h"
+#include "base/orb_defines.h"
 #include "uORBDeviceNode.hpp"
 #include "uORBUtils.hpp"
 
