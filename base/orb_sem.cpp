@@ -47,8 +47,6 @@ int orb_sem_init(orb_sem_t *s, int pshared, unsigned int value) {
   return 0;
 }
 
-int orb_sem_setprotocol(orb_sem_t *s, int protocol) { return 0; }
-
 int orb_sem_wait(orb_sem_t *s) {
   uORB::MutexGuard guard(s->lock);
   int ret;
@@ -56,7 +54,7 @@ int orb_sem_wait(orb_sem_t *s) {
   s->value--;
 
   if (s->value < 0) {
-    ret = s->wait.wait(s->lock);
+    ret = s->cond.wait(s->lock);
 
   } else {
     ret = 0;
@@ -93,7 +91,7 @@ int orb_sem_timedwait(orb_sem_t *s, const struct timespec *abstime) {
   orb_errno = 0;
 
   if (s->value < 0) {
-    ret = s->wait.wait_until(s->lock, abstime);
+    ret = s->cond.wait_until(s->lock, abstime);
 
   } else {
     ret = 0;
@@ -122,7 +120,7 @@ int orb_sem_post(orb_sem_t *s) {
   s->value++;
 
   if (s->value <= 0) {
-    ret = s->wait.notify_one();
+    ret = s->cond.notify_one();
 
   } else {
     ret = 0;

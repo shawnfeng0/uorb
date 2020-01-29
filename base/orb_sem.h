@@ -55,12 +55,11 @@ typedef struct {
   uORB::Mutex lock;
   // We want to use CLOCK_MONOTONIC if possible but we can't on macOS
   // because it's not available.
-  uORB::MonoClockCond wait;
+  uORB::MonoClockCond cond;
   int value;
 } orb_sem_t;
 
 __EXPORT int orb_sem_init(orb_sem_t *s, int pshared, unsigned value);
-__EXPORT int orb_sem_setprotocol(orb_sem_t *s, int protocol);
 __EXPORT int orb_sem_wait(orb_sem_t *s);
 __EXPORT int orb_sem_trywait(orb_sem_t *sem);
 __EXPORT int orb_sem_timedwait(orb_sem_t *sem, const struct timespec *abstime);

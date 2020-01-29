@@ -268,9 +268,6 @@ int orb_poll(orb_pollfd_struct_t *fds, nfds_t nfds, int timeout) {
 
   orb_sem_init(&sem, 0, 0);
 
-  // sem use case is a signal
-  orb_sem_setprotocol(&sem, SEM_PRIO_NONE);
-
   // Go through all fds and check them for a pollable state
   bool fd_pollable = false;
 
