@@ -79,8 +79,8 @@ class ConditionVariable {
 
   int wait_for(Mutex &lock, long usec) {
     struct timespec req {};
-    clock_gettime(CLOCK_MONOTONIC, &req);
-    req.tv_nsec += usec;
+    clock_gettime(clock_id, &req);
+    req.tv_nsec += usec * 1000;
     req.tv_sec += req.tv_nsec / (1e9);
     return wait_until(lock, req);
   }
