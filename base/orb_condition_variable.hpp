@@ -7,52 +7,30 @@
 
 namespace uORB {
 
-typedef pthread_cond_t __orb_thread_cond_t;
-
-#ifdef PTHREAD_COND_INITIALIZER
-#define __ORB_THREAD_COND_INITIALIZER PTHREAD_COND_INITIALIZER
-#endif
-#define __ORB_THREAD_COND_INIT(x) pthread_cond_init((x), nullptr)
-#define __ORB_THREAD_COND_INIT_CLOCK(x, clock_id) \
-  do {                                            \
-    pthread_condattr_t attr;                      \
-    pthread_condattr_init(&attr);                 \
-    pthread_condattr_setclock(&attr, (clock_id)); \
-    pthread_cond_init((x), &attr);                \
-  } while (0)
-#define __ORB_THREAD_COND_DESTROY pthread_cond_destroy
-#define __ORB_THREAD_COND_SIGNAL pthread_cond_signal
-#define __ORB_THREAD_COND_BROADCAST pthread_cond_broadcast
-#define __ORB_THREAD_COND_TIMEDWAIT pthread_cond_timedwait
-#define __ORB_THREAD_COND_WAIT pthread_cond_wait
-
-/// condition_variable
 template <int clock_id>
 class ConditionVariable {
-#ifdef __ORB_THREAD_COND_INITIAIZER
-  __orb_thread_cond_t cond_ = __ORB_THREAD_COND_INITIALIZER;
-  condition_variable() noexcept = default;
-#else
-  __orb_thread_cond_t cond_{};
+  pthread_cond_t cond_{};
 
- public:
+public:
   ConditionVariable() noexcept {
-    __ORB_THREAD_COND_INIT_CLOCK(&cond_, clock_id);
+    pthread_condattr_t attr;
+    pthread_condattr_init(&attr);
+    pthread_condattr_setclock(&attr, (clock_id));
+    pthread_cond_init((&cond_), &attr);
   }
 
-  ~ConditionVariable() noexcept { __ORB_THREAD_COND_DESTROY(&cond_); }
-#endif
+  ~ConditionVariable() noexcept { pthread_cond_destroy(&cond_); }
 
  public:
   ConditionVariable(const ConditionVariable &) = delete;
   ConditionVariable &operator=(const ConditionVariable &) = delete;
 
-  int notify_one() noexcept { return __ORB_THREAD_COND_SIGNAL(&cond_); }
+  int notify_one() noexcept { return pthread_cond_signal(&cond_); }
 
-  int notify_all() noexcept { return __ORB_THREAD_COND_BROADCAST(&cond_); }
+  int notify_all() noexcept { return pthread_cond_broadcast(&cond_); }
 
   int wait(Mutex &lock) noexcept {
-    return __ORB_THREAD_COND_WAIT(&cond_, lock.native_handle());
+    return pthread_cond_wait(&cond_, lock.native_handle());
   }
 
   template <typename _Predicate>
@@ -63,11 +41,11 @@ class ConditionVariable {
   }
 
   int wait_until(Mutex &lock, const struct timespec &atime) {
-    return __ORB_THREAD_COND_TIMEDWAIT(&cond_, lock.native_handle(), &atime);
+    return pthread_cond_timedwait(&cond_, lock.native_handle(), &atime);
   }
 
   int wait_until(Mutex &lock, const struct timespec *atime) {
-    return __ORB_THREAD_COND_TIMEDWAIT(&cond_, lock.native_handle(), atime);
+    return pthread_cond_timedwait(&cond_, lock.native_handle(), atime);
   }
 
   template <typename _Predicate>
@@ -85,7 +63,7 @@ class ConditionVariable {
     return wait_until(lock, req);
   }
 
-  __orb_thread_cond_t *native_handle() { return &cond_; }
+  pthread_cond_t *native_handle() { return &cond_; }
 };
 
 typedef ConditionVariable<CLOCK_MONOTONIC> MonoClockCond;
