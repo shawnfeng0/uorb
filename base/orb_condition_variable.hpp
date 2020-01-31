@@ -89,4 +89,69 @@ class ConditionVariable {
 typedef ConditionVariable<CLOCK_MONOTONIC> MonoClockCond;
 typedef ConditionVariable<CLOCK_REALTIME> RealClockCond;
 
+template <clockid_t clock_id>
+class SimpleSemaphore {
+ public:
+  SimpleSemaphore(unsigned int count) : count_(count) {}
+  SimpleSemaphore(const SimpleSemaphore &) = delete;
+  SimpleSemaphore &operator=(const SimpleSemaphore &) = delete;
+
+  // increments the internal counter and unblocks acquirers
+  void release() {
+    LockGuard<decltype(mutex_)> lock(mutex_);
+    ++count_;
+    // The previous semaphore was 0, and there may be waiting tasks
+    if (count_ == 1) condition_.notify_one();
+  }
+
+  // decrements the internal counter or blocks until it can
+  void acquire() {
+    LockGuard<decltype(mutex_)> lock(mutex_);
+    condition_.wait(mutex_, [&] { return count_ > 0; });
+    --count_;
+  }
+
+  // tries to decrement the internal counter without blocking
+  bool try_acquire() {
+    LockGuard<decltype(mutex_)> lock(mutex_);
+    if (count_) {
+      --count_;
+      return true;
+    }
+    return false;
+  }
+
+  // tries to decrement the internal counter, blocking for up to a duration time
+  bool try_acquire_for(int time_ms) {
+    LockGuard<decltype(mutex_)> lock(mutex_);
+    bool finished =
+        condition_.wait_for(mutex_, time_ms, [&] { return count_ > 0; });
+    if (finished) --count_;
+    return finished;
+  }
+
+  unsigned int get_value() {
+    LockGuard<decltype(mutex_)> lock(mutex_);
+    return count_;
+  }
+
+ private:
+  // Hide this function in case the client is not sure which clockid to use
+  // tries to decrement the internal counter, blocking until a point in time
+  bool try_acquire_until(const struct timespec &atime) {
+    LockGuard<decltype(mutex_)> lock(mutex_);
+    bool finished =
+        condition_.wait_until(mutex_, atime, [&] { return count_ > 0; });
+    if (finished) --count_;
+    return finished;
+  }
+
+  Mutex mutex_;
+  ConditionVariable<clock_id> condition_;
+  unsigned int count_;
+};
+
+typedef SimpleSemaphore<CLOCK_REALTIME> RealClockSemaphore;
+typedef SimpleSemaphore<CLOCK_MONOTONIC> MonoClockSemaphore;
+
 }  // namespace uORB
