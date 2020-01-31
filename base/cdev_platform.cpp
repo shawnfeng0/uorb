@@ -50,9 +50,9 @@ using namespace std;
 static uORB::Mutex devmutex;
 static uORB::Mutex filemutex;
 
-#define PX4_MAX_FD 350
+#define ORB_MAX_FD 100
 static map<string, void *> devmap;
-static cdev::file_t filemap[PX4_MAX_FD] = {};
+static cdev::file_t filemap[ORB_MAX_FD] = {};
 
 extern "C" {
 
@@ -73,7 +73,7 @@ static uORB::DeviceNode *getDev(const char *path) {
 static uORB::DeviceNode *get_vdev(int fd) {
   uORB::MutexGuard guard(filemutex);
 
-  bool valid = (fd < PX4_MAX_FD && fd >= 0 && filemap[fd].vdev);
+  bool valid = (fd < ORB_MAX_FD && fd >= 0 && filemap[fd].vdev);
   uORB::DeviceNode *dev;
 
   if (valid) {
@@ -136,7 +136,7 @@ int orb_open(const char *path, int flags, ...) {
   if (dev) {
     {
       uORB::MutexGuard guard(filemutex);
-      for (i = 0; i < PX4_MAX_FD; ++i) {
+      for (i = 0; i < ORB_MAX_FD; ++i) {
         if (filemap[i].vdev == nullptr) {
           filemap[i] = cdev::file_t(flags, dev);
           break;
@@ -144,7 +144,7 @@ int orb_open(const char *path, int flags, ...) {
       }
     }
 
-    if (i < PX4_MAX_FD) {
+    if (i < ORB_MAX_FD) {
       ret = dev->open(&filemap[i]);
 
     } else {
