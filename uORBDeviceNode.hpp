@@ -344,7 +344,7 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
       0; /**< nr of lost messages for all subscribers. If two subscribers lose
             the same message, it is counted as two. */
 
-  orb_sem_t _lock; /**< lock to protect access to all class members (also for
+  uORB::Mutex _lock; /**< lock to protect access to all class members (also for
                       derived classes) */
 
   const char *_devname{nullptr}; /**< device node name */
@@ -366,25 +366,6 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
    * @return    True if the topic should appear updated to the subscriber
    */
   bool appears_updated(SubscriberData *sd);
-
-  /**
-   * Take the driver lock.
-   *
-   * Each driver instance has its own lock/semaphore.
-   *
-   * Note that we must loop as the wait may be interrupted by a signal.
-   *
-   * Careful: lock() calls cannot be nested!
-   */
-  void lock() {
-    do {
-    } while (orb_sem_wait(&_lock) != 0);
-  }
-
-  /**
-   * Release the driver lock.
-   */
-  void unlock()  { orb_sem_post(&_lock); }
 
   /**
  * Store a pollwaiter in a slot where we can find it later.

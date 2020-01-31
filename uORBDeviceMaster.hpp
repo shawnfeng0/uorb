@@ -39,6 +39,7 @@
 
 #include "base/List.hpp"
 #include "base/orb_posix.h"
+#include "base/orb_mutex.hpp"
 #include "uORBCommon.hpp"
 
 namespace uORB {
@@ -108,18 +109,11 @@ class uORB::DeviceMaster {
    * @return node if exists, nullptr otherwise
    */
   uORB::DeviceNode *getDeviceNodeLocked(const struct orb_metadata *meta,
-                                        const uint8_t instance);
+                                        uint8_t instance);
 
   List<uORB::DeviceNode *> _node_list;
 
   hrt_abstime _last_statistics_output;
 
-  orb_sem_t _lock; /**< lock to protect access to all class members (also for
-                      derived classes) */
-
-  void lock() {
-    do {
-    } while (orb_sem_wait(&_lock) != 0);
-  }
-  void unlock() { orb_sem_post(&_lock); }
+  uORB::Mutex _lock; /**< lock to protect access to all class members (also for derived classes) */
 };

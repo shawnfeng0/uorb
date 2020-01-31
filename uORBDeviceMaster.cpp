@@ -43,15 +43,13 @@
 #include "uORBCommunicator.hpp"
 #endif /* ORB_COMMUNICATOR */
 
-#include "base/SemLockGuard.hpp"
 #include "base/orb_log.h"
 
 uORB::DeviceMaster::DeviceMaster() {
-  orb_sem_init(&_lock, 0, 1);
   _last_statistics_output = hrt_absolute_time();
 }
 
-uORB::DeviceMaster::~DeviceMaster() { orb_sem_destroy(&_lock); }
+uORB::DeviceMaster::~DeviceMaster() = default;
 
 /* Duplicate S, returning an identical string assigned using "new". */
 static inline char *strdup_with_new(const char *__s) {
@@ -96,7 +94,7 @@ int uORB::DeviceMaster::advertise(const struct orb_metadata *meta,
     }
   }
 
-  SemLock smart_lock(_lock);
+  uORB::MutexGuard lg(_lock);
 
   do {
     /* if path is modifyable change try index */
@@ -198,17 +196,17 @@ void uORB::DeviceMaster::printStatistics(bool reset) {
 
   /* Add all nodes to a list while locked, and then print them in unlocked
    * state, to avoid potential dead-locks (where printing blocks) */
-  lock();
   DeviceNodeStatisticsData *first_node = nullptr;
   DeviceNodeStatisticsData *cur_node = nullptr;
   size_t max_topic_name_length = 0;
   int num_topics = 0;
-  int ret = addNewDeviceNodes(&first_node, num_topics, max_topic_name_length,
-                              nullptr, 0);
-  unlock();
-
-  if (ret != 0) {
-    ORB_ERR("addNewDeviceNodes failed (%i)", ret);
+  {
+    uORB::MutexGuard lg(_lock);
+    int ret = addNewDeviceNodes(&first_node, num_topics, max_topic_name_length,
+                                nullptr, 0);
+    if (ret != 0) {
+      ORB_ERR("addNewDeviceNodes failed (%i)", ret);
+    }
   }
 
   cur_node = first_node;
@@ -327,27 +325,26 @@ void uORB::DeviceMaster::showTop(char **topic_filter, int num_filters) {
 
   ORB_INFO_RAW("\033[2J\n");  // clear screen
 
-  lock();
-
-  if (_node_list.empty()) {
-    unlock();
-    ORB_INFO("no active topics");
-    return;
-  }
-
   DeviceNodeStatisticsData *first_node = nullptr;
   DeviceNodeStatisticsData *cur_node = nullptr;
   size_t max_topic_name_length = 0;
   int num_topics = 0;
-  int ret = addNewDeviceNodes(&first_node, num_topics, max_topic_name_length,
-                              topic_filter, num_filters);
+  int ret;
+  {
+    // Automatic mutex guarding
+    uORB::MutexGuard lg(_lock);
+    if (_node_list.empty()) {
+      ORB_INFO("no active topics");
+      return;
+    }
+    ret = addNewDeviceNodes(&first_node, num_topics, max_topic_name_length,
+                                topic_filter, num_filters);
 
-  /* a DeviceNode is never deleted, so it's save to unlock here and still access
-   * the DeviceNodes */
-  unlock();
+    if (ret != 0) {
+      ORB_ERR("addNewDeviceNodes failed (%i)", ret);
+    }
 
-  if (ret != 0) {
-    ORB_ERR("addNewDeviceNodes failed (%i)", ret);
+    /* a DeviceNode is never deleted, so it's save to unlock here and still access the DeviceNodes */
   }
 
   only_once = true;  // For full platform use, so only output once
@@ -396,10 +393,12 @@ void uORB::DeviceMaster::showTop(char **topic_filter, int num_filters) {
         cur_node = cur_node->next;
       }
 
-      lock();
-      ret = addNewDeviceNodes(&first_node, num_topics, max_topic_name_length,
-                              topic_filter, num_filters);
-      unlock();
+      {
+        // Automatic mutex guarding
+        uORB::MutexGuard lg(_lock);
+        ret = addNewDeviceNodes(&first_node, num_topics, max_topic_name_length,
+                                topic_filter, num_filters);
+      }
 
       if (ret != 0) {
         ORB_ERR("addNewDeviceNodes failed (%i)", ret);
@@ -424,16 +423,13 @@ void uORB::DeviceMaster::showTop(char **topic_filter, int num_filters) {
 #undef CLEAR_LINE
 
 uORB::DeviceNode *uORB::DeviceMaster::getDeviceNode(const char *nodepath) {
-  lock();
 
+  uORB::MutexGuard lg(_lock);
   for (uORB::DeviceNode *node : _node_list) {
     if (strcmp(node->get_devname(), nodepath) == 0) {
-      unlock();
       return node;
     }
   }
-
-  unlock();
 
   return nullptr;
 }
@@ -444,9 +440,8 @@ uORB::DeviceNode *uORB::DeviceMaster::getDeviceNode(
     return nullptr;
   }
 
-  lock();
+  uORB::MutexGuard lg(_lock);
   uORB::DeviceNode *node = getDeviceNodeLocked(meta, instance);
-  unlock();
 
   // We can safely return the node that can be used by any thread, because
   // a DeviceNode never gets deleted.
@@ -454,7 +449,7 @@ uORB::DeviceNode *uORB::DeviceMaster::getDeviceNode(
 }
 
 uORB::DeviceNode *uORB::DeviceMaster::getDeviceNodeLocked(
-    const struct orb_metadata *meta, const uint8_t instance) {
+    const struct orb_metadata *meta, uint8_t instance) {
   for (uORB::DeviceNode *node : _node_list) {
     if ((strcmp(node->get_name(), meta->o_name) == 0) &&
         (node->get_instance() == instance)) {

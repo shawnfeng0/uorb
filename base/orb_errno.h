@@ -6,6 +6,7 @@
 #define UORB_ORB_ERRNO_H
 
 #define ENOENT 2        /* No such file or directory */
+#define EINTR 4         /* Interrupted system call */
 #define EIO 5           /* I/O error */
 #define EBADF 9         /* Bad file number */
 #define EAGAIN 11       /* Try again */

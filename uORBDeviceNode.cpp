@@ -63,14 +63,7 @@ uORB::DeviceNode::DeviceNode(const struct orb_metadata *meta,
       _instance(instance),
       _priority(priority),
       _queue_size(queue_size) {
-
   ORB_DEBUG("CDev::CDev");
-
-  int ret = orb_sem_init(&_lock, 0, 1);
-
-  if (ret != 0) {
-    ORB_DEBUG("SEM INIT FAIL: ret %d", ret);
-  }
 }
 
 uORB::DeviceNode::~DeviceNode() {
@@ -88,16 +81,14 @@ uORB::DeviceNode::~DeviceNode() {
   if (_pollset) {
     delete[](_pollset);
   }
-
-  orb_sem_destroy(&_lock);
 }
 
 int uORB::DeviceNode::open(cdev::file_t *filp) {
   /* is this a publisher? */
   if (filp->f_oflags == PX4_F_WRONLY) {
-    lock();
+    // Automatic mutex guarding
+    uORB::MutexGuard lg(_lock);
     mark_as_advertised();
-    unlock();
 
     /* now complete the open */
     return ORB_OK;
@@ -177,23 +168,21 @@ bool uORB::DeviceNode::copy_locked(void *dst, unsigned &generation) {
 }
 
 bool uORB::DeviceNode::copy(void *dst, unsigned &generation) {
-  ATOMIC_ENTER;
+  // Automatic mutex guarding
+  uORB::MutexGuard lg(_lock);
 
   bool updated = copy_locked(dst, generation);
-
-  ATOMIC_LEAVE;
 
   return updated;
 }
 
 uint64_t uORB::DeviceNode::copy_and_get_timestamp(void *dst,
                                                   unsigned &generation) {
-  ATOMIC_ENTER;
+  // Automatic mutex guarding
+  uORB::MutexGuard lg(_lock);
 
   const hrt_abstime update_time = _last_update;
   copy_locked(dst, generation);
-
-  ATOMIC_LEAVE;
 
   return update_time;
 }
@@ -215,16 +204,16 @@ ssize_t uORB::DeviceNode::read(cdev::file_t *filp, char *buffer,
   /*
    * Perform an atomic copy & state update
    */
-  ATOMIC_ENTER;
+  {
+    // Automatic mutex guarding
+    uORB::MutexGuard lg(_lock);
+    copy_locked(buffer, sd->generation);
 
-  copy_locked(buffer, sd->generation);
-
-  // if subscriber has an interval track the last update time
-  if (sd->update_interval) {
-    sd->update_interval->last_update = _last_update;
+    // if subscriber has an interval track the last update time
+    if (sd->update_interval) {
+      sd->update_interval->last_update = _last_update;
+    }
   }
-
-  ATOMIC_LEAVE;
 
   return _meta->o_size;
 }
@@ -245,14 +234,15 @@ ssize_t uORB::DeviceNode::write(const char *buffer, size_t buflen) {
     if (!up_interrupt_context()) {
 #endif /* __PX4_NUTTX */
 
-      lock();
+      {
+        // Automatic mutex guarding
+        uORB::MutexGuard lg(_lock);
 
-      /* re-check size */
-      if (nullptr == _data) {
-        _data = new uint8_t[_meta->o_size * _queue_size];
+        /* re-check size */
+        if (nullptr == _data) {
+          _data = new uint8_t[_meta->o_size * _queue_size];
+        }
       }
-
-      unlock();
 
 #ifdef __PX4_NUTTX
     }
@@ -271,22 +261,24 @@ ssize_t uORB::DeviceNode::write(const char *buffer, size_t buflen) {
   }
 
   /* Perform an atomic copy. */
-  ATOMIC_ENTER;
-  /* wrap-around happens after ~49 days, assuming a publisher rate of 1 kHz */
-  unsigned generation = _generation.fetch_add(1);
+  {
+    // Automatic mutex guarding
+    uORB::MutexGuard lg(_lock);
 
-  memcpy(_data + (_meta->o_size * (generation % _queue_size)), buffer,
-         _meta->o_size);
+    /* wrap-around happens after ~49 days, assuming a publisher rate of 1 kHz */
+    unsigned generation = _generation.fetch_add(1);
 
-  /* update the timestamp and generation count */
-  _last_update = hrt_absolute_time();
+    memcpy(_data + (_meta->o_size * (generation % _queue_size)), buffer,
+           _meta->o_size);
 
-  // callbacks
-  for (auto item : _callbacks) {
-    item->call();
+    /* update the timestamp and generation count */
+    _last_update = hrt_absolute_time();
+
+    // callbacks
+    for (auto item : _callbacks) {
+      item->call();
+    }
   }
-
-  ATOMIC_LEAVE;
 
   /* notify any poll waiters */
   poll_notify(POLLIN);
@@ -299,22 +291,23 @@ int uORB::DeviceNode::ioctl(cdev::file_t *filp, int cmd, unsigned long arg) {
 
   switch (cmd) {
     case ORBIOCLASTUPDATE: {
-      ATOMIC_ENTER;
+      // Automatic mutex guarding
+      uORB::MutexGuard lg(_lock);
       *(hrt_abstime *)arg = _last_update;
-      ATOMIC_LEAVE;
       return ORB_OK;
     }
 
     case ORBIOCUPDATED: {
-      ATOMIC_ENTER;
+      // Automatic mutex guarding
+      uORB::MutexGuard lg(_lock);
       *(bool *)arg = appears_updated(sd);
-      ATOMIC_LEAVE;
       return ORB_OK;
     }
 
     case ORBIOCSETINTERVAL: {
       int ret = ORB_OK;
-      lock();
+      // Automatic mutex guarding
+      uORB::MutexGuard lg(_lock);
 
       if (arg == 0) {
         if (sd->update_interval) {
@@ -337,8 +330,6 @@ int uORB::DeviceNode::ioctl(cdev::file_t *filp, int cmd, unsigned long arg) {
           }
         }
       }
-
-      unlock();
       return ret;
     }
 
@@ -351,9 +342,9 @@ int uORB::DeviceNode::ioctl(cdev::file_t *filp, int cmd, unsigned long arg) {
       return ORB_OK;
 
     case ORBIOCSETQUEUESIZE: {
-      lock();
+      // Automatic mutex guarding
+      uORB::MutexGuard lg(_lock);
       int ret = update_queue_size(arg);
-      unlock();
       return ret;
     }
 
@@ -497,7 +488,7 @@ void uORB::DeviceNode::poll_notify_one(orb_pollfd_struct_t *fds,
    * If the topic looks updated to the subscriber, go ahead and notify them.
    */
   if (appears_updated(sd)) {
-     ORB_DEBUG("CDev::poll_notify_one");
+    ORB_DEBUG("CDev::poll_notify_one");
 
     /* update the reported event set */
     fds->revents |= fds->events & events;
@@ -506,7 +497,7 @@ void uORB::DeviceNode::poll_notify_one(orb_pollfd_struct_t *fds,
               events);
 
     if (fds->revents != 0) {
-      orb_sem_post(fds->sem);
+      fds->sem->release();
     }
   }
 }
@@ -533,24 +524,27 @@ bool uORB::DeviceNode::print_statistics(bool reset) {
   if (!_lost_messages) {
     return false;
   }
+  uint32_t lost_messages;
+  {
+    // Automatic mutex guarding
+    uORB::MutexGuard lg(_lock);
 
-  lock();
-  // This can be wrong: if a reader never reads, _lost_messages will not be
-  // increased either
-  uint32_t lost_messages = _lost_messages;
+    // This can be wrong: if a reader never reads, _lost_messages will not be
+    // increased either
+    lost_messages = _lost_messages;
 
-  if (reset) {
-    _lost_messages = 0;
+    if (reset) {
+      _lost_messages = 0;
+    }
   }
-
-  unlock();
 
   ORB_INFO("%s: %i", _meta->o_name, lost_messages);
   return true;
 }
 
 void uORB::DeviceNode::add_internal_subscriber() {
-  lock();
+  // Automatic mutex guarding
+  uORB::MutexGuard lg(_lock);
   _subscriber_count++;
 
 #ifdef ORB_COMMUNICATOR
@@ -564,14 +558,11 @@ void uORB::DeviceNode::add_internal_subscriber() {
 
   } else
 #endif /* ORB_COMMUNICATOR */
-
-  {
-    unlock();
-  }
 }
 
 void uORB::DeviceNode::remove_internal_subscriber() {
-  lock();
+  // Automatic mutex guarding
+  uORB::MutexGuard lg(_lock);
   _subscriber_count--;
 
 #ifdef ORB_COMMUNICATOR
@@ -585,9 +576,6 @@ void uORB::DeviceNode::remove_internal_subscriber() {
 
   } else
 #endif /* ORB_COMMUNICATOR */
-  {
-    unlock();
-  }
 }
 
 #ifdef ORB_COMMUNICATOR
@@ -652,18 +640,17 @@ int uORB::DeviceNode::update_queue_size(unsigned int queue_size) {
 bool uORB::DeviceNode::register_callback(
     uORB::SubscriptionCallback *callback_sub) {
   if (callback_sub != nullptr) {
-    ATOMIC_ENTER;
+    // Automatic mutex guarding
+    uORB::MutexGuard lg(_lock);
 
     // prevent duplicate registrations
     for (auto existing_callbacks : _callbacks) {
       if (callback_sub == existing_callbacks) {
-        ATOMIC_LEAVE;
         return true;
       }
     }
 
     _callbacks.add(callback_sub);
-    ATOMIC_LEAVE;
     return true;
   }
 
@@ -672,25 +659,23 @@ bool uORB::DeviceNode::register_callback(
 
 void uORB::DeviceNode::unregister_callback(
     uORB::SubscriptionCallback *callback_sub) {
-  ATOMIC_ENTER;
+  // Automatic mutex guarding
+  uORB::MutexGuard lg(_lock);
   _callbacks.remove(callback_sub);
-  ATOMIC_LEAVE;
 }
-
 
 void uORB::DeviceNode::poll_notify(pollevent_t events) {
   ORB_DEBUG("CDev::poll_notify events = %0x", events);
 
   /* lock against poll() as well as other wakeups */
-  ATOMIC_ENTER;
+  // Automatic mutex guarding
+  uORB::MutexGuard lg(_lock);
 
   for (unsigned i = 0; i < _max_pollwaiters; i++) {
     if (nullptr != _pollset[i]) {
       poll_notify_one(_pollset[i], events);
     }
   }
-
-  ATOMIC_LEAVE;
 }
 
 int uORB::DeviceNode::store_poll_waiter(orb_pollfd_struct_t *fds) {
@@ -748,7 +733,8 @@ int uORB::DeviceNode::unregister_driver_and_memory() {
 /*
  * Default implementations of the character device interface
  */
-int uORB::DeviceNode::poll(cdev::file_t *filep, orb_pollfd_struct_t *fds, bool setup) {
+int uORB::DeviceNode::poll(cdev::file_t *filep, orb_pollfd_struct_t *fds,
+                           bool setup) {
   ORB_DEBUG("CDev::Poll %s", setup ? "setup" : "teardown");
   int ret;
 
@@ -763,7 +749,8 @@ int uORB::DeviceNode::poll(cdev::file_t *filep, orb_pollfd_struct_t *fds, bool s
     /*
      * Lock against poll_notify() and possibly other callers (protect _pollset).
      */
-    ATOMIC_ENTER;
+    // Automatic mutex guarding
+    uORB::MutexGuard lg(_lock);
 
     /*
      * Try to store the fds for later use and handle array resizing.
@@ -847,19 +834,18 @@ int uORB::DeviceNode::poll(cdev::file_t *filep, orb_pollfd_struct_t *fds, bool s
 
       /* yes? post the notification */
       if (fds->revents != 0) {
-        orb_sem_post(fds->sem);
+        fds->sem->release();
       }
     }
 
-    ATOMIC_LEAVE;
-
   } else {
-    ATOMIC_ENTER;
+    // Automatic mutex guarding
+    uORB::MutexGuard lg(_lock);
+
     /*
      * Handle a teardown request.
      */
     ret = remove_poll_waiter(fds);
-    ATOMIC_LEAVE;
   }
 
   return ret;

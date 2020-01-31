@@ -5,9 +5,6 @@
 
 #include "visibility.h"
 
-#define ATOMIC_ENTER lock()
-#define ATOMIC_LEAVE unlock()
-
 namespace cdev {
 
 struct file_t {

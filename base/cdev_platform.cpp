@@ -40,8 +40,8 @@
 #include <string>
 
 #include "../uORBDeviceNode.hpp"
-#include "orb_log.h"
 #include "orb_defines.h"
+#include "orb_log.h"
 #include "orb_mutex.hpp"
 #include "orb_posix.h"
 
@@ -240,13 +240,12 @@ int orb_ioctl(int fd, int cmd, unsigned long arg) {
   return ret;
 }
 
-int orb_poll(orb_pollfd_struct_t *fds, nfds_t nfds, int timeout) {
+int orb_poll(orb_pollfd_struct_t *fds, nfds_t nfds, int timeout_ms) {
   if (nfds == 0) {
     ORB_WARN("orb_poll with no fds");
     return -1;
   }
 
-  orb_sem_t sem;
   int count = 0;
   int ret = -1;
   unsigned int i;
@@ -264,13 +263,12 @@ int orb_poll(orb_pollfd_struct_t *fds, nfds_t nfds, int timeout) {
   char thread_name[] = {"\"unknow name\""};
 #endif
 
-  ORB_DEBUG("Called orb_poll timeout = %d", timeout);
-
-  orb_sem_init(&sem, 0, 0);
+  ORB_DEBUG("Called orb_poll timeout = %d", timeout_ms);
 
   // Go through all fds and check them for a pollable state
   bool fd_pollable = false;
 
+  uORB::Semaphore sem(0);
   for (i = 0; i < nfds; ++i) {
     fds[i].sem = &sem;
     fds[i].revents = 0;
@@ -297,29 +295,10 @@ int orb_poll(orb_pollfd_struct_t *fds, nfds_t nfds, int timeout) {
   // If any FD can be polled, lock the semaphore and
   // check for new data
   if (fd_pollable) {
-    if (timeout > 0) {
-      // Get the current time
-      struct timespec ts {};
-      // Note, we can't actually use CLOCK_MONOTONIC on macOS
-      // but that's hidden and implemented in orb_clock_gettime.
-      clock_gettime(CLOCK_MONOTONIC, &ts);
-
-      // Calculate an absolute time in the future
-      const unsigned billion = (1000 * 1000 * 1000);
-      uint64_t nsecs = ts.tv_nsec + ((uint64_t)timeout * 1000 * 1000);
-      ts.tv_sec += nsecs / billion;
-      nsecs -= (nsecs / billion) * billion;
-      ts.tv_nsec = nsecs;
-
-      ret = orb_sem_timedwait(&sem, &ts);
-
-      if (ret && orb_errno != ETIMEDOUT) {
-        ORB_WARN("%s: orb_poll() sem error: %s", thread_name,
-                 strerror(orb_errno));
-      }
-
-    } else if (timeout < 0) {
-      orb_sem_wait(&sem);
+    if (timeout_ms > 0) {
+      sem.try_acquire_for(timeout_ms);
+    } else if (timeout_ms < 0) {
+      sem.acquire();
     }
 
     // We have waited now (or not, depending on timeout),
@@ -344,8 +323,6 @@ int orb_poll(orb_pollfd_struct_t *fds, nfds_t nfds, int timeout) {
       }
     }
   }
-
-  orb_sem_destroy(&sem);
 
   // Return the positive count if present,
   // return the negative error number if failed
