@@ -34,6 +34,8 @@
 project(uORB)
 cmake_minimum_required(VERSION 3.15)
 
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+
 aux_source_directory(${CMAKE_SOURCE_DIR} UORB_SOURCE)
 aux_source_directory(${CMAKE_SOURCE_DIR}/base UORB_SOURCE)
 add_library(uorb ${UORB_SOURCE})

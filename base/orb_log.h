@@ -7,7 +7,7 @@
 
 #if defined(DEBUG_ORB)
 
-#include "../sample/ulog/src/ulog.h"
+#include "sample/ulog/src/ulog.h"
 
 #define ORB_INFO_RAW LOG_RAW
 #define ORB_ERR(FMT, ...) LOG_ERROR(FMT, ##__VA_ARGS__)

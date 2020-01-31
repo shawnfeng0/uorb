@@ -33,11 +33,11 @@
 
 #ifndef _uORBTest_UnitTest_hpp_
 #define _uORBTest_UnitTest_hpp_
-#include "../base/orb_defines.h"
-#include "../base/orb_errno.h"
-#include "../base/orb_log.h"
-#include "../uORB.h"
-#include "../uORBCommon.hpp"
+#include "base/orb_defines.h"
+#include "base/orb_errno.h"
+#include "base/orb_log.h"
+#include "uORB.h"
+#include "uORBCommon.hpp"
 #include "posix_task.h"
 
 #include <unistd.h>
@@ -48,7 +48,6 @@ struct orb_test {
 };
 ORB_DECLARE(orb_test);
 ORB_DECLARE(orb_multitest);
-
 
 struct orb_test_medium {
 	int val;

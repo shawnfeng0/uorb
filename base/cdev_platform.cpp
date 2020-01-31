@@ -39,7 +39,7 @@
 #include <map>
 #include <string>
 
-#include "../uORBDeviceNode.hpp"
+#include "uORBDeviceNode.hpp"
 #include "orb_defines.h"
 #include "orb_log.h"
 #include "orb_mutex.hpp"

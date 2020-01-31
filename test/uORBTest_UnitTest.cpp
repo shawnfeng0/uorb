@@ -32,12 +32,11 @@
  ****************************************************************************/
 
 #include "uORBTest_UnitTest.hpp"
-#include "../base/orb_log.h"
-#include "../base/orb_posix.h"
-#include "../uORBCommon.hpp"
+#include "base/orb_log.h"
+#include "base/orb_posix.h"
+#include "uORBCommon.hpp"
 #include <math.h>
 #include <poll.h>
-#include <stdarg.h>
 #include <stdio.h>
 
 ORB_DEFINE(orb_test, struct orb_test, sizeof(orb_test), "ORB_TEST:int val;hrt_abstime time;");

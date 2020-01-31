@@ -3,8 +3,8 @@
 //
 
 #include "posix_task.h"
-#include "../base/orb_errno.h"
-#include "../base/orb_log.h"
+#include "base/orb_errno.h"
+#include "base/orb_log.h"
 
 #include <climits>
 #include <string>

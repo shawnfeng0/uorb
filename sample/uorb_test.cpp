@@ -5,11 +5,11 @@
 #include <unistd.h>
 #include <pthread.h>
 
-#include "../base/drv_hrt.h"
-#include "../base/orb_defines.h"
-#include "../base/orb_posix.h"
-#include "topic_header/cpuload.h"
-#include "ulog/src/ulog.h"
+#include "base/drv_hrt.h"
+#include "base/orb_defines.h"
+#include "base/orb_posix.h"
+#include "sample/topic_header/cpuload.h"
+#include "sample/ulog/src/ulog.h"
 
 void *adviser_cpuload(void *) {
   struct cpuload_s cpuload {};

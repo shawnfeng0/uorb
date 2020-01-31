@@ -43,7 +43,7 @@
 #include <string.h>
 #endif
 
-#include "../../uORB.h"
+#include "uORB.h"
 
 #ifndef __cplusplus
 
