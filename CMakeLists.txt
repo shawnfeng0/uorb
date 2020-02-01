@@ -34,6 +34,10 @@
 project(uORB)
 cmake_minimum_required(VERSION 3.15)
 
+set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
+set(THREADS_PREFER_PTHREAD_FLAG TRUE)
+find_package(Threads REQUIRED)
+
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 # uorb library
@@ -48,11 +52,11 @@ aux_source_directory(${CMAKE_SOURCE_DIR}/sample SAMPLE_SOURCE)
 aux_source_directory(${CMAKE_SOURCE_DIR}/sample/topic_source SAMPLE_SOURCE)
 add_executable(uorb_sample ${SAMPLE_SOURCE})
 target_link_libraries(uorb_sample uorb)
-target_link_libraries(uorb_sample pthread)
+target_link_libraries(uorb_sample Threads::Threads)
 
 # uorb test source
 aux_source_directory(${CMAKE_SOURCE_DIR}/test TEST_SOURCE)
 
 add_executable(uorb_test ${TEST_SOURCE} test/posix_task.cpp test/posix_task.h)
 target_link_libraries(uorb_test uorb)
-target_link_libraries(uorb_test pthread)
+target_link_libraries(uorb_test Threads::Threads)
