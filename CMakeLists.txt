@@ -36,21 +36,23 @@ cmake_minimum_required(VERSION 3.15)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
+# uorb library
 aux_source_directory(${CMAKE_SOURCE_DIR} UORB_SOURCE)
 aux_source_directory(${CMAKE_SOURCE_DIR}/base UORB_SOURCE)
+aux_source_directory(${CMAKE_SOURCE_DIR}/sample/ulog/src UORB_SOURCE)
+add_definitions(-DDEBUG_ORB)
 add_library(uorb ${UORB_SOURCE})
 
+# uorb sample
 aux_source_directory(${CMAKE_SOURCE_DIR}/sample SAMPLE_SOURCE)
 aux_source_directory(${CMAKE_SOURCE_DIR}/sample/topic_source SAMPLE_SOURCE)
-aux_source_directory(${CMAKE_SOURCE_DIR}/sample/ulog/src SAMPLE_SOURCE)
-
-aux_source_directory(${CMAKE_SOURCE_DIR}/test TEST_SOURCE)
-aux_source_directory(${CMAKE_SOURCE_DIR}/sample/ulog/src TEST_SOURCE)
-add_executable(uorb_test ${TEST_SOURCE} test/posix_task.cpp test/posix_task.h)
-target_link_libraries(uorb_test uorb)
-target_link_libraries(uorb_test pthread)
-add_definitions(-DDEBUG_ORB)
-
 add_executable(uorb_sample ${SAMPLE_SOURCE})
 target_link_libraries(uorb_sample uorb)
 target_link_libraries(uorb_sample pthread)
+
+# uorb test source
+aux_source_directory(${CMAKE_SOURCE_DIR}/test TEST_SOURCE)
+
+add_executable(uorb_test ${TEST_SOURCE} test/posix_task.cpp test/posix_task.h)
+target_link_libraries(uorb_test uorb)
+target_link_libraries(uorb_test pthread)
