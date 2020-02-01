@@ -44,8 +44,8 @@
  *
  ****************************************************************************/
 
-#include <uORB/uORBTopics.h>
-#include <uORB/uORB.h>
+#include <uORBTopics.h>
+#include <uORB.h>
 @{
 msg_names = [mn.replace(".msg", "") for mn in msgs]
 msgs_count = len(msg_names)

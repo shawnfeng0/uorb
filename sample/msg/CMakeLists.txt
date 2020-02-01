@@ -132,8 +132,8 @@ add_custom_command(OUTPUT ${uorb_sources}
 	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 	VERBATIM
 	)
+add_custom_target(uorb_sources DEPENDS ${uorb_headers})
 
-add_custom_target(uorb_sources DEPENDS ${uorb_sources})
-
-#add_library(uorb_msgs ${uorb_sources})
-#add_dependencies(uorb_msgs uorb_headers)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+add_library(uorb_msgs ${uorb_sources})
+add_dependencies(uorb_msgs uorb_headers uorb_sources)

@@ -2,13 +2,14 @@
 // Created by fs on 2020-01-15.
 //
 
-#include <unistd.h>
 #include <pthread.h>
+#include <unistd.h>
+
+#include <sample/msg/uORB/topics/cpuload.h>
 
 #include "base/drv_hrt.h"
 #include "base/orb_defines.h"
 #include "base/orb_posix.h"
-#include "sample/topic_header/cpuload.h"
 #include "sample/ulog/src/ulog.h"
 
 void *adviser_cpuload(void *) {

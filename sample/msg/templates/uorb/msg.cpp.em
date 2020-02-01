@@ -66,11 +66,7 @@ struct_size, padding_end_size = add_padding_bytes(sorted_fields, search_path)
 topic_fields = ["%s %s" % (convert_type(field.type), field.name) for field in sorted_fields]
 }@
 
-#include <inttypes.h>
-#include <px4_platform_common/defines.h>
 #include <uORB/topics/@(topic_name).h>
-#include <drivers/drv_hrt.h>
-#include <lib/drivers/device/Device.hpp>
 
 @# join all msg files in one line e.g: "float[3] position;float[3] velocity;bool armed"
 @# This is used for the logger

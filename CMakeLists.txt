@@ -51,6 +51,8 @@ add_library(uorb ${UORB_SOURCE})
 aux_source_directory(${CMAKE_SOURCE_DIR}/sample SAMPLE_SOURCE)
 aux_source_directory(${CMAKE_SOURCE_DIR}/sample/topic_source SAMPLE_SOURCE)
 add_executable(uorb_sample ${SAMPLE_SOURCE})
+add_subdirectory(${CMAKE_SOURCE_DIR}/sample/msg)
+target_link_libraries(uorb_sample uorb_msgs)
 target_link_libraries(uorb_sample uorb)
 target_link_libraries(uorb_sample Threads::Threads)
 
