@@ -73,7 +73,7 @@ void* cpuload_update_poll(void* arg) {
       error_counter++;
     } else if (poll_ret == 0) {
       /* this means none of our providers is giving us data */
-      LOG_ERROR("Got no data within %d second", timeout_ms);
+      LOG_ERROR("Got no data within %d milliseconds", timeout_ms);
     } else {
       orb_copy(ORB_ID(cpuload), cpuload_sub, &cpu_loader);
       LOG_MULTI_TOKEN(cpu_loader.timestamp, cpu_loader.load, cpu_loader.ram_usage);
