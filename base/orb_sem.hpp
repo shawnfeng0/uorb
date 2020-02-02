@@ -21,14 +21,13 @@
 #include <errno.h>
 #endif
 #include <semaphore.h>
+#include <stdint.h>
 
 namespace uORB {
 
 class Semaphore {
  public:
-  explicit Semaphore(unsigned int count) {
-    sem_init(&m_sema, 0, count);
-  }
+  explicit Semaphore(unsigned int count) { sem_init(&m_sema, 0, count); }
   Semaphore() = delete;
   Semaphore(const Semaphore &other) = delete;
   Semaphore &operator=(const Semaphore &other) = delete;
@@ -56,7 +55,7 @@ class Semaphore {
 
   // tries to decrement the internal counter, blocking for up to a duration time
   bool try_acquire_for(int time_ms) {
-    struct timespec abstime{};
+    struct timespec abstime {};
     GenerateFutureTime(CLOCK_REALTIME, time_ms, abstime);
     return try_acquire_until(abstime);
   }
@@ -71,13 +70,14 @@ class Semaphore {
   }
 
   // Increase time_ms time based on the current clockid time
-  static void GenerateFutureTime(clockid_t clockid, unsigned long time_ms,
+  inline void GenerateFutureTime(clockid_t clockid, unsigned long time_ms,
                                  struct timespec &out) {
+    // Calculate an absolute time in the future
     const decltype(out.tv_nsec) kSec2Nsec = 1000 * 1000 * 1000;
     clock_gettime(clockid, &out);
-    out.tv_nsec += time_ms * 1000 * 1000;
-    out.tv_sec += out.tv_nsec / kSec2Nsec;
-    out.tv_nsec %= kSec2Nsec;
+    uint64_t nano_secs = out.tv_nsec + ((uint64_t)time_ms * 1000 * 1000);
+    out.tv_nsec = nano_secs % kSec2Nsec;
+    out.tv_sec += nano_secs / kSec2Nsec;
   }
 };
 
