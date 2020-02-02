@@ -56,13 +56,13 @@ class Semaphore {
 
   // tries to decrement the internal counter, blocking for up to a duration time
   bool try_acquire_for(int time_ms) {
-    struct timespec abstime;
+    struct timespec abstime{};
     GenerateFutureTime(CLOCK_REALTIME, time_ms, abstime);
     return try_acquire_until(abstime);
   }
 
  private:
-  sem_t m_sema;
+  sem_t m_sema{};
 
   // Hide this function in case the client is not sure which clockid to use
   // tries to decrement the internal counter, blocking until a point in time
