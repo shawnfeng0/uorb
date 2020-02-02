@@ -78,15 +78,7 @@ class uORB::Manager
    * @return uORB::Manager*
    */
   static uORB::Manager *get_instance() {
-    if (_Instance == nullptr) {
-      MutexGuard guard(_mutex_for_instance);
-      if (_Instance == nullptr) {
-        // Guaranteed to be assigned after the constructor is executed
-        auto item = new uORB::Manager();
-        _Instance = item;
-      }
-    }
-    return _Instance;
+    return &_Instance;
   }
 
   /**
@@ -418,8 +410,7 @@ class uORB::Manager
                 int *instance = nullptr, int priority = ORB_PRIO_DEFAULT);
 
  private:  // data members
-  static Manager *_Instance;
-  static Mutex _mutex_for_instance;
+  static Manager _Instance;
 
 #ifdef ORB_COMMUNICATOR
   // the communicator channel instance.

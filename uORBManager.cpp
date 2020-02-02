@@ -39,19 +39,12 @@
 #include "uORBDeviceNode.hpp"
 #include "uORBUtils.hpp"
 
-uORB::Manager *uORB::Manager::_Instance;
-uORB::Mutex uORB::Manager::_mutex_for_instance;
+uORB::Manager uORB::Manager::_Instance;
 
 bool uORB::Manager::initialize() { return get_instance() != nullptr; }
 
 bool uORB::Manager::terminate() {
-  if (_Instance != nullptr) {
-    delete _Instance;
-    _Instance = nullptr;
-    return true;
-  }
-
-  return false;
+  return true;
 }
 
 uORB::Manager::Manager() {
