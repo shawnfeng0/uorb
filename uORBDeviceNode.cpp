@@ -33,7 +33,8 @@
 
 #include "uORBDeviceNode.hpp"
 
-#include "SubscriptionCallback.hpp"
+#include <base/orb_defines.h>
+
 #include "base/orb_errno.h"
 #include "base/orb_log.h"
 #include "uORBManager.hpp"
@@ -274,10 +275,6 @@ ssize_t uORB::DeviceNode::write(const char *buffer, size_t buflen) {
     /* update the timestamp and generation count */
     _last_update = hrt_absolute_time();
 
-    // callbacks
-    for (auto item : _callbacks) {
-      item->call();
-    }
   }
 
   /* notify any poll waiters */
@@ -635,33 +632,6 @@ int uORB::DeviceNode::update_queue_size(unsigned int queue_size) {
 
   _queue_size = queue_size;
   return ORB_OK;
-}
-
-bool uORB::DeviceNode::register_callback(
-    uORB::SubscriptionCallback *callback_sub) {
-  if (callback_sub != nullptr) {
-    // Automatic mutex guarding
-    uORB::MutexGuard lg(_lock);
-
-    // prevent duplicate registrations
-    for (auto existing_callbacks : _callbacks) {
-      if (callback_sub == existing_callbacks) {
-        return true;
-      }
-    }
-
-    _callbacks.add(callback_sub);
-    return true;
-  }
-
-  return false;
-}
-
-void uORB::DeviceNode::unregister_callback(
-    uORB::SubscriptionCallback *callback_sub) {
-  // Automatic mutex guarding
-  uORB::MutexGuard lg(_lock);
-  _callbacks.remove(callback_sub);
 }
 
 void uORB::DeviceNode::poll_notify(pollevent_t events) {

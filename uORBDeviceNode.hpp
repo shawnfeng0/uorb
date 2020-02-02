@@ -43,7 +43,6 @@ namespace uORB {
 class DeviceNode;
 class DeviceMaster;
 class Manager;
-class SubscriptionCallback;
 }  // namespace uORB
 
 /**
@@ -255,12 +254,6 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
    */
   uint64_t copy_and_get_timestamp(void *dst, unsigned &generation);
 
-  // add item to list of work items to schedule on node update
-  bool register_callback(SubscriptionCallback *callback_sub);
-
-  // remove item from list of work items
-  void unregister_callback(SubscriptionCallback *callback_sub);
-
  protected:
     /**
    * Check the current state of the device for poll events from the
@@ -332,7 +325,6 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
   uint8_t *_data{nullptr};     /**< allocated object buffer */
   hrt_abstime _last_update{0}; /**< time the object was last updated */
   uORB::atomic<unsigned> _generation{0}; /**< object generation count */
-  List<uORB::SubscriptionCallback *> _callbacks;
   uint8_t _priority;       /**< priority of the topic */
   bool _advertised{false}; /**< has ever been advertised (not necessarily
                               published data yet) */
