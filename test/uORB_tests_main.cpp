@@ -46,8 +46,6 @@ static void usage()
 	ORB_INFO("Usage: uorb_tests [latency_test]");
 }
 
-int uorb_main(int argc, char *argv[]);
-
 int main(int argc, char **argv)
 {
   /*

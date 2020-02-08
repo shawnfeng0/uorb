@@ -63,43 +63,13 @@ class uORB::DeviceMaster {
    * Public interface for getDeviceNodeLocked(). Takes care of synchronization.
    * @return node if exists, nullptr otherwise
    */
-  uORB::DeviceNode *getDeviceNode(const char *node_name);
   uORB::DeviceNode *getDeviceNode(const struct orb_metadata *meta,
-                                  const uint8_t instance);
-
-  /**
-   * Print statistics for each existing topic.
-   * @param reset if true, reset statistics afterwards
-   */
-  void printStatistics(bool reset);
-
-  /**
-   * Continuously print statistics, like the unix top command for processes.
-   * Exited when the user presses the enter key.
-   * @param topic_filter list of topic filters: if set, each string can be a
-   * substring for topics to match. Or it can be '-a', which means to print all
-   * topics instead of only currently publishing ones.
-   * @param num_filters
-   */
-  void showTop(char **topic_filter, int num_filters);
+                                  uint8_t instance);
 
  private:
   // Private constructor, uORB::Manager takes care of its creation
-  DeviceMaster();
-  ~DeviceMaster();
-
-  struct DeviceNodeStatisticsData {
-    DeviceNode *node{};
-    uint32_t last_lost_msg_count{};
-    unsigned int last_pub_msg_count{};
-    uint32_t lost_msg_delta{};
-    unsigned int pub_msg_delta{};
-    DeviceNodeStatisticsData *next = nullptr;
-  };
-
-  int addNewDeviceNodes(DeviceNodeStatisticsData **first_node, int &num_topics,
-                        size_t &max_topic_name_length, char **topic_filter,
-                        int num_filters);
+  DeviceMaster() = default;
+  ~DeviceMaster() = default;
 
   friend class uORB::Manager;
 
@@ -112,8 +82,6 @@ class uORB::DeviceMaster {
                                         uint8_t instance);
 
   List<uORB::DeviceNode *> _node_list;
-
-  hrt_abstime _last_statistics_output;
 
   uORB::Mutex _lock; /**< lock to protect access to all class members (also for derived classes) */
 };

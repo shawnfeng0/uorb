@@ -1,6 +1,7 @@
 #pragma once
 
 #include <pthread.h>
+#include <stdint.h>
 #include <time.h>
 
 #include "orb_errno.h"
@@ -74,13 +75,14 @@ class ConditionVariable {
 
  private:
   // Increase time_ms time based on the current clockid time
-  static void GenerateFutureTime(clockid_t clockid, unsigned long time_ms,
+  inline void GenerateFutureTime(clockid_t clockid, unsigned long time_ms,
                                  struct timespec &out) {
+    // Calculate an absolute time in the future
     const decltype(out.tv_nsec) kSec2Nsec = 1000 * 1000 * 1000;
     clock_gettime(clockid, &out);
-    out.tv_nsec += time_ms * 1000 * 1000;
-    out.tv_sec += out.tv_nsec / kSec2Nsec;
-    out.tv_nsec %= kSec2Nsec;
+    uint64_t nano_secs = out.tv_nsec + ((uint64_t)time_ms * 1000 * 1000);
+    out.tv_nsec = nano_secs % kSec2Nsec;
+    out.tv_sec += nano_secs / kSec2Nsec;
   }
 
   pthread_cond_t cond_{};
@@ -92,7 +94,7 @@ typedef ConditionVariable<CLOCK_REALTIME> RealClockCond;
 template <clockid_t clock_id>
 class SimpleSemaphore {
  public:
-  SimpleSemaphore(unsigned int count) : count_(count) {}
+  explicit SimpleSemaphore(unsigned int count) : count_(count) {}
   SimpleSemaphore(const SimpleSemaphore &) = delete;
   SimpleSemaphore &operator=(const SimpleSemaphore &) = delete;
 

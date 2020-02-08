@@ -339,16 +339,4 @@ int orb_access(const char *pathname, int mode) {
   return (dev != nullptr) ? 0 : -1;
 }
 
-void orb_show_topics() {
-  ORB_INFO("Devices:");
-
-  uORB::MutexGuard guard(devmutex);
-
-  for (const auto &dev : devmap) {
-    if (strncmp(dev.first.c_str(), "/obj/", 5) == 0) {
-      ORB_INFO("   %s", dev.first.c_str());
-    }
-  }
-}
-
 }  // extern "C"

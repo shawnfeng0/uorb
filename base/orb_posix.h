@@ -81,6 +81,5 @@ __EXPORT ssize_t orb_read(int fd, void *buffer, size_t buflen);
 __EXPORT int orb_ioctl(int fd, int cmd, unsigned long arg);
 __EXPORT int orb_poll(orb_pollfd_struct_t *fds, nfds_t nfds, int timeout_ms);
 __EXPORT int orb_access(const char *pathname, int mode);
-__EXPORT void orb_show_topics(void);
 
 __END_DECLS

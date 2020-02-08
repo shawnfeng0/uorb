@@ -21,6 +21,7 @@ class __mutex_base {
   ~__mutex_base() noexcept { pthread_mutex_destroy(&mutex_); }
 #endif
 
+ public:
   __mutex_base(const __mutex_base &) = delete;
   __mutex_base &operator=(const __mutex_base &) = delete;
 };
