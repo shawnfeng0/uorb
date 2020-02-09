@@ -71,7 +71,7 @@ typedef struct {
   pollevent_t revents; /* The output event flags */
 
   /* Required for PX4 compatibility */
-  uORB::Semaphore *sem; /* Pointer to semaphore used to post output event */
+  uORB::base::Semaphore *sem; /* Pointer to semaphore used to post output event */
   void *priv;     /* For use by drivers */
 } orb_pollfd_t;
 

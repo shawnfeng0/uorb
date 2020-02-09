@@ -86,6 +86,7 @@
 #endif
 
 namespace uORB {
+namespace base {
 
 template <typename T>
 class atomic {
@@ -196,6 +197,7 @@ using atomic_int = atomic<int>;
 using atomic_int32_t = atomic<int32_t>;
 using atomic_bool = atomic<bool>;
 
+}  // namespace base
 }  // namespace uORB
 
 #endif /* __cplusplus */

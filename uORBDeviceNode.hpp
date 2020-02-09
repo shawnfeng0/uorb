@@ -324,7 +324,7 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
   const uint8_t _instance;     /**< orb multi instance identifier */
   uint8_t *_data{nullptr};     /**< allocated object buffer */
   hrt_abstime _last_update{0}; /**< time the object was last updated */
-  uORB::atomic<unsigned> _generation{0}; /**< object generation count */
+  uORB::base::atomic<unsigned> _generation{0}; /**< object generation count */
   uint8_t _priority;       /**< priority of the topic */
   bool _advertised{false}; /**< has ever been advertised (not necessarily
                               published data yet) */
@@ -336,7 +336,7 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
       0; /**< nr of lost messages for all subscribers. If two subscribers lose
             the same message, it is counted as two. */
 
-  uORB::Mutex _lock; /**< lock to protect access to all class members (also for
+  uORB::base::Mutex _lock; /**< lock to protect access to all class members (also for
                       derived classes) */
 
   const char *_devname{nullptr}; /**< device node name */

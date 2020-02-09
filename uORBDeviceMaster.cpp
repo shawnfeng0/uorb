@@ -85,7 +85,7 @@ int uORB::DeviceMaster::advertise(const struct orb_metadata *meta,
     }
   }
 
-  uORB::MutexGuard lg(_lock);
+  uORB::base::MutexGuard lg(_lock);
 
   do {
     /* if path is modifyable change try index */
@@ -182,7 +182,7 @@ uORB::DeviceNode *uORB::DeviceMaster::getDeviceNode(
     return nullptr;
   }
 
-  uORB::MutexGuard lg(_lock);
+  uORB::base::MutexGuard lg(_lock);
   uORB::DeviceNode *node = getDeviceNodeLocked(meta, instance);
 
   // We can safely return the node that can be used by any thread, because

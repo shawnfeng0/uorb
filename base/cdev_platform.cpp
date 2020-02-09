@@ -47,19 +47,19 @@
 
 using namespace std;
 
-static uORB::Mutex devmutex;
-static uORB::Mutex filemutex;
+static uORB::base::Mutex devmutex;
+static uORB::base::Mutex filemutex;
 
 #define ORB_MAX_FD 100
 static map<string, void *> devmap;
-static cdev::file_t filemap[ORB_MAX_FD] = {};
+static uORB::cdev::file_t filemap[ORB_MAX_FD] = {};
 
 extern "C" {
 
 static uORB::DeviceNode *getDev(const char *path) {
   ORB_DEBUG("CDev::getDev");
 
-  uORB::MutexGuard guard(devmutex);
+  uORB::base::MutexGuard guard(devmutex);
 
   auto item = devmap.find(path);
 
@@ -71,7 +71,7 @@ static uORB::DeviceNode *getDev(const char *path) {
 }
 
 static uORB::DeviceNode *get_vdev(int fd) {
-  uORB::MutexGuard guard(filemutex);
+  uORB::base::MutexGuard guard(filemutex);
 
   bool valid = (fd < ORB_MAX_FD && fd >= 0 && filemap[fd].vdev);
   uORB::DeviceNode *dev;
@@ -94,7 +94,7 @@ int register_driver(const char *name, void *data) {
     return -EINVAL;
   }
 
-  uORB::MutexGuard grard(devmutex);
+  uORB::base::MutexGuard grard(devmutex);
 
   // Make sure the device does not already exist
   auto item = devmap.find(name);
@@ -117,7 +117,7 @@ int unregister_driver(const char *name) {
     return -EINVAL;
   }
 
-  uORB::MutexGuard guard(devmutex);
+  uORB::base::MutexGuard guard(devmutex);
 
   if (devmap.erase(name) > 0) {
     ORB_DEBUG("Unregistered DEV %s", name);
@@ -135,10 +135,10 @@ int orb_open(const char *path, int flags, ...) {
 
   if (dev) {
     {
-      uORB::MutexGuard guard(filemutex);
+      uORB::base::MutexGuard guard(filemutex);
       for (i = 0; i < ORB_MAX_FD; ++i) {
         if (filemap[i].vdev == nullptr) {
-          filemap[i] = cdev::file_t(flags, dev);
+          filemap[i] = uORB::cdev::file_t(flags, dev);
           break;
         }
       }
@@ -184,7 +184,7 @@ int orb_close(int fd) {
   uORB::DeviceNode *dev = get_vdev(fd);
 
   if (dev) {
-    uORB::MutexGuard guard(filemutex);
+    uORB::base::MutexGuard guard(filemutex);
 
     ret = dev->close(&filemap[fd]);
     filemap[fd].vdev = nullptr;
@@ -268,7 +268,7 @@ int orb_poll(orb_pollfd_t *fds, nfds_t nfds, int timeout_ms) {
   // Go through all fds and check them for a pollable state
   bool fd_pollable = false;
 
-  uORB::Semaphore sem(0);
+  uORB::base::Semaphore sem(0);
   for (i = 0; i < nfds; ++i) {
     fds[i].sem = &sem;
     fds[i].revents = 0;

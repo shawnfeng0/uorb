@@ -8,6 +8,7 @@
 #include "orb_mutex.hpp"
 
 namespace uORB {
+namespace base {
 
 template <clockid_t clock_id>
 class ConditionVariable {
@@ -156,4 +157,5 @@ class SimpleSemaphore {
 typedef SimpleSemaphore<CLOCK_REALTIME> RealClockSemaphore;
 typedef SimpleSemaphore<CLOCK_MONOTONIC> MonoClockSemaphore;
 
+}  // namespace base
 }  // namespace uORB

@@ -8,6 +8,7 @@
 
 #include <pthread.h>
 
+#include "orb_condition_variable.hpp"
 #include "orb_errno.h"
 #include "visibility.h"
 
@@ -24,6 +25,7 @@
 #include <stdint.h>
 
 namespace uORB {
+namespace base {
 
 class Semaphore {
  public:
@@ -81,4 +83,5 @@ class Semaphore {
   }
 };
 
+}  // namespace base
 }  // namespace uORB

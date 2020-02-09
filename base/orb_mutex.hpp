@@ -3,6 +3,7 @@
 #include <pthread.h>
 
 namespace uORB {
+namespace base {
 
 // Common base class for Mutex
 class __mutex_base {
@@ -32,7 +33,7 @@ class Mutex : private __mutex_base {
 #ifdef PTHREAD_MUTEX_INITIALIZER
   constexpr
 #endif
-  Mutex() noexcept = default;
+      Mutex() noexcept = default;
   ~Mutex() = default;
 
   Mutex(const Mutex &) = delete;
@@ -79,4 +80,5 @@ class LockGuard {
 
 typedef LockGuard<Mutex> MutexGuard;
 
+}  // namespace base
 }  // namespace uORB

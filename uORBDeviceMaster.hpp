@@ -83,5 +83,5 @@ class uORB::DeviceMaster {
 
   List<uORB::DeviceNode *> _node_list;
 
-  uORB::Mutex _lock; /**< lock to protect access to all class members (also for derived classes) */
+  uORB::base::Mutex _lock; /**< lock to protect access to all class members (also for derived classes) */
 };

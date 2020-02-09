@@ -5,6 +5,7 @@
 
 #include "visibility.h"
 
+namespace uORB {
 namespace cdev {
 
 struct file_t {
@@ -17,6 +18,7 @@ struct file_t {
 };
 
 }  // namespace cdev
+}  // namespace uORB
 
 extern "C" __EXPORT int register_driver(const char *name, void *data);
 extern "C" __EXPORT int unregister_driver(const char *path);

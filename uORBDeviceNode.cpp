@@ -88,7 +88,7 @@ int uORB::DeviceNode::open(cdev::file_t *filp) {
   /* is this a publisher? */
   if (filp->f_oflags == PX4_F_WRONLY) {
     // Automatic mutex guarding
-    uORB::MutexGuard lg(_lock);
+    uORB::base::MutexGuard lg(_lock);
     mark_as_advertised();
 
     /* now complete the open */
@@ -170,7 +170,7 @@ bool uORB::DeviceNode::copy_locked(void *dst, unsigned &generation) {
 
 bool uORB::DeviceNode::copy(void *dst, unsigned &generation) {
   // Automatic mutex guarding
-  uORB::MutexGuard lg(_lock);
+  uORB::base::MutexGuard lg(_lock);
 
   bool updated = copy_locked(dst, generation);
 
@@ -180,7 +180,7 @@ bool uORB::DeviceNode::copy(void *dst, unsigned &generation) {
 uint64_t uORB::DeviceNode::copy_and_get_timestamp(void *dst,
                                                   unsigned &generation) {
   // Automatic mutex guarding
-  uORB::MutexGuard lg(_lock);
+  uORB::base::MutexGuard lg(_lock);
 
   const hrt_abstime update_time = _last_update;
   copy_locked(dst, generation);
@@ -207,7 +207,7 @@ ssize_t uORB::DeviceNode::read(cdev::file_t *filp, char *buffer,
    */
   {
     // Automatic mutex guarding
-    uORB::MutexGuard lg(_lock);
+    uORB::base::MutexGuard lg(_lock);
     copy_locked(buffer, sd->generation);
 
     // if subscriber has an interval track the last update time
@@ -237,7 +237,7 @@ ssize_t uORB::DeviceNode::write(const char *buffer, size_t buflen) {
 
       {
         // Automatic mutex guarding
-        uORB::MutexGuard lg(_lock);
+        uORB::base::MutexGuard lg(_lock);
 
         /* re-check size */
         if (nullptr == _data) {
@@ -264,7 +264,7 @@ ssize_t uORB::DeviceNode::write(const char *buffer, size_t buflen) {
   /* Perform an atomic copy. */
   {
     // Automatic mutex guarding
-    uORB::MutexGuard lg(_lock);
+    uORB::base::MutexGuard lg(_lock);
 
     /* wrap-around happens after ~49 days, assuming a publisher rate of 1 kHz */
     unsigned generation = _generation.fetch_add(1);
@@ -289,14 +289,14 @@ int uORB::DeviceNode::ioctl(cdev::file_t *filp, int cmd, unsigned long arg) {
   switch (cmd) {
     case ORBIOCLASTUPDATE: {
       // Automatic mutex guarding
-      uORB::MutexGuard lg(_lock);
+      uORB::base::MutexGuard lg(_lock);
       *(hrt_abstime *)arg = _last_update;
       return ORB_OK;
     }
 
     case ORBIOCUPDATED: {
       // Automatic mutex guarding
-      uORB::MutexGuard lg(_lock);
+      uORB::base::MutexGuard lg(_lock);
       *(bool *)arg = appears_updated(sd);
       return ORB_OK;
     }
@@ -304,7 +304,7 @@ int uORB::DeviceNode::ioctl(cdev::file_t *filp, int cmd, unsigned long arg) {
     case ORBIOCSETINTERVAL: {
       int ret = ORB_OK;
       // Automatic mutex guarding
-      uORB::MutexGuard lg(_lock);
+      uORB::base::MutexGuard lg(_lock);
 
       if (arg == 0) {
         if (sd->update_interval) {
@@ -340,7 +340,7 @@ int uORB::DeviceNode::ioctl(cdev::file_t *filp, int cmd, unsigned long arg) {
 
     case ORBIOCSETQUEUESIZE: {
       // Automatic mutex guarding
-      uORB::MutexGuard lg(_lock);
+      uORB::base::MutexGuard lg(_lock);
       int ret = update_queue_size(arg);
       return ret;
     }
@@ -524,7 +524,7 @@ bool uORB::DeviceNode::print_statistics(bool reset) {
   uint32_t lost_messages;
   {
     // Automatic mutex guarding
-    uORB::MutexGuard lg(_lock);
+    uORB::base::MutexGuard lg(_lock);
 
     // This can be wrong: if a reader never reads, _lost_messages will not be
     // increased either
@@ -541,7 +541,7 @@ bool uORB::DeviceNode::print_statistics(bool reset) {
 
 void uORB::DeviceNode::add_internal_subscriber() {
   // Automatic mutex guarding
-  uORB::MutexGuard lg(_lock);
+  uORB::base::MutexGuard lg(_lock);
   _subscriber_count++;
 
 #ifdef ORB_COMMUNICATOR
@@ -559,7 +559,7 @@ void uORB::DeviceNode::add_internal_subscriber() {
 
 void uORB::DeviceNode::remove_internal_subscriber() {
   // Automatic mutex guarding
-  uORB::MutexGuard lg(_lock);
+  uORB::base::MutexGuard lg(_lock);
   _subscriber_count--;
 
 #ifdef ORB_COMMUNICATOR
@@ -639,7 +639,7 @@ void uORB::DeviceNode::poll_notify(pollevent_t events) {
 
   /* lock against poll() as well as other wakeups */
   // Automatic mutex guarding
-  uORB::MutexGuard lg(_lock);
+  uORB::base::MutexGuard lg(_lock);
 
   for (unsigned i = 0; i < _max_pollwaiters; i++) {
     if (nullptr != _pollset[i]) {
@@ -720,7 +720,7 @@ int uORB::DeviceNode::poll(cdev::file_t *filep, orb_pollfd_t *fds,
      * Lock against poll_notify() and possibly other callers (protect _pollset).
      */
     // Automatic mutex guarding
-    uORB::MutexGuard lg(_lock);
+    uORB::base::MutexGuard lg(_lock);
 
     /*
      * Try to store the fds for later use and handle array resizing.
@@ -810,7 +810,7 @@ int uORB::DeviceNode::poll(cdev::file_t *filep, orb_pollfd_t *fds,
 
   } else {
     // Automatic mutex guarding
-    uORB::MutexGuard lg(_lock);
+    uORB::base::MutexGuard lg(_lock);
 
     /*
      * Handle a teardown request.
