@@ -12,28 +12,20 @@
 #include "base/orb_posix.h"
 #include "sample/ulog/src/ulog.h"
 
+#include <Publication.hpp>
+
 void *adviser_cpuload(void *) {
-  struct cpuload_s cpuload {};
-
-  cpuload.timestamp = hrt_absolute_time();
-  cpuload.load = 1.0f;
-  cpuload.ram_usage = 1.0f;
-
-  orb_advert_t cpuload_pub = orb_advertise_queue(ORB_ID(cpuload), &cpuload, 10);
-  if (cpuload_pub == nullptr) {
-    LOG_WARN("advertise error");
-    return nullptr;
-  } else {
-    LOG_INFO("advertise successful");
-  }
+  uORB::PublicationData<cpuload_s> cpuload_pub(ORB_ID(cpuload));
 
   usleep(2 * 1000 * 1000);
   for (int i = 0; i < 10; i++) {
     usleep(1 * 1000 * 1000);
-    cpuload.timestamp = hrt_absolute_time();
-    cpuload.load++;
-    cpuload.ram_usage++;
-    orb_publish(ORB_ID(cpuload), cpuload_pub, &cpuload);
+    cpuload_pub.get().timestamp = hrt_absolute_time();
+    cpuload_pub.get().load++;
+    cpuload_pub.get().ram_usage++;
+    if (!cpuload_pub.update()) {
+      LOG_WARN("publish error");
+    }
   }
   return nullptr;
 }
