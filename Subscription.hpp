@@ -58,7 +58,7 @@ class Subscription {
    * topic.
    * @param instance The instance for multi sub.
    */
-  Subscription(const orb_metadata *meta, uint8_t instance = 0)
+  explicit Subscription(const orb_metadata *meta, uint8_t instance = 0)
       : _meta(meta), _instance(instance) {
     subscribe();
   }
@@ -151,7 +151,7 @@ class SubscriptionData : public Subscription {
    * topic.
    * @param instance The instance for multi sub.
    */
-  SubscriptionData(const orb_metadata *meta, uint8_t instance = 0)
+  explicit SubscriptionData(const orb_metadata *meta, uint8_t instance = 0)
       : Subscription(meta, instance) {
     copy(&_data);
   }

@@ -52,7 +52,7 @@ void* cpuload_update_poll(void* arg) {
 
   LOG_INFO("orb_subcribe success, cycle: %.1fs", sleep_time_us / 1000.f / 1000.f);
 
-  orb_pollfd_struct_t fds[] = {
+  orb_pollfd_t fds[] = {
       {.fd = cpuload_sub, .events = POLLIN},
   };
 

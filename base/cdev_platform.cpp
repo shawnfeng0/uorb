@@ -240,7 +240,7 @@ int orb_ioctl(int fd, int cmd, unsigned long arg) {
   return ret;
 }
 
-int orb_poll(orb_pollfd_struct_t *fds, nfds_t nfds, int timeout_ms) {
+int orb_poll(orb_pollfd_t *fds, nfds_t nfds, int timeout_ms) {
   if (nfds == 0) {
     ORB_WARN("orb_poll with no fds");
     return -1;

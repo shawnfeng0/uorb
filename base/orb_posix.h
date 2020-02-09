@@ -73,13 +73,13 @@ typedef struct {
   /* Required for PX4 compatibility */
   uORB::Semaphore *sem; /* Pointer to semaphore used to post output event */
   void *priv;     /* For use by drivers */
-} orb_pollfd_struct_t;
+} orb_pollfd_t;
 
 __EXPORT int orb_open(const char *path, int flags, ...);
 __EXPORT int orb_close(int fd);
 __EXPORT ssize_t orb_read(int fd, void *buffer, size_t buflen);
 __EXPORT int orb_ioctl(int fd, int cmd, unsigned long arg);
-__EXPORT int orb_poll(orb_pollfd_struct_t *fds, nfds_t nfds, int timeout_ms);
+__EXPORT int orb_poll(orb_pollfd_t *fds, nfds_t nfds, int timeout_ms);
 __EXPORT int orb_access(const char *pathname, int mode);
 
 __END_DECLS

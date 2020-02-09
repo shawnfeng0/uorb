@@ -77,7 +77,7 @@ class uORB::Manager
    * Method to get the singleton instance for the uORB::Manager.
    * @return uORB::Manager*
    */
-  static uORB::Manager *get_instance() {
+  static inline uORB::Manager *get_instance() {
     return &_Instance;
   }
 

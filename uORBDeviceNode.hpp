@@ -125,7 +125,7 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
    *			it is being torn down.
    * @return		ORB_OK on success, or -errno otherwise.
    */
-  int poll(cdev::file_t *filep, orb_pollfd_struct_t *fds, bool setup) ;
+  int poll(cdev::file_t *filep, orb_pollfd_t *fds, bool setup) ;
 
   /**
    * Get the device name.
@@ -286,7 +286,7 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
    * @param fds		A poll waiter to notify.
    * @param events	The event(s) to send to the waiter.
    */
-  void poll_notify_one(orb_pollfd_struct_t *fds, pollevent_t events) ;
+  void poll_notify_one(orb_pollfd_t *fds, pollevent_t events) ;
 
  private:
   /**
@@ -341,7 +341,7 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
 
   const char *_devname{nullptr}; /**< device node name */
 
-  orb_pollfd_struct_t **_pollset{nullptr};
+  orb_pollfd_t **_pollset{nullptr};
 
   bool _registered{false}; /**< true if device name was registered */
 
@@ -366,14 +366,14 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
  *
  * @return		ORB_OK, or -errno on error.
  */
-  inline int store_poll_waiter(orb_pollfd_struct_t *fds) ;
+  inline int store_poll_waiter(orb_pollfd_t *fds) ;
 
   /**
    * Remove a poll waiter.
    *
    * @return		ORB_OK, or -errno on error.
    */
-  inline int remove_poll_waiter(orb_pollfd_struct_t *fds) ;
+  inline int remove_poll_waiter(orb_pollfd_t *fds) ;
 
     /**
    * First, unregisters the driver. Next, free the memory for the devname,

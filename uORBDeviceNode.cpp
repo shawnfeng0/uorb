@@ -477,7 +477,7 @@ pollevent_t uORB::DeviceNode::poll_state(cdev::file_t *filp) {
   return 0;
 }
 
-void uORB::DeviceNode::poll_notify_one(orb_pollfd_struct_t *fds,
+void uORB::DeviceNode::poll_notify_one(orb_pollfd_t *fds,
                                        pollevent_t events) {
   SubscriberData *sd = filp_to_sd((cdev::file_t *)fds->priv);
 
@@ -648,7 +648,7 @@ void uORB::DeviceNode::poll_notify(pollevent_t events) {
   }
 }
 
-int uORB::DeviceNode::store_poll_waiter(orb_pollfd_struct_t *fds) {
+int uORB::DeviceNode::store_poll_waiter(orb_pollfd_t *fds) {
   // Look for a free slot.
   ORB_DEBUG("CDev::store_poll_waiter");
 
@@ -664,7 +664,7 @@ int uORB::DeviceNode::store_poll_waiter(orb_pollfd_struct_t *fds) {
   return -ENFILE;
 }
 
-int uORB::DeviceNode::remove_poll_waiter(orb_pollfd_struct_t *fds) {
+int uORB::DeviceNode::remove_poll_waiter(orb_pollfd_t *fds) {
   ORB_DEBUG("CDev::remove_poll_waiter");
 
   for (unsigned i = 0; i < _max_pollwaiters; i++) {
@@ -703,7 +703,7 @@ int uORB::DeviceNode::unregister_driver_and_memory() {
 /*
  * Default implementations of the character device interface
  */
-int uORB::DeviceNode::poll(cdev::file_t *filep, orb_pollfd_struct_t *fds,
+int uORB::DeviceNode::poll(cdev::file_t *filep, orb_pollfd_t *fds,
                            bool setup) {
   ORB_DEBUG("CDev::Poll %s", setup ? "setup" : "teardown");
   int ret;
@@ -735,19 +735,19 @@ int uORB::DeviceNode::poll(cdev::file_t *filep, orb_pollfd_struct_t *fds,
       }
 
       const uint8_t new_count = _max_pollwaiters > 0 ? _max_pollwaiters * 2 : 1;
-      orb_pollfd_struct_t **prev_pollset = _pollset;
+      orb_pollfd_t **prev_pollset = _pollset;
 
 #ifdef __PX4_NUTTX
       // malloc uses a semaphore, we need to call it enabled IRQ's
       orb_leave_critical_section(flags);
 #endif
-      auto **new_pollset = new orb_pollfd_struct_t *[new_count];
+      auto **new_pollset = new orb_pollfd_t *[new_count];
 
 #ifdef __PX4_NUTTX
       flags = orb_enter_critical_section();
 #endif
 
-      if (prev_pollset == _pollset) {
+      if (prev_pollset == _pollset) { // Feng: Delete this line,
         // no one else updated the _pollset meanwhile, so we're good to go
         if (!new_pollset) {
           ret = -ENOMEM;
@@ -757,9 +757,9 @@ int uORB::DeviceNode::poll(cdev::file_t *filep, orb_pollfd_struct_t *fds,
         if (_max_pollwaiters > 0) {
           memset(
               new_pollset + _max_pollwaiters, 0,
-              sizeof(orb_pollfd_struct_t *) * (new_count - _max_pollwaiters));
+              sizeof(orb_pollfd_t *) * (new_count - _max_pollwaiters));
           memcpy(new_pollset, _pollset,
-                 sizeof(orb_pollfd_struct_t *) * _max_pollwaiters);
+                 sizeof(orb_pollfd_t *) * _max_pollwaiters);
         }
 
         _pollset = new_pollset;

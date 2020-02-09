@@ -66,7 +66,7 @@ int uORBTest::UnitTest::pubsublatency_main()
 	float latency_integral = 0.0f;
 
 	/* wakeup source(s) */
-	orb_pollfd_struct_t fds[3];
+        orb_pollfd_t fds[3];
 
 	int test_multi_sub = orb_subscribe_multi(ORB_ID(orb_test), 0);
 	int test_multi_sub_medium = orb_subscribe_multi(ORB_ID(orb_test_medium), 0);
@@ -860,7 +860,7 @@ int uORBTest::UnitTest::test_queue_poll_notify()
 	}
 
 	int next_expected_val = 0;
-	 orb_pollfd_struct_t fds[1];
+        orb_pollfd_t fds[1];
 	fds[0].fd = sfd;
 	fds[0].events = POLLIN;
 
