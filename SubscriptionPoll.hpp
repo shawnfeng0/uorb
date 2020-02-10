@@ -6,6 +6,7 @@
 #define UORB__SUBSCRIPTION_POLL_HPP_
 
 #include <base/orb_posix.h>
+#include <base/orb_defines.h>
 #include <uORB.h>
 namespace uORB {
 class SubscriptionPoll {
