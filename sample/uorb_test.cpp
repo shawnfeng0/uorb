@@ -3,74 +3,54 @@
 //
 
 #include <pthread.h>
+#include <uORB/topics/cpuload.h>
 #include <unistd.h>
 
-#include <sample/msg/uORB/topics/cpuload.h>
+#include <Publication.hpp>
+#include <SubscriptionPoll.hpp>
 
 #include "base/drv_hrt.h"
-#include "base/orb_defines.h"
-#include "base/orb_posix.h"
 #include "sample/ulog/src/ulog.h"
-
-#include <Publication.hpp>
 
 void *adviser_cpuload(void *) {
   uORB::PublicationData<cpuload_s> cpuload_pub(ORB_ID(cpuload));
 
-  usleep(2 * 1000 * 1000);
   for (int i = 0; i < 10; i++) {
-    usleep(1 * 1000 * 1000);
     cpuload_pub.get().timestamp = hrt_absolute_time();
     cpuload_pub.get().load++;
     cpuload_pub.get().ram_usage++;
     if (!cpuload_pub.update()) {
       LOG_WARN("publish error");
     }
+    usleep(1 * 1000 * 1000);
   }
+  LOG_WARN("Publication over.");
   return nullptr;
 }
 
-void* cpuload_update_poll(void* arg) {
-  struct cpuload_s cpu_loader {};
-  int cpuload_sub = orb_subscribe(ORB_ID(cpuload));
-  if (cpuload_sub == ORB_ERROR) {
-    LOG_ERROR("orb_subcribe error: %s", strerror(orb_errno));
-    return nullptr;
-  }
+void *cpuload_update_poll(void *arg) {
+  uORB::SubscriptionPollData<cpuload_s> cpu_load_sub_data(ORB_ID(cpuload));
 
-  uint32_t sleep_time_us = 0;
-  if (arg)
-    sleep_time_us = *(uint32_t *) arg;
+  uint32_t sleep_time_s = (arg) ? *(int32_t *)arg : 0;
 
-  LOG_INFO("orb_subcribe success, cycle: %.1fs", sleep_time_us / 1000.f / 1000.f);
+  LOG_INFO("orb_subcribe, cycle: %d", sleep_time_s);
 
-  orb_pollfd_t fds[] = {
-      {.fd = cpuload_sub, .events = POLLIN},
-  };
-
-  memset(&cpu_loader, 0, sizeof(cpu_loader));
-  int error_counter = 0;
-
-  for (int i = 0; i < 12; i ++) {
-    usleep(sleep_time_us);
+  for (int i = 0; i < 20; i++) {
+    sleep(sleep_time_s);
     LOG_INFO("TOPIC: cpuload #%d", i);
     int timeout_ms = 5000;
-    int poll_ret = orb_poll(fds, 1, timeout_ms);
-    if (poll_ret < 0) {
-      /* this is seriously bad - should be an emergency */
-      if (error_counter < 10 || error_counter % 50 == 0) {
-        /* use a counter to prevent flooding (and slowing us down) */
-        LOG_ERROR("ERROR return value from poll(): %d", poll_ret);
-      }
-      error_counter++;
-    } else if (poll_ret == 0) {
+    if (cpu_load_sub_data.poll(timeout_ms)) {
+      cpu_load_sub_data.update();
+      const struct cpuload_s &cpu_loader = cpu_load_sub_data.get();
+      LOG_MULTI_TOKEN(cpu_loader.timestamp, cpu_loader.load,
+                      cpu_loader.ram_usage);
+    } else {
       /* this means none of our providers is giving us data */
       LOG_ERROR("Got no data within %d milliseconds", timeout_ms);
-    } else {
-      orb_copy(ORB_ID(cpuload), cpuload_sub, &cpu_loader);
-      LOG_MULTI_TOKEN(cpu_loader.timestamp, cpu_loader.load, cpu_loader.ram_usage);
+      break;
     }
   }
+  LOG_WARN("subscription over");
   return nullptr;
 }
 
@@ -78,12 +58,12 @@ void uorb_sample() {
   // One publishing thread, three subscription threads
   pthread_t pthread_id;
   pthread_create(&pthread_id, nullptr, adviser_cpuload, nullptr);
-  static uint32_t sleep_time_us_1 = 1 * 1000 * 1000;
-  pthread_create(&pthread_id, nullptr, cpuload_update_poll, &sleep_time_us_1);
-  static uint32_t sleep_time_us_2 = 1.5 * 1000 * 1000;
-  pthread_create(&pthread_id, nullptr, cpuload_update_poll, &sleep_time_us_2);
-  static uint32_t sleep_time_us_3 = 2 * 1000 * 1000;
-  pthread_create(&pthread_id, nullptr, cpuload_update_poll, &sleep_time_us_3);
+  static uint32_t sleep_time_s_1 = 1;
+  pthread_create(&pthread_id, nullptr, cpuload_update_poll, &sleep_time_s_1);
+  static uint32_t sleep_time_s_2 = 2;
+  pthread_create(&pthread_id, nullptr, cpuload_update_poll, &sleep_time_s_2);
+  static uint32_t sleep_time_s_3 = 3;
+  pthread_create(&pthread_id, nullptr, cpuload_update_poll, &sleep_time_s_3);
 }
 
 int main(int argc, char *argv[]) {
