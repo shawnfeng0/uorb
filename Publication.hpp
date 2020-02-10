@@ -38,82 +38,79 @@
 
 #pragma once
 
+#include "base/orb_defines.h"
 #include "uORB.h"
 
-namespace uORB
-{
+namespace uORB {
 
 /**
  * Base publication wrapper class
  */
-template<typename T>
-class Publication
-{
-public:
+template <typename T>
+class Publication {
+ public:
+  /**
+   * Constructor
+   *
+   * @param meta The uORB metadata (usually from the ORB_ID() macro) for the
+   * topic.
+   */
+  explicit Publication(const orb_metadata *meta) : _meta(meta) {}
+  ~Publication() { orb_unadvertise(_handle); }
 
-	/**
-	 * Constructor
-	 *
-	 * @param meta The uORB metadata (usually from the ORB_ID() macro) for the topic.
-	 */
-	explicit Publication(const orb_metadata *meta) : _meta(meta) {}
-	~Publication() { orb_unadvertise(_handle); }
+  /**
+   * Publish the struct
+   * @param data The uORB message struct we are updating.
+   */
+  bool publish(const T &data) {
+    if (_handle != nullptr) {
+      return (orb_publish(_meta, _handle, &data) == ORB_OK);
 
-	/**
-	 * Publish the struct
-	 * @param data The uORB message struct we are updating.
-	 */
-	bool publish(const T &data)
-	{
-		if (_handle != nullptr) {
-			return (orb_publish(_meta, _handle, &data) == ORB_OK);
+    } else {
+      orb_advert_t handle = orb_advertise(_meta, &data);
 
-		} else {
-			orb_advert_t handle = orb_advertise(_meta, &data);
+      if (handle != nullptr) {
+        _handle = handle;
+        return true;
+      }
+    }
 
-			if (handle != nullptr) {
-				_handle = handle;
-				return true;
-			}
-		}
+    return false;
+  }
 
-		return false;
-	}
+ protected:
+  const orb_metadata *_meta;
 
-protected:
-	const orb_metadata *_meta;
-
-	orb_advert_t _handle{nullptr};
+  orb_advert_t _handle{nullptr};
 };
 
 /**
  * The publication class with data embedded.
  */
-template<typename T>
-class PublicationData : public Publication<T>
-{
-public:
-	/**
-	 * Constructor
-	 *
-	 * @param meta The uORB metadata (usually from the ORB_ID() macro) for the topic.
-	 */
-	explicit PublicationData(const orb_metadata *meta) : Publication<T>(meta) {}
-	~PublicationData() = default;
+template <typename T>
+class PublicationData : public Publication<T> {
+ public:
+  /**
+   * Constructor
+   *
+   * @param meta The uORB metadata (usually from the ORB_ID() macro) for the
+   * topic.
+   */
+  explicit PublicationData(const orb_metadata *meta) : Publication<T>(meta) {}
+  ~PublicationData() = default;
 
-	T	&get() { return _data; }
-	void	set(const T &data) { _data = data; }
+  T &get() { return _data; }
+  void set(const T &data) { _data = data; }
 
-	// Publishes the embedded struct.
-	bool	update() { return Publication<T>::publish(_data); }
-	bool	update(const T &data)
-	{
-		_data = data;
-		return Publication<T>::publish(_data);
-	}
+  // Publishes the embedded struct.
+  bool update() { return Publication<T>::publish(_data); }
+  bool update(const T &data) {
+    _data = data;
+    return Publication<T>::publish(_data);
+  }
 
-private:
-	T _data{};
+ private:
+  T _data{};
 };
 
-} // namespace uORB
+}  // namespace uORB
