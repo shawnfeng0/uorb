@@ -35,11 +35,19 @@ void *cpuload_update_poll(void *arg) {
 
   LOG_INFO("orb_subcribe, cycle: %d", sleep_time_s);
 
+#ifndef ARRAY_SIZE
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
+#endif
+
+  orb_pollfd_t fds[] = {
+      {.fd = cpu_load_sub_data.get_fd(), .events = POLLIN},
+  };
+
   for (int i = 0; i < 20; i++) {
     sleep(sleep_time_s);
     LOG_INFO("TOPIC: cpuload #%d", i);
-    int timeout_ms = 5000;
-    if (cpu_load_sub_data.poll(timeout_ms)) {
+    int timeout_ms = 300;
+    if (orb_poll(fds, ARRAY_SIZE(fds), timeout_ms)) {
       cpu_load_sub_data.update();
       const struct cpuload_s &cpu_loader = cpu_load_sub_data.get();
       LOG_MULTI_TOKEN(cpu_loader.timestamp, cpu_loader.load,
