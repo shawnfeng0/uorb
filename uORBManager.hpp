@@ -158,7 +158,7 @@ class uORB::Manager
    */
   orb_advert_t orb_advertise_multi(const struct orb_metadata *meta,
                                    const void *data, int *instance,
-                                   int priority, unsigned int queue_size = 1);
+                                   ORB_PRIO priority, unsigned int queue_size = 1);
 
   /**
    * Unadvertise a topic.
@@ -173,7 +173,7 @@ class uORB::Manager
    *
    * The data is atomically published to the topic and any waiting subscribers
    * will be notified.  Subscribers that are not waiting can check the topic
-   * for updates using orb_check and/or orb_stat.
+   * for updates using orb_check.
    *
    * @param meta    The uORB metadata (usually from the ORB_ID() macro)
    *      for the topic.
@@ -190,7 +190,7 @@ class uORB::Manager
    *
    * The returned value is a file descriptor that can be passed to poll()
    * in order to wait for updates to a topic, as well as topic_read,
-   * orb_check and orb_stat.
+   * orb_check.
    *
    * If there were any publications of the topic prior to the subscription,
    * an orb_check right after orb_subscribe will return true.
@@ -220,7 +220,7 @@ class uORB::Manager
    *
    * The returned value is a file descriptor that can be passed to poll()
    * in order to wait for updates to a topic, as well as topic_read,
-   * orb_check and orb_stat.
+   * orb_check.
    *
    * If there were any publications of the topic prior to the subscription,
    * an orb_check right after orb_subscribe_multi will return true.
@@ -290,29 +290,15 @@ class uORB::Manager
    * topic is likely to have updated.
    *
    * Updates are tracked on a per-handle basis; this call will continue to
-   * return true until orb_copy is called using the same handle. This interface
-   * should be preferred over calling orb_stat due to the race window between
-   * stat and copy that can lead to missed updates.
+   * return true until orb_copy is called using the same handle.
    *
    * @param handle  A handle returned from orb_subscribe.
    * @param updated Set to true if the topic has been updated since the
    *      last time it was copied using this handle.
-   * @return    ORB_OK if the check was successful, ORB_ERROR otherwise with
+   * @return    OK if the check was successful, PX4_ERROR otherwise with
    *      errno set accordingly.
    */
-  static int orb_check(int handle, bool *updated);
-
-  /**
-   * Return the last time that the topic was updated. If a queue is used, it
-   * returns the timestamp of the latest element in the queue.
-   *
-   * @param handle  A handle returned from orb_subscribe.
-   * @param time    Returns the absolute time that the topic was updated, or
-   * zero if it has never been updated. Time is measured in microseconds.
-   * @return    ORB_OK on success, ORB_ERROR otherwise with errno set
-   * accordingly.
-   */
-  static int orb_stat(int handle, uint64_t *time);
+  int  orb_check(int handle, bool *updated);
 
   /**
    * Check if a topic has already been created and published (advertised)
@@ -334,7 +320,7 @@ class uORB::Manager
    * @return    ORB_OK on success, ORB_ERROR otherwise with errno set
    * accordingly.
    */
-  static int orb_priority(int handle, int32_t *priority);
+  static int orb_priority(int handle, ORB_PRIO *priority);
 
   /**
    * Set the minimum interval between which updates are seen for a subscription.
@@ -394,20 +380,13 @@ class uORB::Manager
 
  private:  // class methods
   /**
-   * Advertise a node; don't consider it an error if the node has
-   * already been advertised.
-   */
-  int node_advertise(const struct orb_metadata *meta, bool is_advertiser,
-                     int *instance = nullptr, int priority = ORB_PRIO_DEFAULT);
-
-  /**
    * Common implementation for orb_advertise and orb_subscribe.
    *
    * Handles creation of the object and the initial publication for
    * advertisers.
    */
   int node_open(const struct orb_metadata *meta, bool advertiser,
-                int *instance = nullptr, int priority = ORB_PRIO_DEFAULT);
+                int *instance = nullptr, ORB_PRIO priority = ORB_PRIO_DEFAULT);
 
  private:  // data members
   static Manager _Instance;

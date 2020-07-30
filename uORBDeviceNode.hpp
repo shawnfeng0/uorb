@@ -51,7 +51,7 @@ class Manager;
 class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
  public:
   DeviceNode(const struct orb_metadata *meta, uint8_t instance,
-             const char *path, uint8_t priority, uint8_t queue_size = 1);
+             const char *path, ORB_PRIO priority, uint8_t queue_size = 1);
   ~DeviceNode();
 
   /* do not allow copying this class */
@@ -67,12 +67,12 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
    * Method to create a subscriber instance and return the struct
    * pointing to the subscriber as a file pointer.
    */
-  int open(cdev::file_t *filp) ;
+  int open(cdev::file_t *filp);
 
   /**
    * Method to close a subscriber for this topic.
    */
-  int close(cdev::file_t *filp) ;
+  int close(cdev::file_t *filp);
 
   /**
    * reads data from a subscriber node to the buffer provided.
@@ -85,7 +85,7 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
    * @return
    *   ssize_t the number of bytes read.
    */
-  ssize_t read(cdev::file_t *filp, char *buffer, size_t buflen) ;
+  ssize_t read(cdev::file_t *filp, char *buffer, size_t buflen);
 
   /**
    * writes the published data to the internal buffer to be read by
@@ -97,7 +97,7 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
    * @return ssize_t
    *   The number of bytes that are written
    */
-  ssize_t write(const char *buffer, size_t buflen) ;
+  ssize_t write(const char *buffer, size_t buflen);
 
   /**
    * IOCTL control for the subscriber.
@@ -112,7 +112,7 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
    * @param arg		The ioctl argument value.
    * @return		ORB_OK on success, or -errno otherwise.
    */
-  int ioctl(cdev::file_t *filp, int cmd, unsigned long arg) ;
+  int ioctl(cdev::file_t *filp, int cmd, unsigned long arg);
 
   /**
    * Perform a poll setup/teardown operation.
@@ -125,14 +125,14 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
    *			it is being torn down.
    * @return		ORB_OK on success, or -errno otherwise.
    */
-  int poll(cdev::file_t *filep, orb_pollfd_t *fds, bool setup) ;
+  int poll(cdev::file_t *filep, orb_pollfd_t *fds, bool setup);
 
   /**
    * Get the device name.
    *
    * @return the file system string of the device handle
    */
-  const char *get_devname() const  { return _devname; }
+  const char *get_devname() const { return _devname; }
 
   /**
    * Method to publish a data to this node.
@@ -219,12 +219,14 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
 
   const orb_metadata *get_meta() const { return _meta; }
 
+  ORB_ID id() const { return static_cast<ORB_ID>(_meta->o_id); }
+
   const char *get_name() const { return _meta->o_name; }
 
   uint8_t get_instance() const { return _instance; }
 
-  int get_priority() const { return _priority; }
-  void set_priority(uint8_t priority) { _priority = priority; }
+  ORB_PRIO get_priority() const { return _priority; }
+  void set_priority(ORB_PRIO priority) { _priority = priority; }
 
   /**
    * Copies data and the corresponding generation
@@ -239,23 +241,8 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
    */
   bool copy(void *dst, unsigned &generation);
 
-  /**
-   * Copies data and the corresponding generation
-   * from a node to the buffer provided.
-   *
-   * @param dst
-   *   The buffer into which the data is copied.
-   *   If topic was not updated since last check it will return false but
-   *   still copy the data.
-   * @param generation
-   *   The generation that was copied.
-   * @return uint64_t
-   *   Returns the timestamp of the copied data.
-   */
-  uint64_t copy_and_get_timestamp(void *dst, unsigned &generation);
-
  protected:
-    /**
+  /**
    * Check the current state of the device for poll events from the
    * perspective of the file.
    *
@@ -268,7 +255,7 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
    * @param filep		The file that's interested.
    * @return		The current set of poll events.
    */
-  pollevent_t poll_state(cdev::file_t *filp) ;
+  pollevent_t poll_state(cdev::file_t *filp);
 
   /**
    * Report new poll events.
@@ -278,7 +265,7 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
    *
    * @param events	The new event(s) being announced.
    */
-  void poll_notify(pollevent_t events) ;
+  void poll_notify(pollevent_t events);
 
   /**
    * Internal implementation of poll_notify.
@@ -286,7 +273,7 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
    * @param fds		A poll waiter to notify.
    * @param events	The event(s) to send to the waiter.
    */
-  void poll_notify_one(orb_pollfd_t *fds, pollevent_t events) ;
+  void poll_notify_one(orb_pollfd_t *fds, pollevent_t events);
 
  private:
   /**
@@ -321,23 +308,16 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
   };
 
   const orb_metadata *_meta;   /**< object metadata information */
-  const uint8_t _instance;     /**< orb multi instance identifier */
   uint8_t *_data{nullptr};     /**< allocated object buffer */
-  hrt_abstime _last_update{0}; /**< time the object was last updated */
   uORB::base::atomic<unsigned> _generation{0}; /**< object generation count */
-  uint8_t _priority;       /**< priority of the topic */
-  bool _advertised{false}; /**< has ever been advertised (not necessarily
-                              published data yet) */
-  uint8_t _queue_size;     /**< maximum number of elements in the queue */
-  int8_t _subscriber_count{0};
 
   // statistics
   uint32_t _lost_messages =
       0; /**< nr of lost messages for all subscribers. If two subscribers lose
             the same message, it is counted as two. */
 
-  uORB::base::Mutex _lock; /**< lock to protect access to all class members (also for
-                      derived classes) */
+  uORB::base::Mutex _lock; /**< lock to protect access to all class members
+                      (also for derived classes) */
 
   const char *_devname{nullptr}; /**< device node name */
 
@@ -347,7 +327,12 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
 
   uint8_t _max_pollwaiters{0}; /**< size of the _pollset array */
 
-  inline static SubscriberData *filp_to_sd(cdev::file_t *filp);
+  ORB_PRIO _priority;      /**< priority of the topic */
+  const uint8_t _instance; /**< orb multi instance identifier */
+  bool _advertised{false}; /**< has ever been advertised (not necessarily
+                              published data yet) */
+  uint8_t _queue_size;     /**< maximum number of elements in the queue */
+  int8_t _subscriber_count{0};
 
   /**
    * Check whether a topic appears updated to a subscriber.
@@ -357,25 +342,25 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
    * @param sd    The subscriber for whom to check.
    * @return    True if the topic should appear updated to the subscriber
    */
-  bool appears_updated(SubscriberData *sd);
+  bool      appears_updated(cdev::file_t *filp);
 
   /**
- * Store a pollwaiter in a slot where we can find it later.
- *
- * Expands the pollset as required.  Must be called with the driver locked.
- *
- * @return		ORB_OK, or -errno on error.
- */
-  inline int store_poll_waiter(orb_pollfd_t *fds) ;
+   * Store a pollwaiter in a slot where we can find it later.
+   *
+   * Expands the pollset as required.  Must be called with the driver locked.
+   *
+   * @return		ORB_OK, or -errno on error.
+   */
+  inline int store_poll_waiter(orb_pollfd_t *fds);
 
   /**
    * Remove a poll waiter.
    *
    * @return		ORB_OK, or -errno on error.
    */
-  inline int remove_poll_waiter(orb_pollfd_t *fds) ;
+  inline int remove_poll_waiter(orb_pollfd_t *fds);
 
-    /**
+  /**
    * First, unregisters the driver. Next, free the memory for the devname,
    * in case it was expected to have ownership. Sets devname to nullptr.
    *

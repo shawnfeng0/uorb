@@ -44,21 +44,9 @@
 #include "uORBCommunicator.hpp"
 #endif /* ORB_COMMUNICATOR */
 
-uORB::DeviceNode::SubscriberData *uORB::DeviceNode::filp_to_sd(
-    cdev::file_t *filp) {
-#ifndef __PX4_NUTTX
-
-  if (!filp) {
-    return nullptr;
-  }
-
-#endif
-  return (SubscriberData *)(filp->f_priv);
-}
-
-uORB::DeviceNode::DeviceNode(const struct orb_metadata *meta,
-                             uint8_t instance, const char *path,
-                             uint8_t priority, uint8_t queue_size)
+uORB::DeviceNode::DeviceNode(const struct orb_metadata *meta, uint8_t instance,
+                             const char *path, ORB_PRIO priority,
+                             uint8_t queue_size)
     : _devname(path),
       _meta(meta),
       _instance(instance),
@@ -68,9 +56,8 @@ uORB::DeviceNode::DeviceNode(const struct orb_metadata *meta,
 }
 
 uORB::DeviceNode::~DeviceNode() {
-  if (_data != nullptr) {
-    delete[] _data;
-  }
+  delete[] _data;
+
   unregister_driver_and_memory();
 
   ORB_DEBUG("CDev::~CDev");
@@ -125,7 +112,7 @@ int uORB::DeviceNode::open(cdev::file_t *filp) {
 
 int uORB::DeviceNode::close(cdev::file_t *filp) {
   if (filp->f_oflags == PX4_F_RDONLY) { /* subscriber */
-    SubscriberData *sd = filp_to_sd(filp);
+    auto *sd = static_cast<SubscriberData *>(filp->f_priv);
 
     if (sd != nullptr) {
       remove_internal_subscriber();
@@ -177,17 +164,6 @@ bool uORB::DeviceNode::copy(void *dst, unsigned &generation) {
   return updated;
 }
 
-uint64_t uORB::DeviceNode::copy_and_get_timestamp(void *dst,
-                                                  unsigned &generation) {
-  // Automatic mutex guarding
-  uORB::base::MutexGuard lg(_lock);
-
-  const hrt_abstime update_time = _last_update;
-  copy_locked(dst, generation);
-
-  return update_time;
-}
-
 ssize_t uORB::DeviceNode::read(cdev::file_t *filp, char *buffer,
                                size_t buflen) {
   /* if the object has not been written yet, return zero */
@@ -200,7 +176,7 @@ ssize_t uORB::DeviceNode::read(cdev::file_t *filp, char *buffer,
     return -EIO;
   }
 
-  auto *sd = (SubscriberData *)filp_to_sd(filp);
+  auto *sd = static_cast<SubscriberData *>(filp->f_priv);
 
   /*
    * Perform an atomic copy & state update
@@ -208,12 +184,12 @@ ssize_t uORB::DeviceNode::read(cdev::file_t *filp, char *buffer,
   {
     // Automatic mutex guarding
     uORB::base::MutexGuard lg(_lock);
-    copy_locked(buffer, sd->generation);
 
     // if subscriber has an interval track the last update time
     if (sd->update_interval) {
-      sd->update_interval->last_update = _last_update;
+      sd->update_interval->last_update = hrt_absolute_time();
     }
+    copy_locked(buffer, sd->generation);
   }
 
   return _meta->o_size;
@@ -271,10 +247,6 @@ ssize_t uORB::DeviceNode::write(const char *buffer, size_t buflen) {
 
     memcpy(_data + (_meta->o_size * (generation % _queue_size)), buffer,
            _meta->o_size);
-
-    /* update the timestamp and generation count */
-    _last_update = hrt_absolute_time();
-
   }
 
   /* notify any poll waiters */
@@ -284,20 +256,11 @@ ssize_t uORB::DeviceNode::write(const char *buffer, size_t buflen) {
 }
 
 int uORB::DeviceNode::ioctl(cdev::file_t *filp, int cmd, unsigned long arg) {
-  SubscriberData *sd = filp_to_sd(filp);
-
   switch (cmd) {
-    case ORBIOCLASTUPDATE: {
-      // Automatic mutex guarding
-      uORB::base::MutexGuard lg(_lock);
-      *(hrt_abstime *)arg = _last_update;
-      return ORB_OK;
-    }
-
     case ORBIOCUPDATED: {
       // Automatic mutex guarding
       uORB::base::MutexGuard lg(_lock);
-      *(bool *)arg = appears_updated(sd);
+      *(bool *)arg = appears_updated(filp);
       return ORB_OK;
     }
 
@@ -305,6 +268,8 @@ int uORB::DeviceNode::ioctl(cdev::file_t *filp, int cmd, unsigned long arg) {
       int ret = ORB_OK;
       // Automatic mutex guarding
       uORB::base::MutexGuard lg(_lock);
+
+      auto *sd = static_cast<SubscriberData *>(filp->f_priv);
 
       if (arg == 0) {
         if (sd->update_interval) {
@@ -345,14 +310,16 @@ int uORB::DeviceNode::ioctl(cdev::file_t *filp, int cmd, unsigned long arg) {
       return ret;
     }
 
-    case ORBIOCGETINTERVAL:
+    case ORBIOCGETINTERVAL: {
+      auto *sd = static_cast<SubscriberData *>(filp->f_priv);
+
       if (sd->update_interval) {
         *(unsigned *)arg = sd->update_interval->interval;
 
       } else {
         *(unsigned *)arg = 0;
       }
-
+    }
       return ORB_OK;
 
     case ORBIOCISADVERTISED:
@@ -465,26 +432,17 @@ meta != nullptr) { return ch->topic_unadvertised(meta->o_name);
 #endif /* ORB_COMMUNICATOR */
 
 pollevent_t uORB::DeviceNode::poll_state(cdev::file_t *filp) {
-  SubscriberData *sd = filp_to_sd(filp);
-
-  /*
-   * If the topic appears updated to the subscriber, say so.
-   */
-  if (appears_updated(sd)) {
+  /* If the topic appears updated to the subscriber, say so. */
+  if (appears_updated(filp)) {
     return POLLIN;
   }
 
   return 0;
 }
 
-void uORB::DeviceNode::poll_notify_one(orb_pollfd_t *fds,
-                                       pollevent_t events) {
-  SubscriberData *sd = filp_to_sd((cdev::file_t *)fds->priv);
-
-  /*
-   * If the topic looks updated to the subscriber, go ahead and notify them.
-   */
-  if (appears_updated(sd)) {
+void uORB::DeviceNode::poll_notify_one(orb_pollfd_t *fds, pollevent_t events) {
+  /* If the topic looks updated to the subscriber, go ahead and notify them. */
+  if (appears_updated((cdev::file_t *)fds->priv)) {
     ORB_DEBUG("CDev::poll_notify_one");
 
     /* update the reported event set */
@@ -499,11 +457,13 @@ void uORB::DeviceNode::poll_notify_one(orb_pollfd_t *fds,
   }
 }
 
-bool uORB::DeviceNode::appears_updated(SubscriberData *sd) {
+bool uORB::DeviceNode::appears_updated(cdev::file_t *filp) {
   // check if this topic has been published yet, if not bail out
   if (_data == nullptr) {
     return false;
   }
+
+  auto *sd = static_cast<SubscriberData *>(filp->f_priv);
 
   // if subscriber has interval check time since last update
   if (sd->update_interval != nullptr) {
@@ -703,8 +663,7 @@ int uORB::DeviceNode::unregister_driver_and_memory() {
 /*
  * Default implementations of the character device interface
  */
-int uORB::DeviceNode::poll(cdev::file_t *filep, orb_pollfd_t *fds,
-                           bool setup) {
+int uORB::DeviceNode::poll(cdev::file_t *filep, orb_pollfd_t *fds, bool setup) {
   ORB_DEBUG("CDev::Poll %s", setup ? "setup" : "teardown");
   int ret;
 
@@ -747,7 +706,7 @@ int uORB::DeviceNode::poll(cdev::file_t *filep, orb_pollfd_t *fds,
       flags = orb_enter_critical_section();
 #endif
 
-      if (prev_pollset == _pollset) { // Feng: Delete this line,
+      if (prev_pollset == _pollset) {  // Feng: Delete this line,
         // no one else updated the _pollset meanwhile, so we're good to go
         if (!new_pollset) {
           ret = -ENOMEM;
@@ -755,9 +714,8 @@ int uORB::DeviceNode::poll(cdev::file_t *filep, orb_pollfd_t *fds,
         }
 
         if (_max_pollwaiters > 0) {
-          memset(
-              new_pollset + _max_pollwaiters, 0,
-              sizeof(orb_pollfd_t *) * (new_count - _max_pollwaiters));
+          memset(new_pollset + _max_pollwaiters, 0,
+                 sizeof(orb_pollfd_t *) * (new_count - _max_pollwaiters));
           memcpy(new_pollset, _pollset,
                  sizeof(orb_pollfd_t *) * _max_pollwaiters);
         }

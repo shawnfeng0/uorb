@@ -32,10 +32,10 @@
  ****************************************************************************/
 #include "uORBManager.hpp"
 
+#include "base/orb_defines.h"
 #include "base/orb_errno.h"
 #include "base/orb_log.h"
 #include "base/orb_posix.h"
-#include "base/orb_defines.h"
 #include "uORBDeviceNode.hpp"
 #include "uORBUtils.hpp"
 
@@ -43,9 +43,7 @@ uORB::Manager uORB::Manager::_Instance;
 
 bool uORB::Manager::initialize() { return get_instance() != nullptr; }
 
-bool uORB::Manager::terminate() {
-  return true;
-}
+bool uORB::Manager::terminate() { return true; }
 
 uORB::Manager::Manager() {
 #ifdef ORB_USE_PUBLISHER_RULES
@@ -136,7 +134,7 @@ int uORB::Manager::orb_exists(const struct orb_metadata *meta, int instance) {
 
 orb_advert_t uORB::Manager::orb_advertise_multi(const struct orb_metadata *meta,
                                                 const void *data, int *instance,
-                                                int priority,
+                                                ORB_PRIO priority,
                                                 unsigned int queue_size) {
 #ifdef ORB_USE_PUBLISHER_RULES
 
@@ -197,12 +195,14 @@ orb_advert_t uORB::Manager::orb_advertise_multi(const struct orb_metadata *meta,
   uORB::DeviceNode::topic_advertised(meta, priority);
 #endif /* ORB_COMMUNICATOR */
 
-  /* the advertiser must perform an initial publish to initialise the object */
-  result = orb_publish(meta, advertiser, data);
+  /* the advertiser may perform an initial publish to initialise the object */
+  if (data != nullptr) {
+    result = orb_publish(meta, advertiser, data);
 
-  if (result == ORB_ERROR) {
-    ORB_WARN("orb_publish failed");
-    return nullptr;
+    if (result == ORB_ERROR) {
+      ORB_ERR("orb_publish failed %s", meta->o_name);
+      return nullptr;
+    }
   }
 
   return advertiser;
@@ -269,11 +269,7 @@ int uORB::Manager::orb_check(int handle, bool *updated) {
   return orb_ioctl(handle, ORBIOCUPDATED, (unsigned long)(uintptr_t)updated);
 }
 
-int uORB::Manager::orb_stat(int handle, uint64_t *time) {
-  return orb_ioctl(handle, ORBIOCLASTUPDATE, (unsigned long)(uintptr_t)time);
-}
-
-int uORB::Manager::orb_priority(int handle, int32_t *priority) {
+int uORB::Manager::orb_priority(int handle, ORB_PRIO *priority) {
   return orb_ioctl(handle, ORBIOCGPRIORITY, (unsigned long)(uintptr_t)priority);
 }
 
@@ -287,31 +283,18 @@ int uORB::Manager::orb_get_interval(int handle, unsigned *interval) {
   return ret;
 }
 
-int uORB::Manager::node_advertise(const struct orb_metadata *meta,
-                                  bool is_advertiser, int *instance,
-                                  int priority) {
-  int ret = _device_master.advertise(meta, is_advertiser, instance, priority);
-
-  /* it's ORB_OK if it already exists */
-  if ((ORB_OK != ret) && (EEXIST == orb_errno)) {
-    ret = ORB_OK;
-  }
-
-  return ret;
-}
-
 int uORB::Manager::node_open(const struct orb_metadata *meta, bool advertiser,
-                             int *instance, int priority) {
+                             int *instance, ORB_PRIO priority) {
   char path[orb_maxpath];
   int fd = -1;
-  int ret;
+  int ret = ORB_ERROR;
 
   /*
    * If meta is null, the object was not defined, i.e. it is not
    * known to the system.  We can't advertise/subscribe such a thing.
    */
   if (nullptr == meta) {
-    orb_errno = ENOENT;
+    errno = ENOENT;
     return ORB_ERROR;
   }
 
@@ -324,7 +307,7 @@ int uORB::Manager::node_open(const struct orb_metadata *meta, bool advertiser,
     ret = uORB::Utils::node_mkpath(path, meta, instance);
 
     if (ret != ORB_OK) {
-      orb_errno = -ret;
+      errno = -ret;
       return ORB_ERROR;
     }
 
@@ -337,44 +320,39 @@ int uORB::Manager::node_open(const struct orb_metadata *meta, bool advertiser,
 
   /* we may need to advertise the node... */
   if (fd < 0) {
-    /* try to create the node */
-    ret = node_advertise(meta, advertiser, instance, priority);
+    ret = ORB_ERROR;
+
+    if (get_device_master()) {
+      ret = _device_master.advertise(meta, advertiser, instance, priority);
+    }
+
+    /* it's OK if it already exists */
+    if ((ret != ORB_OK) && (EEXIST == errno)) {
+      ret = ORB_OK;
+    }
 
     if (ret == ORB_OK) {
-      /* update the path, as it might have been updated during the
-       * node_advertise call */
+      /* update the path, as it might have been updated during the node
+       * advertise call */
       ret = uORB::Utils::node_mkpath(path, meta, instance);
 
-      if (ret != ORB_OK) {
-        orb_errno = -ret;
+      /* on success, try to open again */
+      if (ret == ORB_OK) {
+        fd = orb_open(path, (advertiser) ? PX4_F_WRONLY : PX4_F_RDONLY);
+
+      } else {
+        errno = -ret;
         return ORB_ERROR;
       }
     }
-
-    /* try to open again */
-    fd = orb_open(path, (advertiser) ? PX4_F_WRONLY : PX4_F_RDONLY);
   }
 
-  /*
-   else if (advertiser) {
-           * We have a valid fd and are an advertiser.
-           * This can happen if the topic is already subscribed/published, and
-   orb_advertise() is called,
-           * where instance==nullptr.
-           * We would need to set the priority here (via orb_ioctl(fd, ...) and
-   a new IOCTL), but orb_advertise()
-           * uses ORB_PRIO_DEFAULT, and a subscriber also creates the node with
-   ORB_PRIO_DEFAULT. So we don't need
-           * to do anything here.
-   }
-   */
-
   if (fd < 0) {
-    orb_errno = EIO;
+    errno = EIO;
     return ORB_ERROR;
   }
 
-  /* everything has been ORB_OK, we can return the handle now */
+  /* everything has been OK, we can return the handle now */
   return fd;
 }
 

@@ -66,12 +66,14 @@ struct_size, padding_end_size = add_padding_bytes(sorted_fields, search_path)
 topic_fields = ["%s %s" % (convert_type(field.type), field.name) for field in sorted_fields]
 }@
 
+#include <uORB.h>
 #include <uORB/topics/@(topic_name).h>
+#include <uORB/topics/uORBTopics.hpp>
 
 @# join all msg files in one line e.g: "float[3] position;float[3] velocity;bool armed"
 @# This is used for the logger
 constexpr char __orb_@(topic_name)_fields[] = "@( ";".join(topic_fields) );";
 
 @[for multi_topic in topics]@
-ORB_DEFINE(@multi_topic, struct @uorb_struct, @(struct_size-padding_end_size), __orb_@(topic_name)_fields);
+ORB_DEFINE(@multi_topic, struct @uorb_struct, @(struct_size-padding_end_size), __orb_@(topic_name)_fields, static_cast<uint8_t>(ORB_ID::@multi_topic));
 @[end for]
