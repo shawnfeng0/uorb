@@ -40,10 +40,6 @@
 #include "uORBCommon.hpp"
 #include "uORBDeviceMaster.hpp"
 
-#ifdef ORB_COMMUNICATOR
-#include "uORBCommunicator.hpp"
-#endif /* ORB_COMMUNICATOR */
-
 namespace uORB {
 class Manager;
 }
@@ -54,9 +50,6 @@ class Manager;
  * uORB Api's.
  */
 class uORB::Manager
-#ifdef ORB_COMMUNICATOR
-    : public uORBCommunicator::IChannelRxHandler
-#endif /* ORB_COMMUNICATOR */
 {
  public:
   // public interfaces for this class.
@@ -343,29 +336,6 @@ class uORB::Manager
    */
   static int orb_get_interval(int handle, unsigned *interval);
 
-#ifdef ORB_COMMUNICATOR
-  /**
-   * Method to set the uORBCommunicator::IChannel instance.
-   * @param comm_channel
-   *  The IChannel instance to talk to remote proxies.
-   * @note:
-   *  Currently this call only supports the use of one IChannel
-   *  Future extensions may include more than one IChannel's.
-   */
-  void set_uorb_communicator(uORBCommunicator::IChannel *comm_channel);
-
-  /**
-   * Gets the uORB Communicator instance.
-   */
-  uORBCommunicator::IChannel *get_uorb_communicator();
-
-  /**
-   * Utility method to check if there is a remote subscriber present
-   * for a given topic
-   */
-  bool is_remote_subscriber_present(const char *messageName);
-#endif /* ORB_COMMUNICATOR */
-
  private:  // class methods
   /**
    * Common implementation for orb_advertise and orb_subscribe.
@@ -379,120 +349,11 @@ class uORB::Manager
  private:  // data members
   static Manager Instance;
 
-#ifdef ORB_COMMUNICATOR
-  // the communicator channel instance.
-  uORBCommunicator::IChannel *_comm_channel{nullptr};
-
-  ORBSet _remote_subscriber_topics;
-  ORBSet _remote_topics;
-#endif /* ORB_COMMUNICATOR */
-
   DeviceMaster _device_master{};
 
  private:  // class methods
   Manager();
   virtual ~Manager();
-
-#ifdef ORB_COMMUNICATOR
-  /**
-   * Interface to process a received topic from remote.
-   * @param topic_name
-   * 	This represents the uORB message Name (topic); This message Name should
-   * be globally unique.
-   * @param isAdvertisement
-   * 	Represents if the topic has been advertised or is no longer avialable.
-   * @return
-   *  0 = success; This means the messages is successfully handled in the
-   *  	handler.
-   *  otherwise = failure.
-   */
-  virtual int16_t process_remote_topic(const char *topic_name,
-                                       bool isAdvertisement);
-
-  /**
-   * Interface to process a received AddSubscription from remote.
-   * @param messageName
-   *  This represents the uORB message Name; This message Name should be
-   *  globally unique.
-   * @param msgRate
-   *  The max rate at which the subscriber can accept the messages.
-   * @return
-   *  0 = success; This means the messages is successfully handled in the
-   *    handler.
-   *  otherwise = failure.
-   */
-  virtual int16_t process_add_subscription(const char *messageName,
-                                           int32_t msgRateInHz);
-
-  /**
-   * Interface to process a received control msg to remove subscription
-   * @param messageName
-   *  This represents the uORB message Name; This message Name should be
-   *  globally unique.
-   * @return
-   *  0 = success; This means the messages is successfully handled in the
-   *    handler.
-   *  otherwise = failure.
-   */
-  virtual int16_t process_remove_subscription(const char *messageName);
-
-  /**
-   * Interface to process the received data message.
-   * @param messageName
-   *  This represents the uORB message Name; This message Name should be
-   *  globally unique.
-   * @param length
-   *  The length of the data buffer to be sent.
-   * @param data
-   *  The actual data to be sent.
-   * @return
-   *  0 = success; This means the messages is successfully handled in the
-   *    handler.
-   *  otherwise = failure.
-   */
-  virtual int16_t process_received_message(const char *messageName,
-                                           int32_t length, uint8_t *data);
-#endif /* ORB_COMMUNICATOR */
-
-#ifdef ORB_USE_PUBLISHER_RULES
-
-  struct PublisherRule {
-    const char **topics;      // null-terminated list of topic names
-    const char *module_name;  // only this module is allowed to publish one of
-                              // the topics
-    bool ignore_other_topics;
-  };
-
-  /**
-   * test if str starts with pre
-   */
-  bool startsWith(const char *pre, const char *str);
-
-  /**
-   * find a topic in a rule
-   */
-  bool findTopic(const PublisherRule &rule, const char *topic_name);
-
-  /**
-   * trim whitespace from the beginning of a string
-   */
-  void strTrim(const char **str);
-
-  /**
-   * Read publisher rules from a file. It has the format:
-   *
-   * restrict_topics: <topic1>, <topic2>, <topic3>
-   * module: <module_name>
-   * [ignore_others:true]
-   *
-   * @return 0 on success, <0 otherwise
-   */
-  int readPublisherRulesFromFile(const char *file_name, PublisherRule &rule);
-
-  PublisherRule _publisher_rule;
-  bool _has_publisher_rules = false;
-
-#endif /* ORB_USE_PUBLISHER_RULES */
 };
 
 #endif /* _uORBManager_hpp_ */

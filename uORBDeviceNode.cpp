@@ -40,10 +40,6 @@
 #include "uORBManager.hpp"
 #include "uORBUtils.hpp"
 
-#ifdef ORB_COMMUNICATOR
-#include "uORBCommunicator.hpp"
-#endif /* ORB_COMMUNICATOR */
-
 uORB::DeviceNode::DeviceNode(const struct orb_metadata *meta, uint8_t instance,
                              const char *path, ORB_PRIO priority,
                              uint8_t queue_size)
@@ -363,22 +359,6 @@ ssize_t uORB::DeviceNode::publish(const orb_metadata *meta, orb_advert_t handle,
     return ORB_ERROR;
   }
 
-#ifdef ORB_COMMUNICATOR
-  /*
-   * if the write is successful, send the data over the Multi-ORB link
-   */
-  uORBCommunicator::IChannel *ch =
-      uORB::Manager::get_instance()->get_uorb_communicator();
-
-  if (ch != nullptr) {
-    if (ch->send_message(meta->o_name, meta->o_size, (uint8_t *)data) != 0) {
-      PX4_ERR("Error Sending [%s] topic data over comm_channel", meta->o_name);
-      return ORB_ERROR;
-    }
-  }
-
-#endif /* ORB_COMMUNICATOR */
-
   return ORB_OK;
 }
 
@@ -403,33 +383,6 @@ int uORB::DeviceNode::unadvertise(orb_advert_t handle) {
 
   return ORB_OK;
 }
-
-#ifdef ORB_COMMUNICATOR
-int16_t uORB::DeviceNode::topic_advertised(const orb_metadata *meta,
-                                           int priority) {
-  uORBCommunicator::IChannel *ch =
-      uORB::Manager::get_instance()->get_uorb_communicator();
-
-  if (ch != nullptr && meta != nullptr) {
-    return ch->topic_advertised(meta->o_name);
-  }
-
-  return -1;
-}
-
-/*
-//TODO: Check if we need this since we only unadvertise when things all shutdown
-and it doesn't actually remove the device int16_t
-uORB::DeviceNode::topic_unadvertised(const orb_metadata *meta, int priority)
-{
-        uORBCommunicator::IChannel *ch =
-uORB::Manager::get_instance()->get_uorb_communicator(); if (ch != nullptr &&
-meta != nullptr) { return ch->topic_unadvertised(meta->o_name);
-        }
-        return -1;
-}
-*/
-#endif /* ORB_COMMUNICATOR */
 
 pollevent_t uORB::DeviceNode::poll_state(cdev::file_t *filp) {
   /* If the topic appears updated to the subscriber, say so. */
@@ -503,81 +456,13 @@ void uORB::DeviceNode::add_internal_subscriber() {
   // Automatic mutex guarding
   uORB::base::MutexGuard lg(_lock);
   _subscriber_count++;
-
-#ifdef ORB_COMMUNICATOR
-  uORBCommunicator::IChannel *ch =
-      uORB::Manager::get_instance()->get_uorb_communicator();
-
-  if (ch != nullptr && _subscriber_count > 0) {
-    unlock();  // make sure we cannot deadlock if add_subscription calls back
-               // into DeviceNode
-    ch->add_subscription(_meta->o_name, 1);
-
-  } else
-#endif /* ORB_COMMUNICATOR */
 }
 
 void uORB::DeviceNode::remove_internal_subscriber() {
   // Automatic mutex guarding
   uORB::base::MutexGuard lg(_lock);
   _subscriber_count--;
-
-#ifdef ORB_COMMUNICATOR
-  uORBCommunicator::IChannel *ch =
-      uORB::Manager::get_instance()->get_uorb_communicator();
-
-  if (ch != nullptr && _subscriber_count == 0) {
-    unlock();  // make sure we cannot deadlock if remove_subscription calls back
-               // into DeviceNode
-    ch->remove_subscription(_meta->o_name);
-
-  } else
-#endif /* ORB_COMMUNICATOR */
 }
-
-#ifdef ORB_COMMUNICATOR
-int16_t uORB::DeviceNode::process_add_subscription(int32_t rateInHz) {
-  // if there is already data in the node, send this out to
-  // the remote entity.
-  // send the data to the remote entity.
-  uORBCommunicator::IChannel *ch =
-      uORB::Manager::get_instance()->get_uorb_communicator();
-
-  if (_data != nullptr &&
-      ch != nullptr) {  // _data will not be null if there is a publisher.
-    ch->send_message(_meta->o_name, _meta->o_size, _data);
-  }
-
-  return ORB_OK;
-}
-
-int16_t uORB::DeviceNode::process_remove_subscription() { return ORB_OK; }
-
-int16_t uORB::DeviceNode::process_received_message(int32_t length,
-                                                   uint8_t *data) {
-  int16_t ret = -1;
-
-  if (length != (int32_t)(_meta->o_size)) {
-    ORB_ERR("Received '%s' with DataLength[%d] != ExpectedLen[%d]",
-            _meta->o_name, (int)length, (int)_meta->o_size);
-    return ORB_ERROR;
-  }
-
-  /* call the devnode write method with no file pointer */
-  ret = write(nullptr, (const char *)data, _meta->o_size);
-
-  if (ret < 0) {
-    return ORB_ERROR;
-  }
-
-  if (ret != (int)_meta->o_size) {
-    orb_errno = EIO;
-    return ORB_ERROR;
-  }
-
-  return ORB_OK;
-}
-#endif /* ORB_COMMUNICATOR */
 
 int uORB::DeviceNode::update_queue_size(unsigned int queue_size) {
   if (_queue_size == queue_size) {

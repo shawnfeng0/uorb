@@ -142,31 +142,6 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
 
   static int unadvertise(orb_advert_t handle);
 
-#ifdef ORB_COMMUNICATOR
-  static int16_t topic_advertised(const orb_metadata *meta, int priority);
-  // static int16_t topic_unadvertised(const orb_metadata *meta, int priority);
-
-  /**
-   * processes a request for add subscription from remote
-   * @param rateInHz
-   *   Specifies the desired rate for the message.
-   * @return
-   *   0 = success
-   *   otherwise failure.
-   */
-  int16_t process_add_subscription(int32_t rateInHz);
-
-  /**
-   * processes a request to remove a subscription from remote.
-   */
-  int16_t process_remove_subscription();
-
-  /**
-   * processed the received data message from remote.
-   */
-  int16_t process_received_message(int32_t length, uint8_t *data);
-#endif /* ORB_COMMUNICATOR */
-
   /**
    * Add the subscriber to the node's list of subscriber.  If there is
    * remote proxy to which this subscription needs to be sent, it will

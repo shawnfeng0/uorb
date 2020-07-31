@@ -40,10 +40,6 @@
 #include "uORBManager.hpp"
 #include "uORBUtils.hpp"
 
-#ifdef ORB_COMMUNICATOR
-#include "uORBCommunicator.hpp"
-#endif /* ORB_COMMUNICATOR */
-
 #include "base/orb_log.h"
 
 /* Duplicate S, returning an identical string assigned using "new". */
