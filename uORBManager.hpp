@@ -62,23 +62,11 @@ class uORB::Manager
   // public interfaces for this class.
 
   /**
-   * Initialize the singleton. Call this before everything else.
-   * @return true on success
-   */
-  static bool initialize();
-
-  /**
-   * Terminate the singleton. Call this after everything else.
-   * @return true on success
-   */
-  static bool terminate();
-
-  /**
    * Method to get the singleton instance for the uORB::Manager.
    * @return uORB::Manager*
    */
-  static inline uORB::Manager *get_instance() {
-    return &_Instance;
+  static inline uORB::Manager &get_instance() {
+    return Instance;
   }
 
   /**
@@ -389,7 +377,7 @@ class uORB::Manager
                 int *instance = nullptr, ORB_PRIO priority = ORB_PRIO_DEFAULT);
 
  private:  // data members
-  static Manager _Instance;
+  static Manager Instance;
 
 #ifdef ORB_COMMUNICATOR
   // the communicator channel instance.

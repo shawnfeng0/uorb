@@ -39,11 +39,7 @@
 #include "uORBDeviceNode.hpp"
 #include "uORBUtils.hpp"
 
-uORB::Manager uORB::Manager::_Instance;
-
-bool uORB::Manager::initialize() { return get_instance() != nullptr; }
-
-bool uORB::Manager::terminate() { return true; }
+uORB::Manager uORB::Manager::Instance;
 
 uORB::Manager::Manager() {
 #ifdef ORB_USE_PUBLISHER_RULES

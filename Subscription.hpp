@@ -154,7 +154,7 @@ class SubscriptionData : public Subscription
    * @param id The uORB metadata ORB_ID enum for the topic.
    * @param instance The instance for multi sub.
    */
-  SubscriptionData(ORB_ID id, uint8_t instance = 0) :
+  explicit SubscriptionData(ORB_ID id, uint8_t instance = 0) :
       Subscription(id, instance)
   {
     copy(&_data);
@@ -166,7 +166,7 @@ class SubscriptionData : public Subscription
    * @param meta The uORB metadata (usually from the ORB_ID() macro) for the topic.
    * @param instance The instance for multi sub.
    */
-  SubscriptionData(const orb_metadata *meta, uint8_t instance = 0) :
+  explicit SubscriptionData(const orb_metadata *meta, uint8_t instance = 0) :
       Subscription(meta, instance)
   {
     copy(&_data);

@@ -50,7 +50,7 @@ bool Subscription::subscribe()
 
   if (_orb_id != ORB_ID::INVALID) {
 
-    DeviceMaster *device_master = uORB::Manager::get_instance()->get_device_master();
+    DeviceMaster *device_master = uORB::Manager::get_instance().get_device_master();
 
     if (device_master != nullptr) {
 
