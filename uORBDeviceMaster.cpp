@@ -33,28 +33,27 @@
 
 #include "uORBDeviceMaster.hpp"
 
+#include <base/orb_errno.h>
+
 #include <sample/msg/uORB/topics/uORBTopics.hpp>
 
 #include "base/orb_defines.h"
+#include "base/orb_log.h"
 #include "uORBDeviceNode.hpp"
 #include "uORBManager.hpp"
 #include "uORBUtils.hpp"
 
-#include "base/orb_log.h"
-
 /* Duplicate S, returning an identical string assigned using "new". */
-static inline char *strdup_with_new(const char *__s) {
-  const char *__old = (__s);
-  size_t __len = strlen(__old) + 1;
-  char *__new = new char[__len];
+static inline char *strdup_with_new(const char *s) {
+  const char *old = (s);
+  size_t len = strlen(old) + 1;
+  char *new_str = new char[len];
   // Possibility of allocation failure in microcontroller
-  if (__new == nullptr) return __new;
-  return (char *)memcpy(__new, __old, __len);
+  return (char *)memcpy(new_str, old, len);
 }
 
 int uORB::DeviceMaster::advertise(const struct orb_metadata *meta,
-                                  bool is_advertiser, int *instance,
-                                  ORB_PRIO priority) {
+                                  int *instance, ORB_PRIO priority) {
   int ret;
   char nodepath[orb_maxpath];
 
@@ -84,92 +83,34 @@ int uORB::DeviceMaster::advertise(const struct orb_metadata *meta,
 
   uORB::base::MutexGuard lg(_lock);
 
-  do {
-    /* if path is modifyable change try index */
-    if (instance != nullptr) {
-      /* replace the number at the end of the string */
-      nodepath[strlen(nodepath) - 1] = '0' + group_tries;
-      *instance = group_tries;
-    }
-
-    /* driver wants a permanent copy of the path, so make one here */
-    char *devpath = strdup_with_new(nodepath);
-
-    if (devpath == nullptr) {
-      return -ENOMEM;
-    }
-
-    /* construct the new node, passing the ownership of path to it */
-    auto *node = new uORB::DeviceNode(meta, group_tries, devpath, priority);
-
-    /* if we didn't get a device, that's bad, free the path too */
-    if (node == nullptr) {
-      delete[] devpath;
-      return -ENOMEM;
-    }
-
-    /* initialise the node - this may fail if e.g. a node with this name already
-     * exists */
-    ret = node->init();
-
-    /* if init failed, discard the node and its name */
-    if (ret != ORB_OK) {
-      delete node;
-
-      if (ret == -EEXIST) {
-        /* if the node exists already, get the existing one and check if it's
-         * advertised. */
-        uORB::DeviceNode *existing_node =
-            getDeviceNodeLocked(meta, group_tries);
-
-        /*
-         * We can claim an existing node in these cases:
-         * - The node is not advertised (yet). It means there is already one or
-         * more subscribers or it was unadvertised.
-         * - We are a single-instance advertiser requesting the first instance.
-         *   (Usually we don't end up here, but we might in case of a race
-         * condition between 2 advertisers).
-         * - We are a subscriber requesting a certain instance.
-         *   (Also we usually don't end up in that case, but we might in case of
-         * a race condtion between an advertiser and subscriber).
-         */
-        bool is_single_instance_advertiser = is_advertiser && !instance;
-
-        if (existing_node != nullptr &&
-            (!existing_node->is_advertised() || is_single_instance_advertiser ||
-             !is_advertiser)) {
-          if (is_advertiser) {
-            existing_node->set_priority(priority);
-            /* Set as advertised to avoid race conditions (otherwise 2
-             * multi-instance advertisers could get the same instance).
-             */
-            existing_node->mark_as_advertised();
-          }
-
-          ret = ORB_OK;
-
-        } else {
-          /* otherwise: already advertised, keep looking */
-        }
-      }
-
-    } else {
-      if (is_advertiser) {
-        node->mark_as_advertised();
-      }
-
-      // add to the node map.
-      _node_list.add(node);
-      _node_exists[node->get_instance()].set((uint8_t)node->id(), true);
-    }
-
-    group_tries++;
-
-  } while (ret != ORB_OK && (group_tries < max_group_tries));
-
-  if (ret != ORB_OK && group_tries >= max_group_tries) {
-    ret = -ENOMEM;
+  /* if path is modifyable change try index */
+  if (instance != nullptr) {
+    /* replace the number at the end of the string */
+    nodepath[strlen(nodepath) - 1] = '0' + group_tries;
+    *instance = group_tries;
   }
+
+  /* driver wants a permanent copy of the path, so make one here */
+  char *devpath = strdup_with_new(nodepath);
+
+  if (devpath == nullptr) {
+    return -ENOMEM;
+  }
+
+  /* construct the new node, passing the ownership of path to it */
+  auto *node = new uORB::DeviceNode(meta, group_tries, devpath, priority);
+
+  /* if we didn't get a device, that's bad, free the path too */
+  if (node == nullptr) {
+    delete[] devpath;
+    return -ENOMEM;
+  }
+
+  node->mark_as_advertised();
+
+  // add to the node map.
+  _node_list.Add(node);
+  _node_exists[node->get_instance()].set((uint8_t)node->id(), true);
 
   return ret;
 }
@@ -201,7 +142,7 @@ uORB::DeviceNode *uORB::DeviceMaster::getDeviceNode(
 
 uORB::DeviceNode *uORB::DeviceMaster::getDeviceNodeLocked(
     const struct orb_metadata *meta, uint8_t instance) {
-  for (uORB::DeviceNode *node : _node_list) {
+  for (auto node : _node_list) {
     if ((strcmp(node->get_name(), meta->o_name) == 0) &&
         (node->get_instance() == instance)) {
       return node;

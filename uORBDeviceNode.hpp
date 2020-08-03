@@ -34,7 +34,6 @@
 #pragma once
 
 #include "base/List.hpp"
-#include "base/cdev_platform.hpp"
 #include "base/orb_atomic.hpp"
 #include "uORBCommon.hpp"
 #include "uORBDeviceMaster.hpp"
@@ -61,31 +60,11 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
   DeviceNode(DeviceNode &&) = delete;
   DeviceNode &operator=(DeviceNode &&) = delete;
 
-  int init();
-
   /**
    * Method to create a subscriber instance and return the struct
    * pointing to the subscriber as a file pointer.
    */
-  int open(cdev::file_t *filp);
-
-  /**
-   * Method to close a subscriber for this topic.
-   */
-  int close(cdev::file_t *filp);
-
-  /**
-   * reads data from a subscriber node to the buffer provided.
-   * @param filp
-   *   The subscriber from which the data needs to be read from.
-   * @param buffer
-   *   The buffer into which the data is read into.
-   * @param buflen
-   *   the length of the buffer
-   * @return
-   *   ssize_t the number of bytes read.
-   */
-  ssize_t read(cdev::file_t *filp, char *buffer, size_t buflen);
+  int open();
 
   /**
    * writes the published data to the internal buffer to be read by
@@ -98,34 +77,6 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
    *   The number of bytes that are written
    */
   ssize_t write(const char *buffer, size_t buflen);
-
-  /**
-   * IOCTL control for the subscriber.
-   * Perform an ioctl operation on the device.
-   *
-   * The default implementation handles DIOC_GETPRIV, and otherwise
-   * returns -ENOTTY. Subclasses should call the default implementation
-   * for any command they do not handle themselves.
-   *
-   * @param filep		Pointer to the NuttX file structure.
-   * @param cmd		The ioctl command value.
-   * @param arg		The ioctl argument value.
-   * @return		ORB_OK on success, or -errno otherwise.
-   */
-  int ioctl(cdev::file_t *filp, int cmd, unsigned long arg);
-
-  /**
-   * Perform a poll setup/teardown operation.
-   *
-   * This is handled internally and should not normally be overridden.
-   *
-   * @param filep		Pointer to the internal file structure.
-   * @param fds		Poll descriptor being waited on.
-   * @param setup		True if this is establishing a request, false if
-   *			it is being torn down.
-   * @return		ORB_OK on success, or -errno otherwise.
-   */
-  int poll(cdev::file_t *filep, orb_pollfd_t *fds, bool setup);
 
   /**
    * Get the device name.
@@ -175,7 +126,7 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
    * @param queue_size new size of the queue
    * @return ORB_OK if queue size successfully set
    */
-  int update_queue_size(unsigned int queue_size);
+  bool update_queue_size_locked(unsigned int queue_size);
 
   /**
    * Print statistics (nr of lost messages)
@@ -216,39 +167,12 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
    */
   bool copy(void *dst, unsigned &generation);
 
- protected:
-  /**
-   * Check the current state of the device for poll events from the
-   * perspective of the file.
-   *
-   * This function is called by the default poll() implementation when
-   * a poll is set up to determine whether the poll should return
-   * immediately.
-   *
-   * The default implementation returns no events.
-   *
-   * @param filep		The file that's interested.
-   * @return		The current set of poll events.
-   */
-  pollevent_t poll_state(cdev::file_t *filp);
-
-  /**
-   * Report new poll events.
-   *
-   * This function should be called anytime the state of the device changes
-   * in a fashion that might be interesting to a poll waiter.
-   *
-   * @param events	The new event(s) being announced.
-   */
-  void poll_notify(pollevent_t events);
-
-  /**
-   * Internal implementation of poll_notify.
-   *
-   * @param fds		A poll waiter to notify.
-   * @param events	The event(s) to send to the waiter.
-   */
-  void poll_notify_one(orb_pollfd_t *fds, pollevent_t events);
+  /** Get the minimum interval at which the topic can be seen to be updated for
+   * this subscription */
+  bool SetQueueSize(unsigned int queue_size) {
+    uORB::base::MutexGuard lg(_lock);
+    return update_queue_size_locked(queue_size);
+  }
 
  private:
   /**
@@ -277,13 +201,33 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
       }
     }
 
+    bool SetUpdateInterval(unsigned interval) {
+      if (interval == 0) {
+        if (update_interval) {
+          delete (update_interval);
+          update_interval = nullptr;
+        }
+      } else {
+        if (!update_interval) {
+          update_interval = new UpdateIntervalData();
+          if (!update_interval) return false;
+        }
+        update_interval->interval = interval;
+      }
+      return true;
+    }
+
+    unsigned GetUpdateInterval() const {
+      return update_interval ? update_interval->interval : 0;
+    }
+
     unsigned generation{0}; /**< last generation the subscriber has seen */
     UpdateIntervalData *update_interval{
         nullptr}; /**< if null, no update interval */
   };
 
-  const orb_metadata *_meta;   /**< object metadata information */
-  uint8_t *_data{nullptr};     /**< allocated object buffer */
+  const orb_metadata *_meta; /**< object metadata information */
+  uint8_t *_data{nullptr};   /**< allocated object buffer */
   uORB::base::atomic<unsigned> _generation{0}; /**< object generation count */
 
   // statistics
@@ -296,11 +240,7 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
 
   const char *_devname{nullptr}; /**< device node name */
 
-  orb_pollfd_t **_pollset{nullptr};
-
   bool _registered{false}; /**< true if device name was registered */
-
-  uint8_t _max_pollwaiters{0}; /**< size of the _pollset array */
 
   ORB_PRIO _priority;      /**< priority of the topic */
   const uint8_t _instance; /**< orb multi instance identifier */
@@ -310,37 +250,11 @@ class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
   int8_t _subscriber_count{0};
 
   /**
-   * Check whether a topic appears updated to a subscriber.
-   *
-   * Lock must already be held when calling this.
-   *
-   * @param sd    The subscriber for whom to check.
-   * @return    True if the topic should appear updated to the subscriber
-   */
-  bool      appears_updated(cdev::file_t *filp);
-
-  /**
-   * Store a pollwaiter in a slot where we can find it later.
-   *
-   * Expands the pollset as required.  Must be called with the driver locked.
-   *
-   * @return		ORB_OK, or -errno on error.
-   */
-  inline int store_poll_waiter(orb_pollfd_t *fds);
-
-  /**
-   * Remove a poll waiter.
-   *
-   * @return		ORB_OK, or -errno on error.
-   */
-  inline int remove_poll_waiter(orb_pollfd_t *fds);
-
-  /**
    * First, unregisters the driver. Next, free the memory for the devname,
    * in case it was expected to have ownership. Sets devname to nullptr.
    *
-   * This is only needed if the ownership of the devname was passed to the CDev,
-   * otherwise ~CDev handles it.
+   * This is only needed if the ownership of the devname was passed to the
+   * CDev, otherwise ~CDev handles it.
    *
    * @return  ORB_OK on success, -ENODEV if the devname is already nullptr
    */

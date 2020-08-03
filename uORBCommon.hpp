@@ -31,11 +31,9 @@
  *
  ****************************************************************************/
 
-#ifndef _uORBCommon_hpp_
-#define _uORBCommon_hpp_
+#pragma once
 
 #include "base/drv_hrt.h"
-#include "base/orb_dev.h"
 #include "uORB.h"
 
 namespace uORB {
@@ -48,4 +46,3 @@ struct orb_advertdata {
 };
 
 }  // namespace uORB
-#endif  // _uORBCommon_hpp_

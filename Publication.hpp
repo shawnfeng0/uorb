@@ -59,7 +59,7 @@ class PublicationBase
 
  protected:
 
-  PublicationBase(ORB_ID id) : _orb_id(id) {}
+  explicit PublicationBase(ORB_ID id) : _orb_id(id) {}
 
   ~PublicationBase()
   {
@@ -88,8 +88,8 @@ class Publication : public PublicationBase
    *
    * @param meta The uORB metadata (usually from the ORB_ID() macro) for the topic.
    */
-  Publication(ORB_ID id) : PublicationBase(id) {}
-  Publication(const orb_metadata *meta) : PublicationBase(static_cast<ORB_ID>(meta->o_id)) {}
+  explicit Publication(ORB_ID id) : PublicationBase(id) {}
+  explicit Publication(const orb_metadata *meta) : PublicationBase(static_cast<ORB_ID>(meta->o_id)) {}
 
   bool advertise()
   {
@@ -126,8 +126,8 @@ class PublicationData : public Publication<T>
    *
    * @param meta The uORB metadata (usually from the ORB_ID() macro) for the topic.
    */
-  PublicationData(ORB_ID id) : Publication<T>(id) {}
-  PublicationData(const orb_metadata *meta) : Publication<T>(meta) {}
+  explicit PublicationData(ORB_ID id) : Publication<T>(id) {}
+  explicit PublicationData(const orb_metadata *meta) : Publication<T>(meta) {}
 
   T	&get() { return _data; }
   void	set(const T &data) { _data = data; }

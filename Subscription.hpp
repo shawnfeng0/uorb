@@ -49,8 +49,6 @@
 namespace uORB
 {
 
-class SubscriptionCallback;
-
 // Base subscription wrapper class
 class Subscription
 {
@@ -62,7 +60,7 @@ class Subscription
    * @param id The uORB ORB_ID enum for the topic.
    * @param instance The instance for multi sub.
    */
-  Subscription(ORB_ID id, uint8_t instance = 0) :
+  explicit Subscription(ORB_ID id, uint8_t instance = 0) :
       _orb_id(id),
       _instance(instance)
   {
@@ -74,7 +72,7 @@ class Subscription
    * @param meta The uORB metadata (usually from the ORB_ID() macro) for the topic.
    * @param instance The instance for multi sub.
    */
-  Subscription(const orb_metadata *meta, uint8_t instance = 0) :
+  explicit Subscription(const orb_metadata *meta, uint8_t instance = 0) :
       _orb_id((meta == nullptr) ? ORB_ID::INVALID : static_cast<ORB_ID>(meta->o_id)),
       _instance(instance)
   {
@@ -129,10 +127,6 @@ class Subscription
   orb_id_t get_topic() const { return get_orb_meta(_orb_id); }
 
  protected:
-
-  friend class SubscriptionCallback;
-  friend class SubscriptionCallbackWorkItem;
-
   DeviceNode *get_node() { return _node; }
 
   DeviceNode *_node{nullptr};

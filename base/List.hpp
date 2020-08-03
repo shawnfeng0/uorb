@@ -39,13 +39,15 @@
 
 #pragma once
 
-#include <stdlib.h>
+#include <cstdlib>
+
+namespace uORB {
 
 template <class T>
 class ListNode {
  public:
-  void setSibling(T sibling) { _list_node_sibling = sibling; }
-  const T getSibling() const { return _list_node_sibling; }
+  void set_next(T sibling) { _list_node_sibling = sibling; }
+  T get_next() const { return _list_node_sibling; }
 
  protected:
   T _list_node_sibling{nullptr};
@@ -54,36 +56,29 @@ class ListNode {
 template <class T>
 class List {
  public:
-  void add(T newNode) {
-    newNode->setSibling(getHead());
-    _head = newNode;
+  bool Add(T newNode) {
+    if (newNode) {
+      newNode->set_next(head_);
+      head_ = newNode;
+      return true;
+    }
+    return false;
   }
 
-  bool remove(T removeNode) {
-    if (removeNode == nullptr) {
+  bool Remove(T removeNode) {
+    if (removeNode == nullptr || head_ == nullptr) {
       return false;
     }
 
     // base case
-    if (removeNode == _head) {
-      if (_head != nullptr) {
-        _head = _head->getSibling();
-      }
-
+    if (removeNode == head_) {
+      head_ = head_->get_next();
       return true;
     }
 
-    for (T node = getHead(); node != nullptr; node = node->getSibling()) {
-      // is sibling the node to remove?
-      if (node->getSibling() == removeNode) {
-        // replace sibling
-        if (node->getSibling() != nullptr) {
-          node->setSibling(node->getSibling()->getSibling());
-
-        } else {
-          node->setSibling(nullptr);
-        }
-
+    for (T node : *this) {
+      if (node->get_next() == removeNode) {
+        node->set_next(node->get_next()->get_next());
         return true;
       }
     }
@@ -94,55 +89,56 @@ class List {
   struct Iterator {
     T node;
     explicit Iterator(T v) : node(v) {}
-
-    operator T() const { return node; }
-    operator T &() { return node; }
+    explicit operator T() const { return node; }
+    explicit operator T &() const { return node; }
+    inline bool operator!=(const Iterator &y) { return !(node == y.node); }
     T operator*() const { return node; }
     Iterator &operator++() {
       if (node) {
-        node = node->getSibling();
+        node = node->get_next();
       }
 
       return *this;
     }
   };
+  Iterator begin() { return Iterator(head()); }
+  Iterator end() { return Iterator((T) nullptr); }
 
-  Iterator begin() { return Iterator(getHead()); }
-  Iterator end() { return Iterator(nullptr); }
+  T head() const { return head_; }
 
-  const T getHead() const { return _head; }
+  bool Empty() const { return head() == nullptr; }
 
-  bool empty() const { return getHead() == nullptr; }
-
-  size_t size() const {
+  size_t Size() const {
     size_t sz = 0;
 
-    for (auto node = getHead(); node != nullptr; node = node->getSibling()) {
+    for (auto node = head(); node != nullptr; node = node->get_next()) {
       sz++;
     }
 
     return sz;
   }
 
-  void deleteNode(T node) {
-    if (remove(node)) {
+  void DeleteNode(T node) {
+    if (Remove(node)) {
       // only delete if node was successfully removed
       delete node;
     }
   }
 
-  void clear() {
-    auto node = getHead();
+  void Clear() {
+    auto node = head();
 
     while (node != nullptr) {
-      auto next = node->getSibling();
+      auto next = node->get_next();
       delete node;
       node = next;
     }
 
-    _head = nullptr;
+    head_ = nullptr;
   }
 
  protected:
-  T _head{nullptr};
+  T head_{nullptr};
 };
+
+}  // namespace uORB

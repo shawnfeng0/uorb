@@ -11,7 +11,7 @@ static void free_errno(void *p_errno) { delete ((int *)p_errno); }
 
 static void thread_init() { pthread_key_create(&key, free_errno); }
 
-int *__orb_errno_location() {
+int *orb_errno_location() {
   pthread_once(&init_done, thread_init);
 
   int *p_errno = (int *)pthread_getspecific(key);

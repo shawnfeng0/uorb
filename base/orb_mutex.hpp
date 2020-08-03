@@ -6,11 +6,11 @@ namespace uORB {
 namespace base {
 
 // Common base class for Mutex
-class __mutex_base {
+class _mutex_base {
  protected:
 #ifdef PTHREAD_MUTEX_INITIALIZER
   pthread_mutex_t mutex_ = PTHREAD_MUTEX_INITIALIZER;
-  constexpr __mutex_base() noexcept = default;
+  constexpr _mutex_base() noexcept = default;
 #else
   pthread_mutex_t mutex_;
 
@@ -23,12 +23,12 @@ class __mutex_base {
 #endif
 
  public:
-  __mutex_base(const __mutex_base &) = delete;
-  __mutex_base &operator=(const __mutex_base &) = delete;
+  _mutex_base(const _mutex_base &) = delete;
+  _mutex_base &operator=(const _mutex_base &) = delete;
 };
 
 /// The standard Mutex type.
-class Mutex : private __mutex_base {
+class Mutex : private _mutex_base {
  public:
 #ifdef PTHREAD_MUTEX_INITIALIZER
   constexpr
@@ -62,10 +62,10 @@ class Mutex : private __mutex_base {
  * A LockGuard controls Mutex ownership within a scope, releasing
  * ownership in the destructor.
  */
-template <typename _Mutex>
+template <typename Mutex>
 class LockGuard {
  public:
-  typedef _Mutex MutexType;
+  typedef Mutex MutexType;
 
   explicit LockGuard(MutexType &m) : mutex_(m) { mutex_.lock(); }
 

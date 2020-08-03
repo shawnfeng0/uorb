@@ -58,8 +58,8 @@ target_link_libraries(uorb_sample uorb)
 target_link_libraries(uorb_sample Threads::Threads)
 
 # uorb test source
-aux_source_directory(${CMAKE_SOURCE_DIR}/test TEST_SOURCE)
-
-add_executable(uorb_test ${TEST_SOURCE} test/posix_task.cpp test/posix_task.h)
-target_link_libraries(uorb_test uorb)
-target_link_libraries(uorb_test Threads::Threads)
+#aux_source_directory(${CMAKE_SOURCE_DIR}/test TEST_SOURCE)
+#
+#add_executable(uorb_test ${TEST_SOURCE} test/posix_task.cpp test/posix_task.h)
+#target_link_libraries(uorb_test uorb)
+#target_link_libraries(uorb_test Threads::Threads)

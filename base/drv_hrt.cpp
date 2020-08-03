@@ -39,10 +39,10 @@
 
 #include "drv_hrt.h"
 
-#include <time.h>
+#include <ctime>
 
 /*
- * Get absolute time.
+ * Get absolute time. unit: us
  */
 hrt_abstime hrt_absolute_time() {
   struct timespec ts {};

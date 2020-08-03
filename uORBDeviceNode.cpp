@@ -48,74 +48,20 @@ uORB::DeviceNode::DeviceNode(const struct orb_metadata *meta, uint8_t instance,
       _instance(instance),
       _priority(priority),
       _queue_size(queue_size) {
-  ORB_DEBUG("CDev::CDev");
 }
 
 uORB::DeviceNode::~DeviceNode() {
   delete[] _data;
 
   unregister_driver_and_memory();
-
-  ORB_DEBUG("CDev::~CDev");
-
-  if (_registered) {
-    unregister_driver(_devname);
-  }
-
-  if (_pollset) {
-    delete[](_pollset);
-  }
 }
 
-int uORB::DeviceNode::open(cdev::file_t *filp) {
-  /* is this a publisher? */
-  if (filp->f_oflags == PX4_F_WRONLY) {
-    // Automatic mutex guarding
-    uORB::base::MutexGuard lg(_lock);
-    mark_as_advertised();
+int uORB::DeviceNode::open() {
+  // Automatic mutex guarding
+  uORB::base::MutexGuard lg(_lock);
+  mark_as_advertised();
 
-    /* now complete the open */
-    return ORB_OK;
-  }
-
-  /* is this a new subscriber? */
-  if (filp->f_oflags == PX4_F_RDONLY) {
-    /* allocate subscriber data */
-    auto *sd = new SubscriberData{};
-
-    if (nullptr == sd) {
-      return -ENOMEM;
-    }
-
-    /* If there were any previous publications, allow the subscriber to read
-     * them */
-    const unsigned gen = published_message_count();
-    sd->generation =
-        gen - (_queue_size < gen
-                   ? _queue_size
-                   : gen);  // = (_queue_size < gen ? gen - _queue_size : 0);
-
-    filp->f_priv = (void *)sd;
-
-    add_internal_subscriber();
-
-    return ORB_OK;
-  }
-
-  /* can only be pub or sub, not both */
-  return -EINVAL;
-}
-
-int uORB::DeviceNode::close(cdev::file_t *filp) {
-  if (filp->f_oflags == PX4_F_RDONLY) { /* subscriber */
-    auto *sd = static_cast<SubscriberData *>(filp->f_priv);
-
-    if (sd != nullptr) {
-      remove_internal_subscriber();
-      delete sd;
-    }
-  }
-
+  /* now complete the open */
   return ORB_OK;
 }
 
@@ -160,37 +106,6 @@ bool uORB::DeviceNode::copy(void *dst, unsigned &generation) {
   return updated;
 }
 
-ssize_t uORB::DeviceNode::read(cdev::file_t *filp, char *buffer,
-                               size_t buflen) {
-  /* if the object has not been written yet, return zero */
-  if (_data == nullptr) {
-    return 0;
-  }
-
-  /* if the caller's buffer is the wrong size, that's an error */
-  if (buflen != _meta->o_size) {
-    return -EIO;
-  }
-
-  auto *sd = static_cast<SubscriberData *>(filp->f_priv);
-
-  /*
-   * Perform an atomic copy & state update
-   */
-  {
-    // Automatic mutex guarding
-    uORB::base::MutexGuard lg(_lock);
-
-    // if subscriber has an interval track the last update time
-    if (sd->update_interval) {
-      sd->update_interval->last_update = hrt_absolute_time();
-    }
-    copy_locked(buffer, sd->generation);
-  }
-
-  return _meta->o_size;
-}
-
 ssize_t uORB::DeviceNode::write(const char *buffer, size_t buflen) {
   /*
    * Writes are legal from interrupt context as long as the
@@ -202,25 +117,15 @@ ssize_t uORB::DeviceNode::write(const char *buffer, size_t buflen) {
    * Note that filp will usually be NULL.
    */
   if (nullptr == _data) {
-#ifdef __PX4_NUTTX
+    {
+      // Automatic mutex guarding
+      uORB::base::MutexGuard lg(_lock);
 
-    if (!up_interrupt_context()) {
-#endif /* __PX4_NUTTX */
-
-      {
-        // Automatic mutex guarding
-        uORB::base::MutexGuard lg(_lock);
-
-        /* re-check size */
-        if (nullptr == _data) {
-          _data = new uint8_t[_meta->o_size * _queue_size];
-        }
+      /* re-check size */
+      if (nullptr == _data) {
+        _data = new uint8_t[_meta->o_size * _queue_size];
       }
-
-#ifdef __PX4_NUTTX
     }
-
-#endif /* __PX4_NUTTX */
 
     /* failed or could not allocate */
     if (nullptr == _data) {
@@ -244,89 +149,7 @@ ssize_t uORB::DeviceNode::write(const char *buffer, size_t buflen) {
     memcpy(_data + (_meta->o_size * (generation % _queue_size)), buffer,
            _meta->o_size);
   }
-
-  /* notify any poll waiters */
-  poll_notify(POLLIN);
-
   return _meta->o_size;
-}
-
-int uORB::DeviceNode::ioctl(cdev::file_t *filp, int cmd, unsigned long arg) {
-  switch (cmd) {
-    case ORBIOCUPDATED: {
-      // Automatic mutex guarding
-      uORB::base::MutexGuard lg(_lock);
-      *(bool *)arg = appears_updated(filp);
-      return ORB_OK;
-    }
-
-    case ORBIOCSETINTERVAL: {
-      int ret = ORB_OK;
-      // Automatic mutex guarding
-      uORB::base::MutexGuard lg(_lock);
-
-      auto *sd = static_cast<SubscriberData *>(filp->f_priv);
-
-      if (arg == 0) {
-        if (sd->update_interval) {
-          delete (sd->update_interval);
-          sd->update_interval = nullptr;
-        }
-
-      } else {
-        if (sd->update_interval) {
-          sd->update_interval->interval = arg;
-
-        } else {
-          sd->update_interval = new UpdateIntervalData();
-
-          if (sd->update_interval) {
-            sd->update_interval->interval = arg;
-
-          } else {
-            ret = -ENOMEM;
-          }
-        }
-      }
-      return ret;
-    }
-
-    case ORBIOCGADVERTISER:
-      *(uintptr_t *)arg = (uintptr_t)this;
-      return ORB_OK;
-
-    case ORBIOCGPRIORITY:
-      *(int *)arg = get_priority();
-      return ORB_OK;
-
-    case ORBIOCSETQUEUESIZE: {
-      // Automatic mutex guarding
-      uORB::base::MutexGuard lg(_lock);
-      int ret = update_queue_size(arg);
-      return ret;
-    }
-
-    case ORBIOCGETINTERVAL: {
-      auto *sd = static_cast<SubscriberData *>(filp->f_priv);
-
-      if (sd->update_interval) {
-        *(unsigned *)arg = sd->update_interval->interval;
-
-      } else {
-        *(unsigned *)arg = 0;
-      }
-    }
-      return ORB_OK;
-
-    case ORBIOCISADVERTISED:
-      *(unsigned long *)arg = _advertised;
-
-      return ORB_OK;
-
-    default:
-      /* Unknown operation*/
-      return ORB_ERROR;
-  }
 }
 
 ssize_t uORB::DeviceNode::publish(const orb_metadata *meta, orb_advert_t handle,
@@ -384,52 +207,6 @@ int uORB::DeviceNode::unadvertise(orb_advert_t handle) {
   return ORB_OK;
 }
 
-pollevent_t uORB::DeviceNode::poll_state(cdev::file_t *filp) {
-  /* If the topic appears updated to the subscriber, say so. */
-  if (appears_updated(filp)) {
-    return POLLIN;
-  }
-
-  return 0;
-}
-
-void uORB::DeviceNode::poll_notify_one(orb_pollfd_t *fds, pollevent_t events) {
-  /* If the topic looks updated to the subscriber, go ahead and notify them. */
-  if (appears_updated((cdev::file_t *)fds->priv)) {
-    ORB_DEBUG("CDev::poll_notify_one");
-
-    /* update the reported event set */
-    fds->revents |= fds->events & events;
-
-    ORB_DEBUG(" Events fds=%p %0x %0x %0x", fds, fds->revents, fds->events,
-              events);
-
-    if (fds->revents != 0) {
-      fds->sem->release();
-    }
-  }
-}
-
-bool uORB::DeviceNode::appears_updated(cdev::file_t *filp) {
-  // check if this topic has been published yet, if not bail out
-  if (_data == nullptr) {
-    return false;
-  }
-
-  auto *sd = static_cast<SubscriberData *>(filp->f_priv);
-
-  // if subscriber has interval check time since last update
-  if (sd->update_interval != nullptr) {
-    if (hrt_elapsed_time(&sd->update_interval->last_update) <
-        sd->update_interval->interval) {
-      return false;
-    }
-  }
-
-  // finally, compare the generation
-  return (sd->generation != published_message_count());
-}
-
 bool uORB::DeviceNode::print_statistics(bool reset) {
   if (!_lost_messages) {
     return false;
@@ -464,75 +241,23 @@ void uORB::DeviceNode::remove_internal_subscriber() {
   _subscriber_count--;
 }
 
-int uORB::DeviceNode::update_queue_size(unsigned int queue_size) {
+bool uORB::DeviceNode::update_queue_size_locked(unsigned int queue_size) {
   if (_queue_size == queue_size) {
-    return ORB_OK;
+    return true;
   }
 
   // queue size is limited to 255 for the single reason that we use uint8 to
   // store it
   if (_data || _queue_size > queue_size || queue_size > 255) {
-    return ORB_ERROR;
+    return false;
   }
 
   _queue_size = queue_size;
-  return ORB_OK;
-}
-
-void uORB::DeviceNode::poll_notify(pollevent_t events) {
-  ORB_DEBUG("CDev::poll_notify events = %0x", events);
-
-  /* lock against poll() as well as other wakeups */
-  // Automatic mutex guarding
-  uORB::base::MutexGuard lg(_lock);
-
-  for (unsigned i = 0; i < _max_pollwaiters; i++) {
-    if (nullptr != _pollset[i]) {
-      poll_notify_one(_pollset[i], events);
-    }
-  }
-}
-
-int uORB::DeviceNode::store_poll_waiter(orb_pollfd_t *fds) {
-  // Look for a free slot.
-  ORB_DEBUG("CDev::store_poll_waiter");
-
-  for (unsigned i = 0; i < _max_pollwaiters; i++) {
-    if (nullptr == _pollset[i]) {
-      /* save the pollfd */
-      _pollset[i] = fds;
-
-      return ORB_OK;
-    }
-  }
-
-  return -ENFILE;
-}
-
-int uORB::DeviceNode::remove_poll_waiter(orb_pollfd_t *fds) {
-  ORB_DEBUG("CDev::remove_poll_waiter");
-
-  for (unsigned i = 0; i < _max_pollwaiters; i++) {
-    if (fds == _pollset[i]) {
-      _pollset[i] = nullptr;
-      return ORB_OK;
-    }
-  }
-
-  ORB_DEBUG("poll: bad fd state");
-  return -EINVAL;
+  return true;
 }
 
 int uORB::DeviceNode::unregister_driver_and_memory() {
   int retval = ORB_OK;
-
-  if (_registered) {
-    unregister_driver(_devname);
-    _registered = false;
-
-  } else {
-    retval = -ENODEV;
-  }
 
   if (_devname != nullptr) {
     delete[] _devname;
@@ -543,140 +268,4 @@ int uORB::DeviceNode::unregister_driver_and_memory() {
   }
 
   return retval;
-}
-
-/*
- * Default implementations of the character device interface
- */
-int uORB::DeviceNode::poll(cdev::file_t *filep, orb_pollfd_t *fds, bool setup) {
-  ORB_DEBUG("CDev::Poll %s", setup ? "setup" : "teardown");
-  int ret;
-
-  if (setup) {
-    /*
-     * Save the file pointer in the pollfd for the subclass'
-     * benefit.
-     */
-    fds->priv = (void *)filep;
-    ORB_DEBUG("CDev::poll: fds->priv = %p", filep);
-
-    /*
-     * Lock against poll_notify() and possibly other callers (protect _pollset).
-     */
-    // Automatic mutex guarding
-    uORB::base::MutexGuard lg(_lock);
-
-    /*
-     * Try to store the fds for later use and handle array resizing.
-     */
-    while ((ret = store_poll_waiter(fds)) == -ENFILE) {
-      // No free slot found. Resize the pollset. This is expensive, but it's
-      // only needed initially.
-
-      if (_max_pollwaiters >= 256 / 2) {  //_max_pollwaiters is uint8_t
-        ret = -ENOMEM;
-        break;
-      }
-
-      const uint8_t new_count = _max_pollwaiters > 0 ? _max_pollwaiters * 2 : 1;
-      orb_pollfd_t **prev_pollset = _pollset;
-
-#ifdef __PX4_NUTTX
-      // malloc uses a semaphore, we need to call it enabled IRQ's
-      orb_leave_critical_section(flags);
-#endif
-      auto **new_pollset = new orb_pollfd_t *[new_count];
-
-#ifdef __PX4_NUTTX
-      flags = orb_enter_critical_section();
-#endif
-
-      if (prev_pollset == _pollset) {  // Feng: Delete this line,
-        // no one else updated the _pollset meanwhile, so we're good to go
-        if (!new_pollset) {
-          ret = -ENOMEM;
-          break;
-        }
-
-        if (_max_pollwaiters > 0) {
-          memset(new_pollset + _max_pollwaiters, 0,
-                 sizeof(orb_pollfd_t *) * (new_count - _max_pollwaiters));
-          memcpy(new_pollset, _pollset,
-                 sizeof(orb_pollfd_t *) * _max_pollwaiters);
-        }
-
-        _pollset = new_pollset;
-        _pollset[_max_pollwaiters] = fds;
-        _max_pollwaiters = new_count;
-
-        // free the previous _pollset (we need to unlock here which is fine
-        // because we don't access _pollset anymore)
-#ifdef __PX4_NUTTX
-        orb_leave_critical_section(flags);
-#endif
-
-        if (prev_pollset) {
-          delete[](prev_pollset);
-        }
-
-#ifdef __PX4_NUTTX
-        flags = orb_enter_critical_section();
-#endif
-
-        // Success
-        ret = ORB_OK;
-        break;
-      }
-
-#ifdef __PX4_NUTTX
-      orb_leave_critical_section(flags);
-#endif
-      // We have to retry
-      delete[] new_pollset;
-#ifdef __PX4_NUTTX
-      flags = orb_enter_critical_section();
-#endif
-    }
-
-    if (ret == ORB_OK) {
-      /*
-       * Check to see whether we should send a poll notification
-       * immediately.
-       */
-      fds->revents |= fds->events & poll_state(filep);
-
-      /* yes? post the notification */
-      if (fds->revents != 0) {
-        fds->sem->release();
-      }
-    }
-
-  } else {
-    // Automatic mutex guarding
-    uORB::base::MutexGuard lg(_lock);
-
-    /*
-     * Handle a teardown request.
-     */
-    ret = remove_poll_waiter(fds);
-  }
-
-  return ret;
-}
-
-int uORB::DeviceNode::init() {
-  ORB_DEBUG("CDev::init");
-
-  int ret = ORB_OK;
-
-  // now register the driver
-  if (_devname != nullptr) {
-    ret = register_driver(_devname, (void *)this);
-
-    if (ret == ORB_OK) {
-      _registered = true;
-    }
-  }
-
-  return ret;
 }
