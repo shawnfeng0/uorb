@@ -9,14 +9,14 @@
 #include <Publication.hpp>
 #include <Subscription.hpp>
 
-#include "base/drv_hrt.h"
+#include "base/orb_time.h"
 #include "sample/ulog/src/ulog.h"
 
 void *adviser_cpuload(void *) {
   uORB::PublicationData<cpuload_s> cpuload_pub(ORB_ID(cpuload));
 
   for (int i = 0; i < 10; i++) {
-    cpuload_pub.get().timestamp = hrt_absolute_time();
+    cpuload_pub.get().timestamp = orb_absolute_time();
     cpuload_pub.get().load++;
     cpuload_pub.get().ram_usage++;
     if (!cpuload_pub.update()) {

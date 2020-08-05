@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2016 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012 - 2018 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,64 +32,26 @@
  ****************************************************************************/
 
 /**
- * @file drv_hrt.h
+ * @file drv_hrt.cpp
  *
  * High-resolution timer with callouts and timekeeping.
  */
 
-#pragma once
+#include "orb_time.h"
 
-#include <inttypes.h>
-#include <stdbool.h>
+#include <ctime>
 
-#include "visibility.h"
-
-__BEGIN_DECLS
-
-/**
- * Absolute time, in microsecond units.
- *
- * Absolute time is measured from some arbitrary epoch shortly after
- * system startup.  It should never wrap or go backwards.
+/*
+ * Get absolute time. unit: us
  */
-typedef uint64_t hrt_abstime;
+orb_abstime orb_absolute_time() {
+  struct timespec ts {};
+  orb_abstime result;
 
-/**
- * Get absolute time in [us] (does not wrap).
- */
-__EXPORT extern hrt_abstime hrt_absolute_time(void);
+  clock_gettime(CLOCK_MONOTONIC, &ts);
 
-/**
- * Compute the delta between a timestamp taken in the past
- * and now.
- *
- * This function is not interrupt save.
- */
-static inline hrt_abstime hrt_elapsed_time(const hrt_abstime *then) {
-  return hrt_absolute_time() - *then;
+  result = (orb_abstime)(ts.tv_sec) * 1000000;
+  result += ts.tv_nsec / 1000;
+
+  return result;
 }
-
-__END_DECLS
-
-#ifdef __cplusplus
-
-namespace time_literals {
-
-// User-defined integer literals for different time units.
-// The base unit is hrt_abstime in microseconds
-
-constexpr hrt_abstime operator"" _s(unsigned long long seconds) {
-  return hrt_abstime(seconds * 1000000ULL);
-}
-
-constexpr hrt_abstime operator"" _ms(unsigned long long seconds) {
-  return hrt_abstime(seconds * 1000ULL);
-}
-
-constexpr hrt_abstime operator"" _us(unsigned long long seconds) {
-  return hrt_abstime(seconds);
-}
-
-} /* namespace time_literals */
-
-#endif /* __cplusplus */

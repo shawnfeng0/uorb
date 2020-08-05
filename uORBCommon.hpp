@@ -33,7 +33,7 @@
 
 #pragma once
 
-#include "base/drv_hrt.h"
+#include "base/orb_time.h"
 #include "uORB.h"
 
 namespace uORB {

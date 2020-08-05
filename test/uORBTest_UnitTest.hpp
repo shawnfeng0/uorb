@@ -44,14 +44,14 @@
 
 struct orb_test {
 	int val;
-	hrt_abstime time;
+	orb_abstime time;
 };
 ORB_DECLARE(orb_test);
 ORB_DECLARE(orb_multitest);
 
 struct orb_test_medium {
 	int val;
-	hrt_abstime time;
+	orb_abstime time;
 	char junk[64];
 };
 ORB_DECLARE(orb_test_medium);
@@ -61,7 +61,7 @@ ORB_DECLARE(orb_test_medium_queue_poll);
 
 struct orb_test_large {
 	int val;
-	hrt_abstime time;
+	orb_abstime time;
 	char junk[512];
 };
 ORB_DECLARE(orb_test_large);
@@ -125,7 +125,7 @@ int uORBTest::UnitTest::latency_test(orb_id_t T, bool print)
 	ORB_INFO("---------------- LATENCY TEST ------------------");
 	S t;
 	t.val = 308;
-	t.time = hrt_absolute_time();
+	t.time = orb_absolute_time();
 
 	orb_advert_t pfd0 = orb_advertise(T, &t);
 
@@ -154,7 +154,7 @@ int uORBTest::UnitTest::latency_test(orb_id_t T, bool print)
 	/* give the sample task some data */
 	while (!pubsubtest_passed) {
 		++t.val;
-		t.time = hrt_absolute_time();
+		t.time = orb_absolute_time();
 
 		if (ORB_OK != orb_publish(T, pfd0, &t)) {
 			ORB_ERR("mult. pub0 timing fail");

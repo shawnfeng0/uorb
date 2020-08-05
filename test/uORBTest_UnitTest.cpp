@@ -39,20 +39,20 @@
 #include <poll.h>
 #include <stdio.h>
 
-ORB_DEFINE(orb_test, struct orb_test, sizeof(orb_test), "ORB_TEST:int val;hrt_abstime time;");
-ORB_DEFINE(orb_multitest, struct orb_test, sizeof(orb_test), "ORB_MULTITEST:int val;hrt_abstime time;");
+ORB_DEFINE(orb_test, struct orb_test, sizeof(orb_test), "ORB_TEST:int val;orb_abstime time;");
+ORB_DEFINE(orb_multitest, struct orb_test, sizeof(orb_test), "ORB_MULTITEST:int val;orb_abstime time;");
 
 ORB_DEFINE(orb_test_medium, struct orb_test_medium, sizeof(orb_test_medium),
-	   "ORB_TEST_MEDIUM:int val;hrt_abstime time;char[64] junk;");
+	   "ORB_TEST_MEDIUM:int val;orb_abstime time;char[64] junk;");
 ORB_DEFINE(orb_test_medium_multi, struct orb_test_medium, sizeof(orb_test_medium),
-	   "ORB_TEST_MEDIUM_MULTI:int val;hrt_abstime time;char[64] junk;");
+	   "ORB_TEST_MEDIUM_MULTI:int val;orb_abstime time;char[64] junk;");
 ORB_DEFINE(orb_test_medium_queue, struct orb_test_medium, sizeof(orb_test_medium),
-	   "ORB_TEST_MEDIUM_MULTI:int val;hrt_abstime time;char[64] junk;");
+	   "ORB_TEST_MEDIUM_MULTI:int val;orb_abstime time;char[64] junk;");
 ORB_DEFINE(orb_test_medium_queue_poll, struct orb_test_medium, sizeof(orb_test_medium),
-	   "ORB_TEST_MEDIUM_MULTI:int val;hrt_abstime time;char[64] junk;");
+	   "ORB_TEST_MEDIUM_MULTI:int val;orb_abstime time;char[64] junk;");
 
 ORB_DEFINE(orb_test_large, struct orb_test_large, sizeof(orb_test_large),
-	   "ORB_TEST_LARGE:int val;hrt_abstime time;char[512] junk;");
+	   "ORB_TEST_LARGE:int val;orb_abstime time;char[512] junk;");
 
 uORBTest::UnitTest &uORBTest::UnitTest::instance()
 {
@@ -120,7 +120,7 @@ int uORBTest::UnitTest::pubsublatency_main()
 		num_missed += t.val - current_value - 1;
 		current_value = t.val;
 
-		auto elt = hrt_elapsed_time(&t.time);
+		auto elt = orb_elapsed_time(&t.time);
 		latency_integral += elt;
 		timings[i] = elt;
 
@@ -472,7 +472,7 @@ int uORBTest::UnitTest::pub_test_multi2_main()
 	for (int i = 0; i < num_instances; ++i) {
 		orb_advert_t &pub = orb_pub[i];
 		int idx = i;
-//		PX4_WARN("advertise %i, t=%" PRIu64, i, hrt_absolute_time());
+//		PX4_WARN("advertise %i, t=%" PRIu64, i, orb_absolute_time());
 		pub = orb_advertise_multi(ORB_ID(orb_test_medium_multi), &data_topic, &idx, ORB_PRIO_DEFAULT);
 
 		if (idx != i) {
@@ -490,7 +490,7 @@ int uORBTest::UnitTest::pub_test_multi2_main()
 		usleep(2); //make sure the timestamps are different
 		orb_advert_t &pub = orb_pub[data_next_idx];
 
-		data_topic.time = hrt_absolute_time();
+		data_topic.time = orb_absolute_time();
 		data_topic.val = data_next_idx;
 
 		orb_publish(ORB_ID(orb_test_medium_multi), pub, &data_topic);
@@ -524,7 +524,7 @@ int uORBTest::UnitTest::test_multi2()
 	int orb_data_next = 0;
 
 	for (int i = 0; i < num_instances; ++i) {
-//		ORB_WARN("subscribe %i, t=%" PRIu64, i, hrt_absolute_time());
+//		ORB_WARN("subscribe %i, t=%" PRIu64, i, orb_absolute_time());
 		orb_data_fd[i] = orb_subscribe_multi(ORB_ID(orb_test_medium_multi), i);
 	}
 
@@ -541,7 +541,7 @@ int uORBTest::UnitTest::test_multi2()
           return ORB_ERROR;
 	}
 
-	hrt_abstime last_time = 0;
+	orb_abstime last_time = 0;
 
 	while (!_thread_should_exit) {
 
