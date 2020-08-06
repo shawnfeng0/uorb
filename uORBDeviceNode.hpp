@@ -33,7 +33,6 @@
 
 #pragma once
 
-#include "base/List.hpp"
 #include "base/orb_atomic.hpp"
 #include "uORBCommon.hpp"
 #include "uORBDeviceMaster.hpp"
@@ -47,7 +46,7 @@ class Manager;
 /**
  * Per-object device instance.
  */
-class uORB::DeviceNode : public ListNode<uORB::DeviceNode *> {
+class uORB::DeviceNode {
  public:
   DeviceNode(const struct orb_metadata *meta, uint8_t instance,
              const char *path, ORB_PRIO priority, uint8_t queue_size = 1);

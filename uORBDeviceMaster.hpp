@@ -36,10 +36,10 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <list>
 
 #include <sample/msg/uORB/topics/uORBTopics.hpp>
 
-#include "base/List.hpp"
 #include "base/atomic_bitset.h"
 #include "base/orb_mutex.hpp"
 #include "uORB.h"
@@ -86,7 +86,7 @@ class uORB::DeviceMaster {
   uORB::DeviceNode *getDeviceNodeLocked(const struct orb_metadata *meta,
                                         uint8_t instance);
 
-  List<uORB::DeviceNode *> _node_list;
+  std::list<uORB::DeviceNode *> _node_list;
   uORB::base::AtomicBitset<ORB_TOPICS_COUNT>
       _node_exists[ORB_MULTI_MAX_INSTANCES];
 

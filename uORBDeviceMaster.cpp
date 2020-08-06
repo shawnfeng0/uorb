@@ -109,7 +109,7 @@ int uORB::DeviceMaster::advertise(const struct orb_metadata *meta,
   node->mark_as_advertised();
 
   // add to the node map.
-  _node_list.Add(node);
+  _node_list.push_back(node);
   _node_exists[node->get_instance()].set((uint8_t)node->id(), true);
 
   return ret;
