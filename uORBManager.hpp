@@ -37,7 +37,6 @@
 #include <stdint.h>
 
 #include "base/orb_mutex.hpp"
-#include "uORBCommon.hpp"
 #include "uORBDeviceMaster.hpp"
 
 namespace uORB {
@@ -95,8 +94,7 @@ class uORB::Manager {
    */
   orb_advert_t orb_advertise(const struct orb_metadata *meta, const void *data,
                              unsigned int queue_size = 1) {
-    return orb_advertise_multi(meta, data, nullptr, ORB_PRIO_DEFAULT,
-                               queue_size);
+    return orb_advertise_multi(meta, data, nullptr, queue_size);
   }
 
   /**
@@ -136,7 +134,6 @@ class uORB::Manager {
    */
   orb_advert_t orb_advertise_multi(const struct orb_metadata *meta,
                                    const void *data, int *instance,
-                                   ORB_PRIO priority,
                                    unsigned int queue_size = 1);
 
   /**
@@ -163,8 +160,7 @@ class uORB::Manager {
    * Handles creation of the object and the initial publication for
    * advertisers.
    */
-  uORB::DeviceNode *node_open(const struct orb_metadata *meta, int *instance,
-                              ORB_PRIO priority);
+  uORB::DeviceNode *node_open(const struct orb_metadata *meta, int *instance);
 
  private:  // data members
   static Manager Instance;

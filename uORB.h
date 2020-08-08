@@ -31,8 +31,7 @@
  *
  ****************************************************************************/
 
-#ifndef _UORB_UORB_H
-#define _UORB_UORB_H
+#pragma once
 
 /**
  * @file uORB.h
@@ -63,22 +62,6 @@ typedef const struct orb_metadata *orb_id_t;
  */
 #define ORB_MULTI_MAX_INSTANCES \
   4  // This must be < 10 (because it's the last char of the node path)
-
-/**
- * Topic priority.
- * Relevant for multi-topics / topic groups
- */
-enum ORB_PRIO {
-  ORB_PRIO_UNINITIALIZED = 0,
-  ORB_PRIO_MIN =
-      1,  // leave 0 free for other purposes, eg. marking an uninitialized value
-  ORB_PRIO_VERY_LOW = 25,
-  ORB_PRIO_LOW = 50,
-  ORB_PRIO_DEFAULT = 75,
-  ORB_PRIO_HIGH = 100,
-  ORB_PRIO_VERY_HIGH = 125,
-  ORB_PRIO_MAX = 255
-};
 
 /**
  * Generates a pointer to the uORB metadata structure for
@@ -147,5 +130,3 @@ extern orb_advert_t orb_advertise_queue(const struct orb_metadata *meta,
                                         unsigned int queue_size) __EXPORT;
 
 __END_DECLS
-
-#endif /* _UORB_UORB_H */

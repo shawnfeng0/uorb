@@ -43,7 +43,6 @@
 #include "base/atomic_bitset.h"
 #include "base/orb_mutex.hpp"
 #include "uORB.h"
-#include "uORBCommon.hpp"
 
 namespace uORB {
 class DeviceNode;
@@ -59,8 +58,7 @@ class Manager;
  */
 class uORB::DeviceMaster {
  public:
-  int advertise(const struct orb_metadata *meta, int *instance,
-                ORB_PRIO priority);
+  int advertise(const struct orb_metadata *meta, int *instance);
 
   /**
    * Public interface for getDeviceNodeLocked(). Takes care of synchronization.

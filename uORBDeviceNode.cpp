@@ -37,24 +37,13 @@
 
 #include "base/orb_errno.h"
 #include "base/orb_log.h"
-#include "uORBManager.hpp"
 #include "uORBUtils.hpp"
 
 uORB::DeviceNode::DeviceNode(const struct orb_metadata *meta, uint8_t instance,
-                             const char *path, ORB_PRIO priority,
                              uint8_t queue_size)
-    : _devname(path),
-      _meta(meta),
-      _instance(instance),
-      _priority(priority),
-      _queue_size(queue_size) {
-}
+    : _meta(meta), _instance(instance), _queue_size(queue_size) {}
 
-uORB::DeviceNode::~DeviceNode() {
-  delete[] _data;
-
-  unregister_driver_and_memory();
-}
+uORB::DeviceNode::~DeviceNode() { delete[] _data; }
 
 int uORB::DeviceNode::open() {
   // Automatic mutex guarding
@@ -207,28 +196,6 @@ int uORB::DeviceNode::unadvertise(orb_advert_t handle) {
   return ORB_OK;
 }
 
-bool uORB::DeviceNode::print_statistics(bool reset) {
-  if (!_lost_messages) {
-    return false;
-  }
-  uint32_t lost_messages;
-  {
-    // Automatic mutex guarding
-    uORB::base::MutexGuard lg(_lock);
-
-    // This can be wrong: if a reader never reads, _lost_messages will not be
-    // increased either
-    lost_messages = _lost_messages;
-
-    if (reset) {
-      _lost_messages = 0;
-    }
-  }
-
-  ORB_INFO("%s: %i", _meta->o_name, lost_messages);
-  return true;
-}
-
 void uORB::DeviceNode::add_internal_subscriber() {
   // Automatic mutex guarding
   uORB::base::MutexGuard lg(_lock);
@@ -254,18 +221,4 @@ bool uORB::DeviceNode::update_queue_size_locked(unsigned int queue_size) {
 
   _queue_size = queue_size;
   return true;
-}
-
-int uORB::DeviceNode::unregister_driver_and_memory() {
-  int retval = ORB_OK;
-
-  if (_devname != nullptr) {
-    delete[] _devname;
-    _devname = nullptr;
-
-  } else {
-    retval = -ENODEV;
-  }
-
-  return retval;
 }

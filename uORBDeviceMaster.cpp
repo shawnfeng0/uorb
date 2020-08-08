@@ -53,7 +53,7 @@ static inline char *strdup_with_new(const char *s) {
 }
 
 int uORB::DeviceMaster::advertise(const struct orb_metadata *meta,
-                                  int *instance, ORB_PRIO priority) {
+                                  int *instance) {
   int ret;
   char nodepath[orb_maxpath];
 
@@ -90,19 +90,11 @@ int uORB::DeviceMaster::advertise(const struct orb_metadata *meta,
     *instance = group_tries;
   }
 
-  /* driver wants a permanent copy of the path, so make one here */
-  char *devpath = strdup_with_new(nodepath);
-
-  if (devpath == nullptr) {
-    return -ENOMEM;
-  }
-
   /* construct the new node, passing the ownership of path to it */
-  auto *node = new uORB::DeviceNode(meta, group_tries, devpath, priority);
+  auto *node = new uORB::DeviceNode(meta, group_tries);
 
   /* if we didn't get a device, that's bad, free the path too */
   if (node == nullptr) {
-    delete[] devpath;
     return -ENOMEM;
   }
 

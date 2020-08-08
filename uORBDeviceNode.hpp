@@ -34,7 +34,6 @@
 #pragma once
 
 #include "base/orb_atomic.hpp"
-#include "uORBCommon.hpp"
 #include "uORBDeviceMaster.hpp"
 
 namespace uORB {
@@ -48,8 +47,7 @@ class Manager;
  */
 class uORB::DeviceNode {
  public:
-  DeviceNode(const struct orb_metadata *meta, uint8_t instance,
-             const char *path, ORB_PRIO priority, uint8_t queue_size = 1);
+  DeviceNode(const struct orb_metadata *meta, uint8_t instance, uint8_t queue_size = 1);
   ~DeviceNode();
 
   /* do not allow copying this class */
@@ -76,13 +74,6 @@ class uORB::DeviceNode {
    *   The number of bytes that are written
    */
   ssize_t write(const char *buffer, size_t buflen);
-
-  /**
-   * Get the device name.
-   *
-   * @return the file system string of the device handle
-   */
-  const char *get_devname() const { return _devname; }
 
   /**
    * Method to publish a data to this node.
@@ -127,13 +118,6 @@ class uORB::DeviceNode {
    */
   bool update_queue_size_locked(unsigned int queue_size);
 
-  /**
-   * Print statistics (nr of lost messages)
-   * @param reset if true, reset statistics afterwards
-   * @return true if printed something, false otherwise (if no lost messages)
-   */
-  bool print_statistics(bool reset);
-
   uint8_t get_queue_size() const { return _queue_size; }
 
   int8_t subscriber_count() const { return _subscriber_count; }
@@ -149,9 +133,6 @@ class uORB::DeviceNode {
   const char *get_name() const { return _meta->o_name; }
 
   uint8_t get_instance() const { return _instance; }
-
-  ORB_PRIO get_priority() const { return _priority; }
-  void set_priority(ORB_PRIO priority) { _priority = priority; }
 
   /**
    * Copies data and the corresponding generation
@@ -237,25 +218,9 @@ class uORB::DeviceNode {
   uORB::base::Mutex _lock; /**< lock to protect access to all class members
                       (also for derived classes) */
 
-  const char *_devname{nullptr}; /**< device node name */
-
-  bool _registered{false}; /**< true if device name was registered */
-
-  ORB_PRIO _priority;      /**< priority of the topic */
   const uint8_t _instance; /**< orb multi instance identifier */
   bool _advertised{false}; /**< has ever been advertised (not necessarily
                               published data yet) */
   uint8_t _queue_size;     /**< maximum number of elements in the queue */
   int8_t _subscriber_count{0};
-
-  /**
-   * First, unregisters the driver. Next, free the memory for the devname,
-   * in case it was expected to have ownership. Sets devname to nullptr.
-   *
-   * This is only needed if the ownership of the devname was passed to the
-   * CDev, otherwise ~CDev handles it.
-   *
-   * @return  ORB_OK on success, -ENODEV if the devname is already nullptr
-   */
-  int unregister_driver_and_memory();
 };

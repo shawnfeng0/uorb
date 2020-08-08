@@ -30,24 +30,17 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  ****************************************************************************/
-#ifndef _uORBUtils_hpp_
-#define _uORBUtils_hpp_
 
-#include "uORBCommon.hpp"
+#pragma once
 
 namespace uORB {
-class Utils;
-}
 
-class uORB::Utils {
+static constexpr unsigned orb_maxpath = 64;
+
+class Utils {
  public:
   static int node_mkpath(char *buf, const struct orb_metadata *meta,
                          const int *instance = nullptr);
-
-  /**
-   * same as above except this generators the path based on the string.
-   */
-  static int node_mkpath(char *buf, const char *orbMsgName);
 };
 
-#endif  // _uORBUtils_hpp_
+}  // namespace uORB

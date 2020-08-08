@@ -46,10 +46,9 @@ uORB::DeviceMaster &uORB::Manager::get_device_master() {
 
 orb_advert_t uORB::Manager::orb_advertise_multi(const struct orb_metadata *meta,
                                                 const void *data, int *instance,
-                                                ORB_PRIO priority,
                                                 unsigned int queue_size) {
   /* open the node as an advertiser */
-  uORB::DeviceNode *dev = node_open(meta, instance, priority);
+  uORB::DeviceNode *dev = node_open(meta, instance);
 
   if (!dev) {
     ORB_ERR("%s advertise failed (%i)", meta->o_name, orb_errno);
@@ -83,7 +82,7 @@ int uORB::Manager::orb_publish(const struct orb_metadata *meta,
 }
 
 uORB::DeviceNode *uORB::Manager::node_open(const struct orb_metadata *meta,
-                                           int *instance, ORB_PRIO priority) {
+                                           int *instance) {
   char path[orb_maxpath];
   uORB::DeviceNode *dev = nullptr;
 
@@ -118,7 +117,7 @@ uORB::DeviceNode *uORB::Manager::node_open(const struct orb_metadata *meta,
 
   /* we may need to advertise the node... */
   if (!dev) {
-    int ret = _device_master.advertise(meta, instance, priority);
+    int ret = _device_master.advertise(meta, instance);
 
     /* it's OK if it already exists */
     if ((ret != ORB_OK) && (EEXIST == orb_errno)) {
