@@ -59,7 +59,7 @@ bool Subscription::subscribe() {
 
     if (node != nullptr) {
       _node = node;
-      _node->add_internal_subscriber();
+      _node->IncreaseSubscriberCount();
 
       // If there were any previous publications, allow the subscriber to read
       // them
@@ -82,7 +82,7 @@ bool Subscription::subscribe() {
 
 void Subscription::unsubscribe() {
   if (_node != nullptr) {
-    _node->remove_internal_subscriber();
+    _node->ReduceSubscriberCount();
   }
 
   _node = nullptr;

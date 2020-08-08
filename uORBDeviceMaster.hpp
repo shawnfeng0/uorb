@@ -33,9 +33,9 @@
 
 #pragma once
 
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
 #include <list>
 
 #include <sample/msg/uORB/topics/uORBTopics.hpp>
@@ -58,7 +58,7 @@ class Manager;
  */
 class uORB::DeviceMaster {
  public:
-  int advertise(const struct orb_metadata *meta, int *instance);
+  bool advertise(const struct orb_metadata *meta, unsigned int *instance);
 
   /**
    * Public interface for getDeviceNodeLocked(). Takes care of synchronization.

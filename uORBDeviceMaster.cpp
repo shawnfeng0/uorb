@@ -37,33 +37,12 @@
 
 #include <sample/msg/uORB/topics/uORBTopics.hpp>
 
-#include "base/orb_defines.h"
 #include "base/orb_log.h"
 #include "uORBDeviceNode.hpp"
 #include "uORBManager.hpp"
-#include "uORBUtils.hpp"
 
-/* Duplicate S, returning an identical string assigned using "new". */
-static inline char *strdup_with_new(const char *s) {
-  const char *old = (s);
-  size_t len = strlen(old) + 1;
-  char *new_str = new char[len];
-  // Possibility of allocation failure in microcontroller
-  return (char *)memcpy(new_str, old, len);
-}
-
-int uORB::DeviceMaster::advertise(const struct orb_metadata *meta,
-                                  int *instance) {
-  int ret;
-  char nodepath[orb_maxpath];
-
-  /* construct a path to the node - this also checks the node name */
-  ret = uORB::Utils::node_mkpath(nodepath, meta, instance);
-
-  if (ret != ORB_OK) {
-    return ret;
-  }
-
+bool uORB::DeviceMaster::advertise(const struct orb_metadata *meta,
+                                  unsigned int *instance) {
   /* try for topic groups */
   const unsigned max_group_tries =
       (instance != nullptr) ? ORB_MULTI_MAX_INSTANCES : 1;
@@ -85,13 +64,11 @@ int uORB::DeviceMaster::advertise(const struct orb_metadata *meta,
 
   /* if path is modifyable change try index */
   if (instance != nullptr) {
-    /* replace the number at the end of the string */
-    nodepath[strlen(nodepath) - 1] = '0' + group_tries;
     *instance = group_tries;
   }
 
   /* construct the new node, passing the ownership of path to it */
-  auto *node = new uORB::DeviceNode(meta, group_tries);
+  auto *node = new uORB::DeviceNode(*meta, group_tries);
 
   /* if we didn't get a device, that's bad, free the path too */
   if (node == nullptr) {
@@ -104,7 +81,7 @@ int uORB::DeviceMaster::advertise(const struct orb_metadata *meta,
   _node_list.push_back(node);
   _node_exists[node->get_instance()].set((uint8_t)node->id(), true);
 
-  return ret;
+  return true;
 }
 
 bool uORB::DeviceMaster::deviceNodeExists(ORB_ID id, uint8_t instance) {

@@ -38,33 +38,30 @@
 
 #pragma once
 
-#include "base/orb_defines.h"
 #include "uORB.h"
 #include "uORB/topics/uORBTopics.hpp"
 #include "uORBDeviceNode.hpp"
 
+namespace uORB {
 
-namespace uORB
-{
-
-class PublicationBase
-{
+class PublicationBase {
  public:
-
   bool advertised() const { return _handle != nullptr; }
 
-  bool unadvertise() { return (DeviceNode::unadvertise(_handle) == ORB_OK); }
+  bool unadvertise() {
+    if (_handle) return static_cast<DeviceNode *>(_handle)->Unadvertise();
+    return false;
+  }
 
   orb_id_t get_topic() const { return get_orb_meta(_orb_id); }
 
  protected:
-
   explicit PublicationBase(ORB_ID id) : _orb_id(id) {}
 
-  ~PublicationBase()
-  {
+  ~PublicationBase() {
     if (_handle != nullptr) {
-      // don't automatically unadvertise queued publications (eg vehicle_command)
+      // don't automatically unadvertise queued publications (eg
+      // vehicle_command)
       if (static_cast<DeviceNode *>(_handle)->get_queue_size() == 1) {
         unadvertise();
       }
@@ -78,21 +75,20 @@ class PublicationBase
 /**
  * uORB publication wrapper class
  */
-template<typename T, uint8_t ORB_QSIZE = 1>
-class Publication : public PublicationBase
-{
+template <typename T, uint8_t ORB_QSIZE = 1>
+class Publication : public PublicationBase {
  public:
-
   /**
    * Constructor
    *
-   * @param meta The uORB metadata (usually from the ORB_ID() macro) for the topic.
+   * @param meta The uORB metadata (usually from the ORB_ID() macro) for the
+   * topic.
    */
   explicit Publication(ORB_ID id) : PublicationBase(id) {}
-  explicit Publication(const orb_metadata *meta) : PublicationBase(static_cast<ORB_ID>(meta->o_id)) {}
+  explicit Publication(const orb_metadata *meta)
+      : PublicationBase(static_cast<ORB_ID>(meta->o_id)) {}
 
-  bool advertise()
-  {
+  bool advertise() {
     if (!advertised()) {
       _handle = orb_advertise_queue(get_topic(), nullptr, ORB_QSIZE);
     }
@@ -104,38 +100,40 @@ class Publication : public PublicationBase
    * Publish the struct
    * @param data The uORB message struct we are updating.
    */
-  bool publish(const T &data)
-  {
+  bool publish(const T &data) {
     if (!advertised()) {
       advertise();
     }
-
-    return (DeviceNode::publish(get_topic(), _handle, &data) == ORB_OK);
+    if (advertised()) {
+      // don't automatically unadvertise queued publications (eg
+      // vehicle_command)
+      return static_cast<DeviceNode *>(_handle)->Publish(*get_topic(), &data);
+    }
+    return false;
   }
 };
 
 /**
  * The publication class with data embedded.
  */
-template<typename T>
-class PublicationData : public Publication<T>
-{
+template <typename T>
+class PublicationData : public Publication<T> {
  public:
   /**
    * Constructor
    *
-   * @param meta The uORB metadata (usually from the ORB_ID() macro) for the topic.
+   * @param meta The uORB metadata (usually from the ORB_ID() macro) for the
+   * topic.
    */
   explicit PublicationData(ORB_ID id) : Publication<T>(id) {}
   explicit PublicationData(const orb_metadata *meta) : Publication<T>(meta) {}
 
-  T	&get() { return _data; }
-  void	set(const T &data) { _data = data; }
+  T &get() { return _data; }
+  void set(const T &data) { _data = data; }
 
   // Publishes the embedded struct.
-  bool	update() { return Publication<T>::publish(_data); }
-  bool	update(const T &data)
-  {
+  bool update() { return Publication<T>::publish(_data); }
+  bool update(const T &data) {
     _data = data;
     return Publication<T>::publish(_data);
   }
@@ -144,8 +142,7 @@ class PublicationData : public Publication<T>
   T _data{};
 };
 
-
-template<class T>
+template <class T>
 using PublicationQueued = Publication<T, T::ORB_QUEUE_LENGTH>;
 
-} // namespace uORB
+}  // namespace uORB

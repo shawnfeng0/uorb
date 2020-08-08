@@ -33,21 +33,17 @@
 
 #pragma once
 
-#include "base/orb_atomic.hpp"
 #include "uORBDeviceMaster.hpp"
 
 namespace uORB {
-class DeviceNode;
-class DeviceMaster;
-class Manager;
-}  // namespace uORB
 
 /**
  * Per-object device instance.
  */
-class uORB::DeviceNode {
+class DeviceNode {
  public:
-  DeviceNode(const struct orb_metadata *meta, uint8_t instance, uint8_t queue_size = 1);
+  DeviceNode(const struct orb_metadata &meta, uint8_t instance,
+             uint16_t queue_size = 1);
   ~DeviceNode();
 
   /* do not allow copying this class */
@@ -58,30 +54,9 @@ class uORB::DeviceNode {
   DeviceNode &operator=(DeviceNode &&) = delete;
 
   /**
-   * Method to create a subscriber instance and return the struct
-   * pointing to the subscriber as a file pointer.
-   */
-  int open();
-
-  /**
-   * writes the published data to the internal buffer to be read by
-   * subscribers later.
-   * @param buffer
-   *   The buffer for the input data
-   * @param buflen
-   *   the length of the buffer.
-   * @return ssize_t
-   *   The number of bytes that are written
-   */
-  ssize_t write(const char *buffer, size_t buflen);
-
-  /**
    * Method to publish a data to this node.
    */
-  static ssize_t publish(const orb_metadata *meta, orb_advert_t handle,
-                         const void *data);
-
-  static int unadvertise(orb_advert_t handle);
+  bool Publish(const orb_metadata &meta, const void *data);
 
   /**
    * Add the subscriber to the node's list of subscriber.  If there is
@@ -90,7 +65,7 @@ class uORB::DeviceNode {
    * @param sd
    *   the subscriber to be added.
    */
-  void add_internal_subscriber();
+  void IncreaseSubscriberCount();
 
   /**
    * Removes the subscriber from the list.  Also notifies the remote
@@ -98,41 +73,28 @@ class uORB::DeviceNode {
    * @param sd
    *   the Subscriber to be removed.
    */
-  void remove_internal_subscriber();
+  void ReduceSubscriberCount();
 
   /**
    * Return true if this topic has been advertised.
    *
    * This is used in the case of multi_pub/sub to check if it's valid to
    * advertise and publish to this node or if another node should be tried. */
-  bool is_advertised() const { return _advertised; }
+  bool is_advertised() const { return advertised_; }
 
-  void mark_as_advertised() { _advertised = true; }
+  bool Unadvertise();
 
-  /**
-   * Try to change the size of the queue. This can only be done as long as
-   * nobody published yet. This is the case, for example when orb_subscribe was
-   * called before an orb_advertise. The queue size can only be increased.
-   * @param queue_size new size of the queue
-   * @return ORB_OK if queue size successfully set
-   */
-  bool update_queue_size_locked(unsigned int queue_size);
+  void mark_as_advertised() { advertised_ = true; }
 
-  uint8_t get_queue_size() const { return _queue_size; }
+  uint16_t get_queue_size() const { return queue_size_; }
 
-  int8_t subscriber_count() const { return _subscriber_count; }
+  unsigned published_message_count() const { return generation_; }
 
-  uint32_t lost_message_count() const { return _lost_messages; }
+  ORB_ID id() const { return static_cast<ORB_ID>(meta_.o_id); }
 
-  unsigned published_message_count() const { return _generation.load(); }
+  const char *get_name() const { return meta_.o_name; }
 
-  const orb_metadata *get_meta() const { return _meta; }
-
-  ORB_ID id() const { return static_cast<ORB_ID>(_meta->o_id); }
-
-  const char *get_name() const { return _meta->o_name; }
-
-  uint8_t get_instance() const { return _instance; }
+  uint8_t get_instance() const { return instance_; }
 
   /**
    * Copies data and the corresponding generation
@@ -140,87 +102,59 @@ class uORB::DeviceNode {
    *
    * @param dst
    *   The buffer into which the data is copied.
-   * @param generation
+   * @param sub_generation
    *   The generation that was copied.
    * @return bool
    *   Returns true if the data was copied.
    */
-  bool copy(void *dst, unsigned &generation);
+  bool Copy(void *dst, unsigned &sub_generation);
 
-  /** Get the minimum interval at which the topic can be seen to be updated for
-   * this subscription */
-  bool SetQueueSize(unsigned int queue_size) {
-    uORB::base::MutexGuard lg(_lock);
-    return update_queue_size_locked(queue_size);
-  }
+  bool SetQueueSize(uint16_t queue_size);
 
  private:
-  /**
-   * Copies data and the corresponding generation
-   * from a node to the buffer provided. Caller handles locking.
-   *
-   * @param dst
-   *   The buffer into which the data is copied.
-   * @param generation
-   *   The generation that was copied.
-   * @return bool
-   *   Returns true if the data was copied.
-   */
-  bool copy_locked(void *dst, unsigned &generation);
+  const orb_metadata &meta_; /**< object metadata information */
+  const uint8_t instance_;   /**< orb multi instance identifier */
 
-  struct UpdateIntervalData {
-    uint64_t last_update{0}; /**< time at which the last update was provided,
-                                used when update_interval is nonzero */
-    unsigned interval{0};    /**< if nonzero minimum interval between updates */
-  };
+  uint8_t *data_{nullptr}; /**< allocated object buffer */
+  uint16_t queue_size_;    /**< maximum number of elements in the queue */
+  unsigned generation_{0}; /**< object generation count */
+  bool queue_is_full_ = false;
 
-  struct SubscriberData {
-    ~SubscriberData() {
-      if (update_interval) {
-        delete (update_interval);
-      }
-    }
-
-    bool SetUpdateInterval(unsigned interval) {
-      if (interval == 0) {
-        if (update_interval) {
-          delete (update_interval);
-          update_interval = nullptr;
-        }
-      } else {
-        if (!update_interval) {
-          update_interval = new UpdateIntervalData();
-          if (!update_interval) return false;
-        }
-        update_interval->interval = interval;
-      }
-      return true;
-    }
-
-    unsigned GetUpdateInterval() const {
-      return update_interval ? update_interval->interval : 0;
-    }
-
-    unsigned generation{0}; /**< last generation the subscriber has seen */
-    UpdateIntervalData *update_interval{
-        nullptr}; /**< if null, no update interval */
-  };
-
-  const orb_metadata *_meta; /**< object metadata information */
-  uint8_t *_data{nullptr};   /**< allocated object buffer */
-  uORB::base::atomic<unsigned> _generation{0}; /**< object generation count */
+  base::Mutex lock_; /**< lock to protect access to all class members
+  (also for derived classes) */
 
   // statistics
-  uint32_t _lost_messages =
+  uint32_t lost_messages_ =
       0; /**< nr of lost messages for all subscribers. If two subscribers lose
             the same message, it is counted as two. */
+  uint8_t subscriber_count_{0};
 
-  uORB::base::Mutex _lock; /**< lock to protect access to all class members
-                      (also for derived classes) */
-
-  const uint8_t _instance; /**< orb multi instance identifier */
-  bool _advertised{false}; /**< has ever been advertised (not necessarily
+  bool advertised_{false}; /**< has ever been advertised (not necessarily
                               published data yet) */
-  uint8_t _queue_size;     /**< maximum number of elements in the queue */
-  int8_t _subscriber_count{0};
+
+  static inline uint16_t GenerateQueueSize(uint16_t queue_size) {
+    return queue_size < 2 ? 1 : RoundupPowOfTwo(queue_size);
+  }
+
+  // round up to nearest power of two
+  static inline unsigned long RoundupPowOfTwo(unsigned long n) {
+    return 1UL << (unsigned int)fls(n - 1U);
+  }
+
+  // fls: find last bit set.
+  static inline int fls(uint64_t x) { return 64 - clz64(x); }
+
+  // Returns the number of leading 0-bits in x, starting at the most significant
+  // bit position. If x is 0, the result is undefined.
+  static inline int clz64(uint64_t x) {
+    int r = 0;
+    if (!(x & 0xFFFFFFFF00000000)) r += 32, x <<= 32U;
+    if (!(x & 0xFFFF000000000000)) r += 16, x <<= 16U;
+    if (!(x & 0xFF00000000000000)) r += 8, x <<= 8U;
+    if (!(x & 0xF000000000000000)) r += 4, x <<= 4U;
+    if (!(x & 0xC000000000000000)) r += 2, x <<= 2U;
+    if (!(x & 0x8000000000000000)) r += 1;
+    return r;
+  }
 };
+}  // namespace uORB

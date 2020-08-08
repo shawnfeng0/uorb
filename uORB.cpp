@@ -38,7 +38,6 @@
 
 #include "uORB.h"
 
-#include "base/orb_defines.h"
 #include "uORBManager.hpp"
 
 orb_advert_t orb_advertise_queue(const struct orb_metadata *meta,

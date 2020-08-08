@@ -31,13 +31,17 @@
  *
  ****************************************************************************/
 
-#ifndef _uORBManager_hpp_
-#define _uORBManager_hpp_
+#pragma once
 
-#include <stdint.h>
+#include <base/orb_errno.h>
+#include <base/orb_log.h>
+#include <sample/ulog/src/ulog_common.h>
+
+#include <cstdint>
 
 #include "base/orb_mutex.hpp"
 #include "uORBDeviceMaster.hpp"
+#include "uORBDeviceNode.hpp"
 
 namespace uORB {
 class Manager;
@@ -94,64 +98,29 @@ class uORB::Manager {
    */
   orb_advert_t orb_advertise(const struct orb_metadata *meta, const void *data,
                              unsigned int queue_size = 1) {
-    return orb_advertise_multi(meta, data, nullptr, queue_size);
+    DeviceNode *dev = node_open(meta, nullptr);
+
+    if (!dev) {
+      ORB_ERR("%s advertise failed (%i)", meta->o_name, orb_errno);
+      return nullptr;
+    }
+
+    /* Set the queue size. This must be done before the first publication; thus
+     * it fails if this is not the first advertiser.
+     */
+    if (!dev->SetQueueSize(queue_size))
+      ORB_WARN("orb_advertise_multi: failed to set queue size");
+
+    /* the advertiser may perform an initial publish to initialise the object */
+    if (data != nullptr) {
+      if (!dev->Publish(*meta, data)) {
+        ORB_ERR("orb_publish failed %s", meta->o_name);
+        return nullptr;
+      }
+    }
+
+    return dev;
   }
-
-  /**
-   * Advertise as the publisher of a topic.
-   *
-   * This performs the initial advertisement of a topic; it creates the topic
-   * node in /obj if required and publishes the initial data.
-   *
-   * Any number of advertisers may publish to a topic; publications are atomic
-   * but co-ordination between publishers is not provided by the ORB.
-   *
-   * The multi can be used to create multiple independent instances of the same
-   * topic (each instance has its own buffer). This is useful for multiple
-   * publishers who publish the same topic. The subscriber then subscribes to
-   * all instances and chooses which source he wants to use.
-   *
-   * @param meta    The uORB metadata (usually from the ORB_ID() macro)
-   *      for the topic.
-   * @param data    A pointer to the initial data to be published.
-   *      For topics updated by interrupt handlers, the advertisement
-   *      must be performed from non-interrupt context.
-   * @param instance  Pointer to an integer which will yield the instance ID
-   * (0-based) of the publication. This is an output parameter and will be set
-   * to the newly created instance, ie. 0 for the first advertiser, 1 for the
-   * next and so on.
-   * @param priority  The priority of the instance. If a subscriber subscribes
-   * multiple instances, the priority allows the subscriber to prioritize the
-   * best data source as long as its available. The subscriber is responsible to
-   * check and handle different priorities (@see orb_priority()).
-   * @param queue_size  Maximum number of buffered elements. If this is 1, no
-   * queuing is used.
-   * @return    ORB_ERROR on error, otherwise returns a handle
-   *      that can be used to publish to the topic.
-   *      If the topic in question is not known (due to an
-   *      ORB_DEFINE with no corresponding ORB_DECLARE)
-   *      this function will return -1 and set errno to ENOENT.
-   */
-  orb_advert_t orb_advertise_multi(const struct orb_metadata *meta,
-                                   const void *data, int *instance,
-                                   unsigned int queue_size = 1);
-
-  /**
-   * Publish new data to a topic.
-   *
-   * The data is atomically published to the topic and any waiting subscribers
-   * will be notified.  Subscribers that are not waiting can check the topic
-   * for updates using orb_check.
-   *
-   * @param meta    The uORB metadata (usually from the ORB_ID() macro)
-   *      for the topic.
-   * @handle    The handle returned from orb_advertise.
-   * @param data    A pointer to the data to be published.
-   * @return    ORB_OK on success, ORB_ERROR otherwise with errno set
-   * accordingly.
-   */
-  static int orb_publish(const struct orb_metadata *meta, orb_advert_t handle,
-                         const void *data);
 
  private:  // class methods
   /**
@@ -160,7 +129,8 @@ class uORB::Manager {
    * Handles creation of the object and the initial publication for
    * advertisers.
    */
-  uORB::DeviceNode *node_open(const struct orb_metadata *meta, int *instance);
+  uORB::DeviceNode *node_open(const struct orb_metadata *meta,
+                              unsigned int *instance);
 
  private:  // data members
   static Manager Instance;
@@ -170,5 +140,3 @@ class uORB::Manager {
  private:  // class methods
   Manager() = default;
 };
-
-#endif /* _uORBManager_hpp_ */

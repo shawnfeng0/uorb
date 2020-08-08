@@ -40,18 +40,14 @@
 
 #include <sample/msg/uORB/topics/uORBTopics.hpp>
 
-#include "base/orb_defines.h"
 #include "uORB.h"
 #include "uORBDeviceNode.hpp"
 #include "uORBManager.hpp"
-#include "uORBUtils.hpp"
 
-namespace uORB
-{
+namespace uORB {
 
 // Base subscription wrapper class
-class Subscription
-{
+class Subscription {
  public:
 
   /**
@@ -119,7 +115,7 @@ class Subscription
    * Copy the struct
    * @param data The uORB message struct we are updating.
    */
-  bool copy(void *dst) { return advertised() ? _node->copy(dst, _last_generation) : false; }
+  bool copy(void *dst) { return advertised() ? _node->Copy(dst, _last_generation) : false; }
 
   uint8_t  get_instance() const { return _instance; }
   unsigned get_last_generation() const { return _last_generation; }
