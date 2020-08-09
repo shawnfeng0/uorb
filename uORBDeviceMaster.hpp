@@ -34,11 +34,7 @@
 #pragma once
 
 #include <cstdint>
-#include <cstdlib>
-#include <cstring>
 #include <list>
-
-#include <sample/msg/uORB/topics/uORBTopics.hpp>
 
 #include "base/atomic_bitset.h"
 #include "base/orb_mutex.hpp"
@@ -47,47 +43,37 @@
 namespace uORB {
 class DeviceNode;
 class DeviceMaster;
-class Manager;
 }  // namespace uORB
 
 /**
- * Master control device for ObjDev.
- *
- * Used primarily to create new objects via the ORBIOCCREATE
- * ioctl.
+ * Master control device for uorb message device node.
  */
 class uORB::DeviceMaster {
  public:
-  bool advertise(const struct orb_metadata *meta, unsigned int *instance);
-
   /**
-   * Public interface for getDeviceNodeLocked(). Takes care of synchronization.
+   * Method to get the singleton instance for the uORB::DeviceMaster.
+   * @return uORB::DeviceMaster &
+   */
+  static inline uORB::DeviceMaster &get_instance() { return instance_; }
+
+  DeviceNode *CreateAdvertiser(const orb_metadata &meta,
+                               const unsigned int *instance,
+                               uint16_t queue_size);
+  /**
+   * Public interface for GetDeviceNodeLocked(). Takes care of synchronization.
    * @return node if exists, nullptr otherwise
    */
-  uORB::DeviceNode *getDeviceNode(const struct orb_metadata *meta,
-                                  uint8_t instance);
-
-  bool deviceNodeExists(ORB_ID id, uint8_t instance);
+  uORB::DeviceNode *GetDeviceNode(const orb_metadata &meta, uint8_t instance);
+  uORB::DeviceNode *GetDeviceNodeLocked(const orb_metadata &meta,
+                                        uint8_t instance) const;
 
  private:
+  static DeviceMaster instance_;
   // Private constructor, uORB::Manager takes care of its creation
   DeviceMaster() = default;
   ~DeviceMaster() = default;
 
-  friend class uORB::Manager;
-
-  /**
-   * Find a node give its name.
-   * _lock must already be held when calling this.
-   * @return node if exists, nullptr otherwise
-   */
-  uORB::DeviceNode *getDeviceNodeLocked(const struct orb_metadata *meta,
-                                        uint8_t instance);
-
   std::list<uORB::DeviceNode *> _node_list;
-  uORB::base::AtomicBitset<ORB_TOPICS_COUNT>
-      _node_exists[ORB_MULTI_MAX_INSTANCES];
-
-  uORB::base::Mutex _lock; /**< lock to protect access to all class members
+  base::Mutex _lock; /**< lock to protect access to all class members
                               (also for derived classes) */
 };

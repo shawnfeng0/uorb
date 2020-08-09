@@ -39,83 +39,72 @@
 
 #include "base/orb_log.h"
 #include "uORBDeviceNode.hpp"
-#include "uORBManager.hpp"
 
-bool uORB::DeviceMaster::advertise(const struct orb_metadata *meta,
-                                  unsigned int *instance) {
+uORB::DeviceMaster uORB::DeviceMaster::instance_;
+
+uORB::DeviceNode *uORB::DeviceMaster::CreateAdvertiser(
+    const orb_metadata &meta, const unsigned int *instance,
+    uint16_t queue_size) {
   /* try for topic groups */
-  const unsigned max_group_tries =
-      (instance != nullptr) ? ORB_MULTI_MAX_INSTANCES : 1;
+  const unsigned max_group_tries = (!instance) ? ORB_MULTI_MAX_INSTANCES : 1;
+  const bool is_single_instance_advertiser = !instance;
+
+  DeviceNode *device_node;
   unsigned group_tries = 0;
-
-  if (instance) {
-    /* for an advertiser, this will be 0, but a for subscriber that requests a
-     * certain instance, we do not want to start with 0, but with the instance
-     * the subscriber actually requests.
-     */
-    group_tries = *instance;
-
-    if (group_tries >= max_group_tries) {
-      return -ENOMEM;
-    }
-  }
+  bool find_one = false;
 
   uORB::base::MutexGuard lg(_lock);
 
-  /* if path is modifyable change try index */
-  if (instance != nullptr) {
-    *instance = group_tries;
-  }
+  // Find the following devices that can advertise:
+  // - Unregistered device
+  // - Unadvertised device
+  // - Single instance device
+  do {
+    device_node = GetDeviceNodeLocked(meta, group_tries);
+    if (!device_node) {
+      device_node = new DeviceNode(meta, group_tries, queue_size);
+      if (!device_node) {
+        orb_errno = ENOMEM;
+        return nullptr;
+      }
 
-  /* construct the new node, passing the ownership of path to it */
-  auto *node = new uORB::DeviceNode(*meta, group_tries);
+      // add to the node map.
+      _node_list.push_back(device_node);
 
-  /* if we didn't get a device, that's bad, free the path too */
-  if (node == nullptr) {
-    return -ENOMEM;
-  }
-
-  node->mark_as_advertised();
-
-  // add to the node map.
-  _node_list.push_back(node);
-  _node_exists[node->get_instance()].set((uint8_t)node->id(), true);
-
-  return true;
-}
-
-bool uORB::DeviceMaster::deviceNodeExists(ORB_ID id, uint8_t instance) {
-  if ((id == ORB_ID::INVALID) || (instance > ORB_MULTI_MAX_INSTANCES - 1)) {
-    return false;
-  }
-
-  return _node_exists[instance][(uint8_t)id];
-}
-
-uORB::DeviceNode *uORB::DeviceMaster::getDeviceNode(
-    const struct orb_metadata *meta, uint8_t instance) {
-  if (meta == nullptr) {
-    return nullptr;
-  }
-  if (!deviceNodeExists(static_cast<ORB_ID>(meta->o_id), instance)) {
-    return nullptr;
-  }
-
-  uORB::base::MutexGuard lg(_lock);
-  uORB::DeviceNode *node = getDeviceNodeLocked(meta, instance);
-
-  // We can safely return the node that can be used by any thread, because
-  // a DeviceNode never gets deleted.
-  return node;
-}
-
-uORB::DeviceNode *uORB::DeviceMaster::getDeviceNodeLocked(
-    const struct orb_metadata *meta, uint8_t instance) {
-  for (auto node : _node_list) {
-    if ((strcmp(node->get_name(), meta->o_name) == 0) &&
-        (node->get_instance() == instance)) {
-      return node;
+      device_node->mark_as_advertised();
+      find_one = true;
     }
+
+    if (!device_node->is_advertised() || is_single_instance_advertiser) {
+      /* Set as advertised to avoid race conditions (otherwise 2 multi-instance
+       * advertisers could get the same instance).
+       */
+      device_node->mark_as_advertised();
+      find_one = true;
+    }
+    group_tries++;
+  } while (!find_one && (group_tries < max_group_tries));
+
+  if (!find_one) {
+    orb_errno = EEXIST;
+    return nullptr;
+  }
+
+  return device_node;
+}
+
+uORB::DeviceNode *uORB::DeviceMaster::GetDeviceNode(const orb_metadata &meta,
+                                                    uint8_t instance) {
+  uORB::base::MutexGuard lg(_lock);
+  return GetDeviceNodeLocked(meta, instance);
+}
+
+uORB::DeviceNode *uORB::DeviceMaster::GetDeviceNodeLocked(
+    const orb_metadata &meta, uint8_t instance) const {
+  // We can safely return the node that can be used by any thread, because a
+  // DeviceNode never gets deleted.
+  for (auto node : this->_node_list) {
+    if (node->IsSameWith(meta, instance)) return node;
   }
 
   return nullptr;

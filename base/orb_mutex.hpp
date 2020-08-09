@@ -81,4 +81,4 @@ class LockGuard {
 typedef LockGuard<Mutex> MutexGuard;
 
 }  // namespace base
-}  // namespace uORB
+}  // namespace uorb

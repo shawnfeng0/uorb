@@ -46,38 +46,29 @@ bool Subscription::subscribe() {
     return true;
   }
 
-  if (_orb_id != ORB_ID::INVALID) {
-    DeviceMaster &device_master =
-        uORB::Manager::get_instance().get_device_master();
+  DeviceMaster &device_master = uORB::DeviceMaster::get_instance();
 
-    if (!device_master.deviceNodeExists(_orb_id, _instance)) {
-      return false;
-    }
+  _node = device_master.GetDeviceNode(*get_topic(), _instance);
 
-    uORB::DeviceNode *node =
-        device_master.getDeviceNode(get_topic(), _instance);
-
-    if (node != nullptr) {
-      _node = node;
-      _node->IncreaseSubscriberCount();
-
-      // If there were any previous publications, allow the subscriber to read
-      // them
-      const unsigned curr_gen = _node->published_message_count();
-      const uint8_t q_size = _node->get_queue_size();
-
-      if (q_size < curr_gen) {
-        _last_generation = curr_gen - q_size;
-
-      } else {
-        _last_generation = 0;
-      }
-
-      return true;
-    }
+  if (_node == nullptr) {
+    return false;
   }
 
-  return false;
+  _node->IncreaseSubscriberCount();
+
+  // If there were any previous publications, allow the subscriber to read
+  // them
+  const unsigned curr_gen = _node->published_message_count();
+  const uint8_t q_size = _node->get_queue_size();
+
+  if (q_size < curr_gen) {
+    _last_generation = curr_gen - q_size;
+
+  } else {
+    _last_generation = 0;
+  }
+
+  return true;
 }
 
 void Subscription::unsubscribe() {

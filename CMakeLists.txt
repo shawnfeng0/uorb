@@ -46,6 +46,10 @@ aux_source_directory(${CMAKE_SOURCE_DIR}/base UORB_SOURCE)
 aux_source_directory(${CMAKE_SOURCE_DIR}/sample/ulog/src UORB_SOURCE)
 add_definitions(-DDEBUG_ORB)
 add_library(uorb ${UORB_SOURCE})
+set_target_properties(uorb PROPERTIES
+        CMAKE_CXX_STANDARD 11)
+target_compile_features(uorb INTERFACE
+        cxx_noexcept)
 
 # uorb sample
 aux_source_directory(${CMAKE_SOURCE_DIR}/sample SAMPLE_SOURCE)

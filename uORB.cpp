@@ -38,9 +38,7 @@
 
 #include "uORB.h"
 
-#include "uORBManager.hpp"
+#include <base/orb_errno.h>
+#include <base/orb_log.h>
 
-orb_advert_t orb_advertise_queue(const struct orb_metadata *meta,
-                                 const void *data, unsigned int queue_size) {
-  return uORB::Manager::get_instance().orb_advertise(meta, data, queue_size);
-}
+#include "uORBDeviceNode.hpp"

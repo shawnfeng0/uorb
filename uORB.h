@@ -122,11 +122,4 @@ __BEGIN_DECLS
  */
 typedef void *orb_advert_t;
 
-/**
- * @see uORB::Manager::orb_advertise()
- */
-extern orb_advert_t orb_advertise_queue(const struct orb_metadata *meta,
-                                        const void *data,
-                                        unsigned int queue_size) __EXPORT;
-
 __END_DECLS

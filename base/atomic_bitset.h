@@ -96,4 +96,4 @@ class AtomicBitset {
 };
 
 }  // namespace base
-}  // namespace uORB
+}  // namespace uorb

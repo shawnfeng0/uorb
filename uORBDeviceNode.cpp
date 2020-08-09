@@ -132,38 +132,6 @@ bool uORB::DeviceNode::Publish(const orb_metadata &meta, const void *data) {
   return true;
 }
 
-bool uORB::DeviceNode::Unadvertise() {
-  /*
-   * We are cheating a bit here. First, with the current implementation, we can
-   * only have multiple publishers for instance 0. In this case the caller will
-   * have instance=nullptr and _published has no effect at all. Thus no
-   * unadvertise is necessary. In case of multiple instances, we have at most 1
-   * publisher per instance and we can signal an instance as 'free' by setting
-   * _published to false. We never really free the DeviceNode, for this we would
-   * need reference counting of subscribers and publishers. But we also do not
-   * have a leak since future publishers reuse the same DeviceNode object.
-   */
-  advertised_ = false;
-
-  return true;
-}
-
-bool uORB::DeviceNode::SetQueueSize(uint16_t queue_size) {
-  uORB::base::MutexGuard lg(lock_);
-  if (queue_size_ == queue_size) {
-    return true;
-  }
-
-  // queue size is limited to 255 for the single reason that we use uint8 to
-  // store it
-  if (data_ || queue_size_ > queue_size) {
-    return false;
-  }
-
-  queue_size_ = GenerateQueueSize(queue_size);
-  return true;
-}
-
 void uORB::DeviceNode::IncreaseSubscriberCount() {
   base::MutexGuard lg(lock_);
   subscriber_count_++;
@@ -172,4 +140,9 @@ void uORB::DeviceNode::IncreaseSubscriberCount() {
 void uORB::DeviceNode::ReduceSubscriberCount() {
   base::MutexGuard lg(lock_);
   subscriber_count_--;
+}
+
+bool uORB::DeviceNode::IsSameWith(const orb_metadata &meta,
+                                  uint8_t instance) const {
+  return (strcmp(meta_.o_name, meta.o_name) == 0) && (instance_ == instance);
 }

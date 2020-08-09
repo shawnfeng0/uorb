@@ -38,6 +38,9 @@
 
 #pragma once
 
+#include <base/orb_errno.h>
+#include <base/orb_log.h>
+
 #include "uORB.h"
 #include "uORB/topics/uORBTopics.hpp"
 #include "uORBDeviceNode.hpp"
@@ -46,30 +49,30 @@ namespace uORB {
 
 class PublicationBase {
  public:
-  bool advertised() const { return _handle != nullptr; }
+  bool advertised() const { return dev_ != nullptr; }
 
   bool unadvertise() {
-    if (_handle) return static_cast<DeviceNode *>(_handle)->Unadvertise();
-    return false;
+    if (dev_) dev_->mark_as_unadvertised();
+    return true;
   }
 
-  orb_id_t get_topic() const { return get_orb_meta(_orb_id); }
+  orb_id_t get_topic() const { return meta_; }
 
  protected:
-  explicit PublicationBase(ORB_ID id) : _orb_id(id) {}
+  explicit PublicationBase(const orb_metadata *meta) : meta_(meta) {}
 
   ~PublicationBase() {
-    if (_handle != nullptr) {
+    if (dev_ != nullptr) {
       // don't automatically unadvertise queued publications (eg
       // vehicle_command)
-      if (static_cast<DeviceNode *>(_handle)->get_queue_size() == 1) {
+      if (dev_->get_queue_size() == 1) {
         unadvertise();
       }
     }
   }
 
-  orb_advert_t _handle{nullptr};
-  const ORB_ID _orb_id;
+  uORB::DeviceNode *dev_{nullptr};
+  const orb_metadata *meta_;
 };
 
 /**
@@ -84,13 +87,28 @@ class Publication : public PublicationBase {
    * @param meta The uORB metadata (usually from the ORB_ID() macro) for the
    * topic.
    */
-  explicit Publication(ORB_ID id) : PublicationBase(id) {}
-  explicit Publication(const orb_metadata *meta)
-      : PublicationBase(static_cast<ORB_ID>(meta->o_id)) {}
+  explicit Publication(const orb_metadata *meta) : PublicationBase(meta) {}
 
   bool advertise() {
     if (!advertised()) {
-      _handle = orb_advertise_queue(get_topic(), nullptr, ORB_QSIZE);
+      const orb_metadata &meta = *get_topic();
+      DeviceMaster &master = DeviceMaster::get_instance();
+
+      /* if we have an instance and are an advertiser, we will generate a new
+       * node and set the instance, so we do not need to open here */
+      /* open the path as either the advertiser or the subscriber */
+      dev_ = master.GetDeviceNode(meta, 0);
+
+      /* we may need to advertise the node... */
+      if (!dev_) {
+        /* it's OK if it already exists */
+        dev_ = master.CreateAdvertiser(meta, nullptr, ORB_QSIZE);
+      }
+
+      if (!dev_) {
+        ORB_ERR("%s advertise failed (%i)", meta.o_name, orb_errno);
+        return false;
+      }
     }
 
     return advertised();
@@ -107,7 +125,7 @@ class Publication : public PublicationBase {
     if (advertised()) {
       // don't automatically unadvertise queued publications (eg
       // vehicle_command)
-      return static_cast<DeviceNode *>(_handle)->Publish(*get_topic(), &data);
+      return dev_->Publish(*get_topic(), &data);
     }
     return false;
   }
@@ -125,7 +143,6 @@ class PublicationData : public Publication<T> {
    * @param meta The uORB metadata (usually from the ORB_ID() macro) for the
    * topic.
    */
-  explicit PublicationData(ORB_ID id) : Publication<T>(id) {}
   explicit PublicationData(const orb_metadata *meta) : Publication<T>(meta) {}
 
   T &get() { return _data; }

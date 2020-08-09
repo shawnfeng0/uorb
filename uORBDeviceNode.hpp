@@ -75,6 +75,8 @@ class DeviceNode {
    */
   void ReduceSubscriberCount();
 
+  bool IsSameWith(const orb_metadata &meta, uint8_t instance) const;
+
   /**
    * Return true if this topic has been advertised.
    *
@@ -82,15 +84,22 @@ class DeviceNode {
    * advertise and publish to this node or if another node should be tried. */
   bool is_advertised() const { return advertised_; }
 
-  bool Unadvertise();
-
+  /*
+   * We are cheating a bit here. First, with the current implementation, we can
+   * only have multiple publishers for instance 0. In this case the caller will
+   * have instance=nullptr and _published has no effect at all. Thus no
+   * unadvertise is necessary. In case of multiple instances, we have at most 1
+   * publisher per instance and we can signal an instance as 'free' by setting
+   * _published to false. We never really free the DeviceNode, for this we would
+   * need reference counting of subscribers and publishers. But we also do not
+   * have a leak since future publishers reuse the same DeviceNode object.
+   */
+  void mark_as_unadvertised() { advertised_ = false; }
   void mark_as_advertised() { advertised_ = true; }
 
   uint16_t get_queue_size() const { return queue_size_; }
 
   unsigned published_message_count() const { return generation_; }
-
-  ORB_ID id() const { return static_cast<ORB_ID>(meta_.o_id); }
 
   const char *get_name() const { return meta_.o_name; }
 
@@ -108,8 +117,6 @@ class DeviceNode {
    *   Returns true if the data was copied.
    */
   bool Copy(void *dst, unsigned &sub_generation);
-
-  bool SetQueueSize(uint16_t queue_size);
 
  private:
   const orb_metadata &meta_; /**< object metadata information */

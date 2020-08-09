@@ -42,49 +42,29 @@
 
 #include "uORB.h"
 #include "uORBDeviceNode.hpp"
-#include "uORBManager.hpp"
 
 namespace uORB {
 
 // Base subscription wrapper class
 class Subscription {
  public:
-
   /**
    * Constructor
    *
-   * @param id The uORB ORB_ID enum for the topic.
+   * @param meta The uORB metadata (usually from the ORB_ID() macro) for the
+   * topic.
    * @param instance The instance for multi sub.
    */
-  explicit Subscription(ORB_ID id, uint8_t instance = 0) :
-      _orb_id(id),
-      _instance(instance)
-  {
-  }
+  explicit Subscription(const orb_metadata *meta, uint8_t instance = 0)
+      : meta_(meta), _instance(instance) {}
 
-  /**
-   * Constructor
-   *
-   * @param meta The uORB metadata (usually from the ORB_ID() macro) for the topic.
-   * @param instance The instance for multi sub.
-   */
-  explicit Subscription(const orb_metadata *meta, uint8_t instance = 0) :
-      _orb_id((meta == nullptr) ? ORB_ID::INVALID : static_cast<ORB_ID>(meta->o_id)),
-      _instance(instance)
-  {
-  }
-
-  ~Subscription()
-  {
-    unsubscribe();
-  }
+  ~Subscription() { unsubscribe(); }
 
   bool subscribe();
   void unsubscribe();
 
   bool valid() const { return _node != nullptr; }
-  bool advertised()
-  {
+  bool advertised() {
     if (valid()) {
       return _node->is_advertised();
     }
@@ -103,7 +83,10 @@ class Subscription {
   /**
    * Check if there is a new update.
    * */
-  bool updated() { return advertised() ? (_node->published_message_count() != _last_generation) : false; }
+  bool updated() {
+    return advertised() ? (_node->published_message_count() != _last_generation)
+                        : false;
+  }
 
   /**
    * Update the struct
@@ -115,11 +98,13 @@ class Subscription {
    * Copy the struct
    * @param data The uORB message struct we are updating.
    */
-  bool copy(void *dst) { return advertised() ? _node->Copy(dst, _last_generation) : false; }
+  bool copy(void *dst) {
+    return advertised() ? _node->Copy(dst, _last_generation) : false;
+  }
 
-  uint8_t  get_instance() const { return _instance; }
+  uint8_t get_instance() const { return _instance; }
   unsigned get_last_generation() const { return _last_generation; }
-  orb_id_t get_topic() const { return get_orb_meta(_orb_id); }
+  orb_id_t get_topic() const { return meta_; }
 
  protected:
   DeviceNode *get_node() { return _node; }
@@ -128,14 +113,13 @@ class Subscription {
 
   unsigned _last_generation{0}; /**< last generation the subscriber has seen */
 
-  ORB_ID _orb_id{ORB_ID::INVALID};
+  const orb_metadata *meta_;
   uint8_t _instance{0};
 };
 
 // Subscription wrapper class with data
-template<class T>
-class SubscriptionData : public Subscription
-{
+template <class T>
+class SubscriptionData : public Subscription {
  public:
   /**
    * Constructor
@@ -143,21 +127,20 @@ class SubscriptionData : public Subscription
    * @param id The uORB metadata ORB_ID enum for the topic.
    * @param instance The instance for multi sub.
    */
-  explicit SubscriptionData(ORB_ID id, uint8_t instance = 0) :
-      Subscription(id, instance)
-  {
+  explicit SubscriptionData(ORB_ID id, uint8_t instance = 0)
+      : Subscription(id, instance) {
     copy(&_data);
   }
 
   /**
    * Constructor
    *
-   * @param meta The uORB metadata (usually from the ORB_ID() macro) for the topic.
+   * @param meta The uORB metadata (usually from the ORB_ID() macro) for the
+   * topic.
    * @param instance The instance for multi sub.
    */
-  explicit SubscriptionData(const orb_metadata *meta, uint8_t instance = 0) :
-      Subscription(meta, instance)
-  {
+  explicit SubscriptionData(const orb_metadata *meta, uint8_t instance = 0)
+      : Subscription(meta, instance) {
     copy(&_data);
   }
 
@@ -175,8 +158,7 @@ class SubscriptionData : public Subscription
   const T &get() const { return _data; }
 
  private:
-
   T _data{};
 };
 
-} // namespace uORB
+}  // namespace uORB

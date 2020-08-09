@@ -199,6 +199,6 @@ using atomic_int32_t = atomic<int32_t>;
 using atomic_bool = atomic<bool>;
 
 }  // namespace base
-}  // namespace uORB
+}  // namespace uorb
 
 #endif /* __cplusplus */
