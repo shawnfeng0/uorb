@@ -38,7 +38,7 @@
 
 #include "orb_atomic.hpp"
 
-namespace uORB {
+namespace uorb {
 
 namespace base {
 template <size_t N>

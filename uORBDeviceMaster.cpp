@@ -38,9 +38,9 @@
 #include "base/orb_log.h"
 #include "uORBDeviceNode.hpp"
 
-uORB::DeviceMaster uORB::DeviceMaster::instance_;
+uorb::DeviceMaster uorb::DeviceMaster::instance_;
 
-uORB::DeviceNode *uORB::DeviceMaster::CreateAdvertiser(
+uorb::DeviceNode *uorb::DeviceMaster::CreateAdvertiser(
     const orb_metadata &meta, const unsigned int *instance,
     uint16_t queue_size) {
   /* try for topic groups */
@@ -51,7 +51,7 @@ uORB::DeviceNode *uORB::DeviceMaster::CreateAdvertiser(
   unsigned group_tries = 0;
   bool find_one = false;
 
-  uORB::base::MutexGuard lg(_lock);
+  uorb::base::MutexGuard lg(_lock);
 
   // Find the following devices that can advertise:
   // - Unregistered device
@@ -91,13 +91,13 @@ uORB::DeviceNode *uORB::DeviceMaster::CreateAdvertiser(
   return device_node;
 }
 
-uORB::DeviceNode *uORB::DeviceMaster::GetDeviceNode(const orb_metadata &meta,
+uorb::DeviceNode *uorb::DeviceMaster::GetDeviceNode(const orb_metadata &meta,
                                                     uint8_t instance) {
-  uORB::base::MutexGuard lg(_lock);
+  uorb::base::MutexGuard lg(_lock);
   return GetDeviceNodeLocked(meta, instance);
 }
 
-uORB::DeviceNode *uORB::DeviceMaster::GetDeviceNodeLocked(
+uorb::DeviceNode *uorb::DeviceMaster::GetDeviceNodeLocked(
     const orb_metadata &meta, uint8_t instance) const {
   // We can safely return the node that can be used by any thread, because a
   // DeviceNode never gets deleted.

@@ -35,7 +35,7 @@
 
 #include "uORBDeviceMaster.hpp"
 
-namespace uORB {
+namespace uorb {
 
 /**
  * Per-object device instance.
@@ -164,4 +164,4 @@ class DeviceNode {
     return r;
   }
 };
-}  // namespace uORB
+}  // namespace uorb

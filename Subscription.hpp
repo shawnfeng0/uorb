@@ -41,7 +41,7 @@
 #include "uORB.h"
 #include "uORBDeviceNode.hpp"
 
-namespace uORB {
+namespace uorb {
 
 // Base subscription wrapper class
 class Subscription {
@@ -148,4 +148,4 @@ class SubscriptionData : public Subscription {
   T _data{};
 };
 
-}  // namespace uORB
+}  // namespace uorb

@@ -2,7 +2,7 @@
 
 #include <pthread.h>
 
-namespace uORB {
+namespace uorb {
 namespace base {
 
 // Common base class for Mutex

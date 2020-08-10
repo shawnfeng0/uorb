@@ -24,7 +24,7 @@
 #include <semaphore.h>
 #include <stdint.h>
 
-namespace uORB {
+namespace uorb {
 namespace base {
 
 class Semaphore {
@@ -84,4 +84,4 @@ class Semaphore {
 };
 
 }  // namespace base
-}  // namespace uORB
+}  // namespace uorb

@@ -36,13 +36,13 @@
 #include "base/orb_errno.h"
 #include "base/orb_log.h"
 
-uORB::DeviceNode::DeviceNode(const struct orb_metadata &meta, uint8_t instance,
+uorb::DeviceNode::DeviceNode(const struct orb_metadata &meta, uint8_t instance,
                              uint16_t queue_size)
     : meta_(meta),
       instance_(instance),
       queue_size_(GenerateQueueSize(queue_size)) {}
 
-uORB::DeviceNode::~DeviceNode() { delete[] data_; }
+uorb::DeviceNode::~DeviceNode() { delete[] data_; }
 
 template <typename T>
 static inline bool is_in_range(const T &left, const T &value, const T &right) {
@@ -53,7 +53,7 @@ static inline bool is_in_range(const T &left, const T &value, const T &right) {
   }
 }
 
-bool uORB::DeviceNode::Copy(void *dst, unsigned &sub_generation) {
+bool uorb::DeviceNode::Copy(void *dst, unsigned &sub_generation) {
   base::MutexGuard lg(lock_);
 
   if ((dst == nullptr) || (data_ == nullptr) || (generation_ == 0)) {
@@ -94,7 +94,7 @@ bool uORB::DeviceNode::Copy(void *dst, unsigned &sub_generation) {
   return true;
 }
 
-bool uORB::DeviceNode::Publish(const orb_metadata &meta, const void *data) {
+bool uorb::DeviceNode::Publish(const orb_metadata &meta, const void *data) {
   /* check if the device handle is initialized and data is valid */
   if (data == nullptr) {
     orb_errno = EFAULT;
@@ -132,17 +132,17 @@ bool uORB::DeviceNode::Publish(const orb_metadata &meta, const void *data) {
   return true;
 }
 
-void uORB::DeviceNode::IncreaseSubscriberCount() {
+void uorb::DeviceNode::IncreaseSubscriberCount() {
   base::MutexGuard lg(lock_);
   subscriber_count_++;
 }
 
-void uORB::DeviceNode::ReduceSubscriberCount() {
+void uorb::DeviceNode::ReduceSubscriberCount() {
   base::MutexGuard lg(lock_);
   subscriber_count_--;
 }
 
-bool uORB::DeviceNode::IsSameWith(const orb_metadata &meta,
+bool uorb::DeviceNode::IsSameWith(const orb_metadata &meta,
                                   uint8_t instance) const {
   return (strcmp(meta_.o_name, meta.o_name) == 0) && (instance_ == instance);
 }

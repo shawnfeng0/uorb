@@ -85,7 +85,7 @@
 #define __ATOMIC_SEQ_CST 5
 #endif
 
-namespace uORB {
+namespace uorb {
 namespace base {
 
 template <typename T>

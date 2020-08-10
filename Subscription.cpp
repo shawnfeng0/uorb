@@ -38,7 +38,7 @@
 
 #include "Subscription.hpp"
 
-namespace uORB {
+namespace uorb {
 
 bool Subscription::subscribe() {
   // check if already subscribed
@@ -46,7 +46,7 @@ bool Subscription::subscribe() {
     return true;
   }
 
-  DeviceMaster &device_master = uORB::DeviceMaster::get_instance();
+  DeviceMaster &device_master = uorb::DeviceMaster::get_instance();
 
   _node = device_master.GetDeviceNode(*get_topic(), _instance);
 
@@ -80,4 +80,4 @@ void Subscription::unsubscribe() {
   _last_generation = 0;
 }
 
-}  // namespace uORB
+}  // namespace uorb

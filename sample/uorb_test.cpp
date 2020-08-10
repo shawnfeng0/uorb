@@ -13,7 +13,7 @@
 #include "sample/ulog/src/ulog.h"
 
 void *adviser_cpuload(void *) {
-  uORB::PublicationData<cpuload_s> cpuload_pub{};
+  uorb::PublicationData<cpuload_s> cpuload_pub{};
 
   for (int i = 0; i < 10; i++) {
     cpuload_pub.get().timestamp = orb_absolute_time();
@@ -29,7 +29,7 @@ void *adviser_cpuload(void *) {
 }
 
 void *cpuload_update_poll(void *arg) {
-  uORB::SubscriptionData<cpuload_s> cpu_load_sub_data{};
+  uorb::SubscriptionData<cpuload_s> cpu_load_sub_data{};
 
   uint32_t sleep_time_s = (arg) ? *(int32_t *)arg : 0;
 

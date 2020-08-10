@@ -36,25 +36,24 @@
 #include <cstdint>
 #include <list>
 
-#include "base/atomic_bitset.h"
 #include "base/orb_mutex.hpp"
 #include "uORB.h"
 
-namespace uORB {
+namespace uorb {
 class DeviceNode;
 class DeviceMaster;
-}  // namespace uORB
+}  // namespace uorb
 
 /**
  * Master control device for uorb message device node.
  */
-class uORB::DeviceMaster {
+class uorb::DeviceMaster {
  public:
   /**
    * Method to get the singleton instance for the uORB::DeviceMaster.
    * @return uORB::DeviceMaster &
    */
-  static inline uORB::DeviceMaster &get_instance() { return instance_; }
+  static inline uorb::DeviceMaster &get_instance() { return instance_; }
 
   DeviceNode *CreateAdvertiser(const orb_metadata &meta,
                                const unsigned int *instance,
@@ -63,8 +62,8 @@ class uORB::DeviceMaster {
    * Public interface for GetDeviceNodeLocked(). Takes care of synchronization.
    * @return node if exists, nullptr otherwise
    */
-  uORB::DeviceNode *GetDeviceNode(const orb_metadata &meta, uint8_t instance);
-  uORB::DeviceNode *GetDeviceNodeLocked(const orb_metadata &meta,
+  uorb::DeviceNode *GetDeviceNode(const orb_metadata &meta, uint8_t instance);
+  uorb::DeviceNode *GetDeviceNodeLocked(const orb_metadata &meta,
                                         uint8_t instance) const;
 
  private:
@@ -73,7 +72,7 @@ class uORB::DeviceMaster {
   DeviceMaster() = default;
   ~DeviceMaster() = default;
 
-  std::list<uORB::DeviceNode *> _node_list;
+  std::list<uorb::DeviceNode *> _node_list;
   base::Mutex _lock; /**< lock to protect access to all class members
                               (also for derived classes) */
 };

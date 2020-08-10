@@ -44,7 +44,7 @@
 #include "uORB.h"
 #include "uORBDeviceNode.hpp"
 
-namespace uORB {
+namespace uorb {
 
 class PublicationBase {
  public:
@@ -70,7 +70,7 @@ class PublicationBase {
     }
   }
 
-  uORB::DeviceNode *dev_{nullptr};
+  uorb::DeviceNode *dev_{nullptr};
   const orb_metadata *meta_;
 };
 
@@ -161,4 +161,4 @@ class PublicationData : public Publication<T> {
 template <class T>
 using PublicationQueued = Publication<T, T::ORB_QUEUE_LENGTH>;
 
-}  // namespace uORB
+}  // namespace uorb

@@ -7,7 +7,7 @@
 #include "orb_errno.h"
 #include "orb_mutex.hpp"
 
-namespace uORB {
+namespace uorb {
 namespace base {
 
 template <clockid_t clock_id>
@@ -158,4 +158,4 @@ typedef SimpleSemaphore<CLOCK_REALTIME> RealClockSemaphore;
 typedef SimpleSemaphore<CLOCK_MONOTONIC> MonoClockSemaphore;
 
 }  // namespace base
-}  // namespace uORB
+}  // namespace uorb
