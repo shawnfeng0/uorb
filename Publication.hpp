@@ -86,7 +86,7 @@ class Publication : public PublicationBase {
    * @param meta The uORB metadata (usually from the ORB_ID() macro) for the
    * topic.
    */
-  explicit Publication(const orb_metadata *meta) : PublicationBase(meta) {}
+  explicit Publication() : PublicationBase(T::get_metadata()) {}
 
   bool advertise() {
     if (!advertised()) {
@@ -142,7 +142,7 @@ class PublicationData : public Publication<T> {
    * @param meta The uORB metadata (usually from the ORB_ID() macro) for the
    * topic.
    */
-  explicit PublicationData(const orb_metadata *meta) : Publication<T>(meta) {}
+  explicit PublicationData() : Publication<T>() {}
 
   T &get() { return _data; }
   void set(const T &data) { _data = data; }

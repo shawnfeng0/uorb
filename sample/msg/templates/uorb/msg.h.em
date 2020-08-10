@@ -83,6 +83,11 @@ for field in spec.parsed_fields():
             print('#include <uORB/topics/%s.h>'%(name))
 }@
 
+/* register this as object request broker structure */
+@[for multi_topic in topics]@
+ORB_DECLARE(@multi_topic);
+@[end for]
+
 @# Constants c style
 #ifndef __cplusplus
 @[for constant in spec.constants]@
@@ -127,10 +132,10 @@ for constant in spec.constants:
 
     print('\tstatic constexpr %s %s = %s;'%(type_px4, constant.name, int(constant.val)))
 }
+@{
+print('\tstatic const orb_metadata *get_metadata() {')
+print('\t\treturn ORB_ID(%s);'%(topic_name))
+print('\t}')
+}
 #endif
 };
-
-/* register this as object request broker structure */
-@[for multi_topic in topics]@
-ORB_DECLARE(@multi_topic);
-@[end for]

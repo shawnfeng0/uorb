@@ -126,8 +126,8 @@ class SubscriptionData : public Subscription {
    * topic.
    * @param instance The instance for multi sub.
    */
-  explicit SubscriptionData(const orb_metadata *meta, uint8_t instance = 0)
-      : Subscription(meta, instance) {
+  explicit SubscriptionData(uint8_t instance = 0)
+      : Subscription(T::get_metadata(), instance) {
     copy(&_data);
   }
 
