@@ -74,15 +74,13 @@ except ImportError as e:
     print("")
     sys.exit(1)
 
-
 __author__ = "Sergey Belash, Thomas Gubler, Beat Kueng"
 __copyright__ = "Copyright (C) 2013-2016 PX4 Development Team."
 __license__ = "BSD"
 __email__ = "thomasgubler@gmail.com"
 
-
 TEMPLATE_FILE = ['msg.h.em', 'msg.cpp.em']
-TOPICS_LIST_TEMPLATE_FILE = ['uORBTopics.hpp.em', 'uORBTopics.cpp.em']
+TOPICS_LIST_TEMPLATE_FILE = 'uORBTopics.cpp.em'
 OUTPUT_FILE_EXT = ['.h', '.cpp']
 INCL_DEFAULT = ['std_msgs:./msg/std_msgs']
 PACKAGE = 'px4'
@@ -144,8 +142,9 @@ def generate_output_from_file(format_idx, filename, outputdir, package, template
     try:
         assert field_name_and_type.get('timestamp') == 'uint64'
     except AssertionError:
-        print("[ERROR] uORB topic files generator:\n\tgenerate_output_from_file:\t'timestamp' field in " + spec.short_name +
-              " msg definition is not of type uint64 but rather of type " + field_name_and_type.get('timestamp') + "!")
+        print(
+            "[ERROR] uORB topic files generator:\n\tgenerate_output_from_file:\t'timestamp' field in " + spec.short_name +
+            " msg definition is not of type uint64 but rather of type " + field_name_and_type.get('timestamp') + "!")
         exit(1)
     topics = get_multi_topics(filename)
     if includepath:
@@ -177,7 +176,8 @@ def generate_output_from_file(format_idx, filename, outputdir, package, template
     return generate_by_template(output_file, template_file, em_globals)
 
 
-def generate_idl_file(filename_msg, msg_dir, alias, outputdir, templatedir, package, includepath, fastrtps_version, ros2_distro, ids):
+def generate_idl_file(filename_msg, msg_dir, alias, outputdir, templatedir, package, includepath, fastrtps_version,
+                      ros2_distro, ids):
     """
     Generates an .idl from .msg file
     """
@@ -207,8 +207,10 @@ def generate_idl_file(filename_msg, msg_dir, alias, outputdir, templatedir, pack
     return generate_by_template(output_file, template_file, em_globals)
 
 
-def generate_uRTPS_general(filename_send_msgs, filename_alias_send_msgs, filename_receive_msgs, filename_alias_receive_msgs,
-                           msg_dir, outputdir, templatedir, package, includepath, ids, fastrtps_version, ros2_distro, template_name):
+def generate_uRTPS_general(filename_send_msgs, filename_alias_send_msgs, filename_receive_msgs,
+                           filename_alias_receive_msgs,
+                           msg_dir, outputdir, templatedir, package, includepath, ids, fastrtps_version, ros2_distro,
+                           template_name):
     """
     Generates source file by msg content
     """
@@ -230,7 +232,8 @@ def generate_uRTPS_general(filename_send_msgs, filename_alias_send_msgs, filenam
 
     if alias_send_msgs:
         em_globals_list.extend([get_em_globals(
-            f[0], f[1], package, includepath, ids, fastrtps_version, ros2_distro, MsgScope.SEND) for f in alias_send_msgs])
+            f[0], f[1], package, includepath, ids, fastrtps_version, ros2_distro, MsgScope.SEND) for f in
+            alias_send_msgs])
 
     if receive_msgs:
         em_globals_list.extend([get_em_globals(
@@ -238,7 +241,8 @@ def generate_uRTPS_general(filename_send_msgs, filename_alias_send_msgs, filenam
 
     if alias_receive_msgs:
         em_globals_list.extend([get_em_globals(
-            f[0], f[1], package, includepath, ids, fastrtps_version, ros2_distro, MsgScope.RECEIVE) for f in alias_receive_msgs])
+            f[0], f[1], package, includepath, ids, fastrtps_version, ros2_distro, MsgScope.RECEIVE) for f in
+            alias_receive_msgs])
 
     merged_em_globals = merge_em_globals_list(em_globals_list)
 
@@ -253,7 +257,8 @@ def generate_uRTPS_general(filename_send_msgs, filename_alias_send_msgs, filenam
     return generate_by_template(output_file, template_file, merged_em_globals)
 
 
-def generate_topic_file(filename_msg, msg_dir, alias, outputdir, templatedir, package, includepath, ids, fastrtps_version, ros2_distro, template_name):
+def generate_topic_file(filename_msg, msg_dir, alias, outputdir, templatedir, package, includepath, ids,
+                        fastrtps_version, ros2_distro, template_name):
     """
     Generates a sources and headers from .msg file
     """
@@ -343,7 +348,7 @@ def generate_by_template(output_file, template_file, em_globals):
     ofile = open(output_file, 'w')
     # todo, reuse interpreter
     interpreter = em.Interpreter(output=ofile, globals=em_globals, options={
-                                 em.RAW_OPT: True, em.BUFFERED_OPT: True})
+        em.RAW_OPT: True, em.BUFFERED_OPT: True})
     try:
         interpreter.file(open(template_file))
     except OSError as e:
@@ -444,7 +449,7 @@ def convert_dir_save(format_idx, inputdir, outputdir, package, templatedir, temp
     # Create new headers in temporary output directory
     convert_dir(format_idx, inputdir, temporarydir, package, templatedir)
     if generate_idx == 1:
-        generate_topics_list_file(inputdir, temporarydir, TOPICS_LIST_TEMPLATE_FILE[1], templatedir)
+        generate_topics_list_file(inputdir, temporarydir, TOPICS_LIST_TEMPLATE_FILE, templatedir)
     # Copy changed headers from temporary dir to output dir
     copy_changed(temporarydir, outputdir, prefix, quiet)
 
@@ -495,7 +500,7 @@ if __name__ == "__main__":
                         help='Additional Include Paths', nargs="*",
                         default=None)
     parser.add_argument('-e', dest='templatedir',
-                        help='directory with template files',)
+                        help='directory with template files', )
     parser.add_argument('-k', dest='package', default=PACKAGE,
                         help='package name')
     parser.add_argument('-o', dest='outputdir',
@@ -504,10 +509,10 @@ if __name__ == "__main__":
                         help='temporary directory')
     parser.add_argument('-p', dest='prefix', default='',
                         help='string added as prefix to the output file '
-                        ' name when converting directories')
+                             ' name when converting directories')
     parser.add_argument('-q', dest='quiet', default=False, action='store_true',
                         help='string added as prefix to the output file '
-                        ' name when converting directories')
+                             ' name when converting directories')
     parser.add_argument('--constrained-flash', dest='constrained_flash', default=False, action='store_true',
                         help='set to save flash space')
     args = parser.parse_args()
@@ -528,8 +533,9 @@ if __name__ == "__main__":
         for f in args.file:
             generate_output_from_file(
                 generate_idx, f, args.temporarydir, args.package, args.templatedir, INCL_DEFAULT)
-
-        generate_topics_list_file_from_files(args.file, args.outputdir, TOPICS_LIST_TEMPLATE_FILE[generate_idx], args.templatedir)
+        if generate_idx == 1:
+            generate_topics_list_file_from_files(
+                args.file, args.outputdir, TOPICS_LIST_TEMPLATE_FILE, args.templatedir)
         copy_changed(args.temporarydir, args.outputdir, args.prefix, args.quiet)
     elif args.dir is not None:
         convert_dir_save(

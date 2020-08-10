@@ -38,8 +38,6 @@
 
 #pragma once
 
-#include <sample/msg/uORB/topics/uORBTopics.hpp>
-
 #include "uORB.h"
 #include "uORBDeviceNode.hpp"
 
@@ -121,17 +119,6 @@ class Subscription {
 template <class T>
 class SubscriptionData : public Subscription {
  public:
-  /**
-   * Constructor
-   *
-   * @param id The uORB metadata ORB_ID enum for the topic.
-   * @param instance The instance for multi sub.
-   */
-  explicit SubscriptionData(ORB_ID id, uint8_t instance = 0)
-      : Subscription(id, instance) {
-    copy(&_data);
-  }
-
   /**
    * Constructor
    *

@@ -35,8 +35,6 @@
 
 #include <base/orb_errno.h>
 
-#include <sample/msg/uORB/topics/uORBTopics.hpp>
-
 #include "base/orb_log.h"
 #include "uORBDeviceNode.hpp"
 

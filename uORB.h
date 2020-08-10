@@ -52,7 +52,6 @@ struct orb_metadata {
   const uint16_t
       o_size_no_padding; /**< object size w/o padding at the end (for logger) */
   const char *o_fields;  /**< semicolon separated list of fields (with type) */
-  uint8_t o_id;          /**< ORB_ID enum */
 };
 
 typedef const struct orb_metadata *orb_id_t;
@@ -103,9 +102,9 @@ typedef const struct orb_metadata *orb_id_t;
  * position;bool armed"
  * @param _orb_id_enum	ORB ID enum e.g.: ORB_ID::vehicle_status
  */
-#define ORB_DEFINE(_name, _struct, _size_no_padding, _fields, _orb_id_enum) \
-  const struct orb_metadata __orb_##_name = {                               \
-      #_name, sizeof(_struct), _size_no_padding, _fields, _orb_id_enum};    \
+#define ORB_DEFINE(_name, _struct, _size_no_padding, _fields)            \
+  const struct orb_metadata __orb_##_name = {#_name, sizeof(_struct),    \
+                                             _size_no_padding, _fields}; \
   struct hack
 
 __BEGIN_DECLS
