@@ -6,6 +6,7 @@
 
 static pthread_key_t key;
 static pthread_once_t init_done = PTHREAD_ONCE_INIT;
+static int errno_aux;
 
 static void free_errno(void *p_errno) { delete ((int *)p_errno); }
 
@@ -18,7 +19,12 @@ int *orb_errno_location() {
 
   if (p_errno == nullptr) {
     p_errno = new int;
-    if (p_errno != nullptr) pthread_setspecific(key, p_errno);
+  }
+
+  if (p_errno != nullptr) {
+    pthread_setspecific(key, p_errno);
+  } else {
+    p_errno = &errno_aux;
   }
 
   return p_errno;
