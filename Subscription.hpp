@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -54,25 +54,22 @@ class Subscription {
    * @param instance The instance for multi sub.
    */
   explicit Subscription(const orb_metadata &meta, uint8_t instance = 0)
-      : meta_(meta), _instance(instance) {}
+      : meta_(meta), instance_(instance) {}
 
-  ~Subscription() { unsubscribe(); }
+  ~Subscription() {
+    if (node_) node_->ReduceSubscriberCount();
+  }
 
   bool subscribe();
-  void unsubscribe();
 
-  bool valid() const { return _node != nullptr; }
   bool advertised() {
-    if (valid()) {
-      return _node->is_advertised();
+    if (!node_) {
+      // try to initialize
+      subscribe();
     }
 
-    // try to initialize
-    if (subscribe()) {
-      // check again if valid
-      if (valid()) {
-        return _node->is_advertised();
-      }
+    if (node_) {
+      return node_->is_advertised();
     }
 
     return false;
@@ -80,9 +77,9 @@ class Subscription {
 
   /**
    * Check if there is a new update.
-   * */
+   */
   bool updated() {
-    return advertised() ? (_node->published_message_count() != _last_generation)
+    return advertised() ? (node_->published_message_count() != last_generation_)
                         : false;
   }
 
@@ -97,21 +94,19 @@ class Subscription {
    * @param data The uORB message struct we are updating.
    */
   bool copy(void *dst) {
-    return advertised() ? _node->Copy(dst, _last_generation) : false;
+    return advertised() ? node_->Copy(dst, last_generation_) : false;
   }
 
-  uint8_t get_instance() const { return _instance; }
-  unsigned get_last_generation() const { return _last_generation; }
+  uint8_t get_instance() const { return instance_; }
+  unsigned get_last_generation() const { return last_generation_; }
 
  protected:
-  DeviceNode *get_node() { return _node; }
+  DeviceNode *node_{nullptr};
 
-  DeviceNode *_node{nullptr};
-
-  unsigned _last_generation{0}; /**< last generation the subscriber has seen */
+  unsigned last_generation_{0}; /**< last generation the subscriber has seen */
 
   const orb_metadata &meta_;
-  uint8_t _instance{0};
+  uint8_t instance_{0};
 };
 
 // Subscription wrapper class with data
@@ -121,13 +116,11 @@ class SubscriptionData : public Subscription {
   /**
    * Constructor
    *
-   * @param meta The uORB metadata (usually from the ORB_ID() macro) for the
-   * topic.
    * @param instance The instance for multi sub.
    */
   explicit SubscriptionData(uint8_t instance = 0)
       : Subscription(T::get_metadata(), instance) {
-    copy(&_data);
+    copy(&data_);
   }
 
   ~SubscriptionData() = default;
@@ -139,12 +132,12 @@ class SubscriptionData : public Subscription {
   SubscriptionData &operator=(SubscriptionData &&) = delete;
 
   // update the embedded struct.
-  bool update() { return Subscription::update((void *)(&_data)); }
+  bool update() { return Subscription::update(&data_); }
 
-  const T &get() const { return _data; }
+  const T &get() const { return data_; }
 
  private:
-  T _data{};
+  T data_{};
 };
 
 }  // namespace uorb

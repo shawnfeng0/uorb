@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -44,42 +44,33 @@ namespace uorb {
 
 bool Subscription::subscribe() {
   // check if already subscribed
-  if (_node != nullptr) {
+  if (node_) {
     return true;
   }
 
   DeviceMaster &device_master = uorb::DeviceMaster::get_instance();
 
-  _node = device_master.GetDeviceNode(meta_, _instance);
+  node_ = device_master.GetDeviceNode(meta_, instance_);
 
-  if (_node == nullptr) {
+  if (!node_) {
     return false;
   }
 
-  _node->IncreaseSubscriberCount();
+  node_->IncreaseSubscriberCount();
 
   // If there were any previous publications, allow the subscriber to read
   // them
-  const unsigned curr_gen = _node->published_message_count();
-  const uint8_t q_size = _node->get_queue_size();
+  const unsigned curr_gen = node_->published_message_count();
+  const uint8_t q_size = node_->get_queue_size();
 
   if (q_size < curr_gen) {
-    _last_generation = curr_gen - q_size;
+    last_generation_ = curr_gen - q_size;
 
   } else {
-    _last_generation = 0;
+    last_generation_ = 0;
   }
 
   return true;
-}
-
-void Subscription::unsubscribe() {
-  if (_node != nullptr) {
-    _node->ReduceSubscriberCount();
-  }
-
-  _node = nullptr;
-  _last_generation = 0;
 }
 
 }  // namespace uorb
