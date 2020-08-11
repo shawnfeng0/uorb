@@ -76,6 +76,7 @@ class DeviceNode {
   void ReduceSubscriberCount();
 
   bool IsSameWith(const orb_metadata &meta, uint8_t instance) const;
+  bool IsSameWith(const orb_metadata &meta) const;
 
   /**
    * Return true if this topic has been advertised.

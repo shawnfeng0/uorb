@@ -101,7 +101,7 @@ bool uorb::DeviceNode::Publish(const orb_metadata &meta, const void *data) {
   }
 
   /* check if the orb meta data matches the publication */
-  if (&meta_ != &meta) {
+  if (!IsSameWith(meta)) {
     orb_errno = EINVAL;
     return false;
   }
@@ -143,5 +143,9 @@ void uorb::DeviceNode::ReduceSubscriberCount() {
 
 bool uorb::DeviceNode::IsSameWith(const orb_metadata &meta,
                                   uint8_t instance) const {
-  return (strcmp(meta_.o_name, meta.o_name) == 0) && (instance_ == instance);
+  return IsSameWith(meta) && (instance_ == instance);
+}
+
+bool uorb::DeviceNode::IsSameWith(const orb_metadata &meta) const {
+  return &meta_ == &meta;
 }
