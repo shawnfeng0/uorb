@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -38,8 +38,8 @@
 
 #pragma once
 
-#include <base/errno.h>
-#include <base/log.h>
+#include "base/errno.h"
+#include "base/log.h"
 
 #include "DeviceMaster.hpp"
 #include "DeviceNode.hpp"
@@ -48,25 +48,11 @@
 namespace uorb {
 
 class PublicationBase {
- public:
-  bool advertised() const { return dev_ != nullptr; }
-
-  bool unadvertise() {
-    if (dev_) dev_->mark_as_unadvertised();
-    return true;
-  }
-
  protected:
   explicit PublicationBase(const orb_metadata &meta) : meta_(meta) {}
 
   ~PublicationBase() {
-    if (dev_ != nullptr) {
-      // don't automatically unadvertise queued publications (eg
-      // vehicle_command)
-      if (dev_->get_queue_size() == 1) {
-        unadvertise();
-      }
-    }
+    if (dev_) dev_->mark_as_unadvertised();
   }
 
   uorb::DeviceNode *dev_{nullptr};
@@ -79,81 +65,55 @@ class PublicationBase {
 template <typename T, uint8_t ORB_QSIZE = 1>
 class Publication : public PublicationBase {
  public:
-  /**
-   * Constructor
-   *
-   * @param meta The uORB metadata (usually from the ORB_ID() macro) for the
-   * topic.
-   */
-  explicit Publication() : PublicationBase(T::get_metadata()) {}
-
-  bool advertise() {
-    if (!advertised()) {
-      DeviceMaster &master = DeviceMaster::get_instance();
-
-      /* if we have an instance and are an advertiser, we will generate a new
-       * node and set the instance, so we do not need to open here */
-      /* open the path as either the advertiser or the subscriber */
-      dev_ = master.GetDeviceNode(meta_, 0);
-
-      /* we may need to advertise the node... */
-      if (!dev_) {
-        /* it's OK if it already exists */
-        dev_ = master.CreateAdvertiser(meta_, nullptr, ORB_QSIZE);
-      }
-
-      if (!dev_) {
-        ORB_ERR("%s advertise failed (%i)", meta_.o_name, orb_errno);
-        return false;
-      }
-    }
-
-    return advertised();
-  }
+  Publication() : PublicationBase(T::get_metadata()) {}
 
   /**
    * Publish the struct
    * @param data The uORB message struct we are updating.
    */
   bool publish(const T &data) {
-    if (!advertised()) {
-      advertise();
-    }
-    if (advertised()) {
-      // don't automatically unadvertise queued publications (eg
-      // vehicle_command)
+    if (!dev_) advertise();
+
+    if (dev_) {
       return dev_->Publish(meta_, &data);
     }
+
     return false;
+  }
+
+ private:
+  bool advertise() {
+    auto &device_master = DeviceMaster::get_instance();
+    dev_ = device_master.CreateAdvertiser(meta_, nullptr, ORB_QSIZE);
+
+    if (!dev_) {
+      ORB_ERR("%s advertise failed (%i)", meta_.o_name, orb_errno);
+    }
+
+    return dev_ != nullptr;
   }
 };
 
 /**
  * The publication class with data embedded.
  */
-template <typename T>
-class PublicationData : public Publication<T> {
+template <typename T, uint8_t queue_size = 1>
+class PublicationData : public Publication<T, queue_size> {
  public:
-  /**
-   * Constructor
-   *
-   * @param meta The uORB metadata (usually from the ORB_ID() macro) for the
-   * topic.
-   */
-  explicit PublicationData() : Publication<T>() {}
+  PublicationData() = default;
 
-  T &get() { return _data; }
-  void set(const T &data) { _data = data; }
+  T &get() { return data_; }
+  void set(const T &data) { data_ = data; }
 
   // Publishes the embedded struct.
-  bool update() { return Publication<T>::publish(_data); }
+  bool update() { return Publication<T, queue_size>::publish(data_); }
   bool update(const T &data) {
-    _data = data;
-    return Publication<T>::publish(_data);
+    data_ = data;
+    return Publication<T, queue_size>::publish(data_);
   }
 
  private:
-  T _data{};
+  T data_{};
 };
 
 template <class T>
