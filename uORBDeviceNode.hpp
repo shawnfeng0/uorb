@@ -41,11 +41,8 @@ namespace uorb {
  * Per-object device instance.
  */
 class DeviceNode {
+  friend DeviceMaster;
  public:
-  DeviceNode(const struct orb_metadata &meta, uint8_t instance,
-             uint16_t queue_size = 1);
-  ~DeviceNode();
-
   /* do not allow copying this class */
   // no copy, assignment, move, move assignment
   DeviceNode(const DeviceNode &) = delete;
@@ -135,6 +132,10 @@ class DeviceNode {
 
   bool advertised_{false}; /**< has ever been advertised (not necessarily
                               published data yet) */
+
+  DeviceNode(const struct orb_metadata &meta, uint8_t instance,
+             uint16_t queue_size = 1);
+  ~DeviceNode();
 
   static inline uint16_t GenerateQueueSize(uint16_t queue_size) {
     return queue_size < 2 ? 1 : RoundupPowOfTwo(queue_size);
