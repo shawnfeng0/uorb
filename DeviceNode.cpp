@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2016 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -127,6 +127,9 @@ bool uorb::DeviceNode::Publish(const orb_metadata &meta, const void *data) {
   }
 
   generation_++;
+
+  // Mark advertise status
+  if (!advertised_) advertised_ = true;
 
   return true;
 }
