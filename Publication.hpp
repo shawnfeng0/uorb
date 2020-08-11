@@ -56,10 +56,8 @@ class PublicationBase {
     return true;
   }
 
-  orb_id_t get_topic() const { return meta_; }
-
  protected:
-  explicit PublicationBase(const orb_metadata *meta) : meta_(meta) {}
+  explicit PublicationBase(const orb_metadata &meta) : meta_(meta) {}
 
   ~PublicationBase() {
     if (dev_ != nullptr) {
@@ -72,7 +70,7 @@ class PublicationBase {
   }
 
   uorb::DeviceNode *dev_{nullptr};
-  const orb_metadata *meta_;
+  const orb_metadata &meta_;
 };
 
 /**
@@ -91,22 +89,21 @@ class Publication : public PublicationBase {
 
   bool advertise() {
     if (!advertised()) {
-      const orb_metadata &meta = *get_topic();
       DeviceMaster &master = DeviceMaster::get_instance();
 
       /* if we have an instance and are an advertiser, we will generate a new
        * node and set the instance, so we do not need to open here */
       /* open the path as either the advertiser or the subscriber */
-      dev_ = master.GetDeviceNode(meta, 0);
+      dev_ = master.GetDeviceNode(meta_, 0);
 
       /* we may need to advertise the node... */
       if (!dev_) {
         /* it's OK if it already exists */
-        dev_ = master.CreateAdvertiser(meta, nullptr, ORB_QSIZE);
+        dev_ = master.CreateAdvertiser(meta_, nullptr, ORB_QSIZE);
       }
 
       if (!dev_) {
-        ORB_ERR("%s advertise failed (%i)", meta.o_name, orb_errno);
+        ORB_ERR("%s advertise failed (%i)", meta_.o_name, orb_errno);
         return false;
       }
     }
@@ -125,7 +122,7 @@ class Publication : public PublicationBase {
     if (advertised()) {
       // don't automatically unadvertise queued publications (eg
       // vehicle_command)
-      return dev_->Publish(*get_topic(), &data);
+      return dev_->Publish(meta_, &data);
     }
     return false;
   }

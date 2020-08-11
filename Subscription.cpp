@@ -50,7 +50,7 @@ bool Subscription::subscribe() {
 
   DeviceMaster &device_master = uorb::DeviceMaster::get_instance();
 
-  _node = device_master.GetDeviceNode(*get_topic(), _instance);
+  _node = device_master.GetDeviceNode(meta_, _instance);
 
   if (_node == nullptr) {
     return false;

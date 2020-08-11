@@ -133,8 +133,8 @@ for constant in spec.constants:
     print('\tstatic constexpr %s %s = %s;'%(type_px4, constant.name, int(constant.val)))
 }
 @{
-print('\tstatic const orb_metadata *get_metadata() {')
-print('\t\treturn ORB_ID(%s);'%(topic_name))
+print('\tstatic inline const constexpr orb_metadata &get_metadata() {')
+print('\t\treturn *ORB_ID(%s);'%(topic_name))
 print('\t}')
 }
 #endif

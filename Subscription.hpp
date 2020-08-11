@@ -53,7 +53,7 @@ class Subscription {
    * topic.
    * @param instance The instance for multi sub.
    */
-  explicit Subscription(const orb_metadata *meta, uint8_t instance = 0)
+  explicit Subscription(const orb_metadata &meta, uint8_t instance = 0)
       : meta_(meta), _instance(instance) {}
 
   ~Subscription() { unsubscribe(); }
@@ -102,7 +102,6 @@ class Subscription {
 
   uint8_t get_instance() const { return _instance; }
   unsigned get_last_generation() const { return _last_generation; }
-  orb_id_t get_topic() const { return meta_; }
 
  protected:
   DeviceNode *get_node() { return _node; }
@@ -111,7 +110,7 @@ class Subscription {
 
   unsigned _last_generation{0}; /**< last generation the subscriber has seen */
 
-  const orb_metadata *meta_;
+  const orb_metadata &meta_;
   uint8_t _instance{0};
 };
 
