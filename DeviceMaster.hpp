@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2016 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -51,22 +51,41 @@ class uorb::DeviceMaster {
  public:
   /**
    * Method to get the singleton instance for the uORB::DeviceMaster.
-   * @return uORB::DeviceMaster &
+   * @return DeviceMaster instance reference
    */
-  static inline uorb::DeviceMaster &get_instance() { return instance_; }
+  static inline DeviceMaster &get_instance() { return instance_; }
 
+  /**
+   * Advertise as the publisher of a topic
+   * @param meta The uORB metadata (usually from the *ORB_ID() macro) for the
+   * topic.
+   * @param instance  Pointer to an integer which will yield the instance ID
+   * (0-based) of the publication. This is an output parameter and will be set
+   * to the newly created instance, ie. 0 for the first advertiser, 1 for the
+   * next and so on. If it is nullptr, it will only be created at 0.
+   * @param queue_size Maximum number of buffered elements. If this is 1, no
+   * queuing is used.
+   * @return nullptr on error, and set errno to orb_errno. Otherwise returns a
+   * DeviceNode that can be used to publish to the topic.
+   */
   DeviceNode *CreateAdvertiser(const orb_metadata &meta,
                                const unsigned int *instance,
                                uint16_t queue_size);
+
   /**
    * Public interface for GetDeviceNodeLocked(). Takes care of synchronization.
    * @return node if exists, nullptr otherwise
    */
-  uorb::DeviceNode *GetDeviceNode(const orb_metadata &meta, uint8_t instance);
+  DeviceNode *GetDeviceNode(const orb_metadata &meta, uint8_t instance);
 
  private:
-  uorb::DeviceNode *GetDeviceNodeLocked(const orb_metadata &meta,
-                                        uint8_t instance) const;
+  /**
+   * Find a node give its name.
+   * lock_ must already be held when calling this.
+   * @return node if exists, nullptr otherwise
+   */
+  DeviceNode *GetDeviceNodeLocked(const orb_metadata &meta,
+                                  uint8_t instance) const;
 
   // Private constructor, uORB::Manager takes care of its creation
   DeviceMaster() = default;
@@ -74,7 +93,7 @@ class uorb::DeviceMaster {
 
   static DeviceMaster instance_;
 
-  std::list<uorb::DeviceNode *> _node_list;
-  base::Mutex _lock; /**< lock to protect access to all class members
+  std::list<DeviceNode *> node_list_;
+  base::Mutex lock_; /**< lock to protect access to all class members
                               (also for derived classes) */
 };

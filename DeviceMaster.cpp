@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2016 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -49,41 +49,36 @@ uorb::DeviceNode *uorb::DeviceMaster::CreateAdvertiser(
 
   DeviceNode *device_node;
   unsigned group_tries = 0;
-  bool find_one = false;
 
-  uorb::base::MutexGuard lg(_lock);
+  uorb::base::MutexGuard lg(lock_);
 
   // Find the following devices that can advertise:
-  // - Unregistered device
   // - Unadvertised device
   // - Single instance device
+  // - Unregistered device
   do {
     device_node = GetDeviceNodeLocked(meta, group_tries);
+    if (device_node &&
+        (!device_node->is_advertised() || is_single_instance_advertiser)) {
+      device_node->mark_as_advertised();
+      break;  // Find a unadvertised device or single instance device
+    }
+
     if (!device_node) {
       device_node = new DeviceNode(meta, group_tries, queue_size);
       if (!device_node) {
         orb_errno = ENOMEM;
         return nullptr;
       }
-
-      // add to the node map.
-      _node_list.push_back(device_node);
-
       device_node->mark_as_advertised();
-      find_one = true;
-    }
-
-    if (!device_node->is_advertised() || is_single_instance_advertiser) {
-      /* Set as advertised to avoid race conditions (otherwise 2 multi-instance
-       * advertisers could get the same instance).
-       */
-      device_node->mark_as_advertised();
-      find_one = true;
+      node_list_.push_back(device_node);
+      break;  // Create new device
     }
     group_tries++;
-  } while (!find_one && (group_tries < max_group_tries));
+  } while (group_tries < max_group_tries);
 
-  if (!find_one) {
+  // All instances already exist
+  if (group_tries >= max_group_tries) {
     orb_errno = EEXIST;
     return nullptr;
   }
@@ -93,7 +88,7 @@ uorb::DeviceNode *uorb::DeviceMaster::CreateAdvertiser(
 
 uorb::DeviceNode *uorb::DeviceMaster::GetDeviceNode(const orb_metadata &meta,
                                                     uint8_t instance) {
-  uorb::base::MutexGuard lg(_lock);
+  uorb::base::MutexGuard lg(lock_);
   return GetDeviceNodeLocked(meta, instance);
 }
 
@@ -101,7 +96,7 @@ uorb::DeviceNode *uorb::DeviceMaster::GetDeviceNodeLocked(
     const orb_metadata &meta, uint8_t instance) const {
   // We can safely return the node that can be used by any thread, because a
   // DeviceNode never gets deleted.
-  for (auto node : this->_node_list) {
+  for (auto node : this->node_list_) {
     if (node->IsSameWith(meta, instance)) return node;
   }
 
