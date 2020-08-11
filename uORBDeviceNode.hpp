@@ -130,10 +130,6 @@ class DeviceNode {
   base::Mutex lock_; /**< lock to protect access to all class members
   (also for derived classes) */
 
-  // statistics
-  uint32_t lost_messages_ =
-      0; /**< nr of lost messages for all subscribers. If two subscribers lose
-            the same message, it is counted as two. */
   uint8_t subscriber_count_{0};
 
   bool advertised_{false}; /**< has ever been advertised (not necessarily

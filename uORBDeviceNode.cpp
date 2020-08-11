@@ -75,7 +75,6 @@ bool uorb::DeviceNode::Copy(void *dst, unsigned &sub_generation) {
     // range, and others are not.
     if (!is_in_range(queue_start, sub_generation, generation_ - 1)) {
       // Reader is too far behind: some messages are lost
-      lost_messages_ += queue_start - sub_generation;
       sub_generation = queue_start;
     }
   } else {
