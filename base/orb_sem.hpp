@@ -8,9 +8,9 @@
 
 #include <pthread.h>
 
-#include "orb_condition_variable.hpp"
-#include "orb_errno.h"
-#include "visibility.h"
+#include "base/orb_condition_variable.hpp"
+#include "base/orb_errno.h"
+#include "base/visibility.h"
 
 //---------------------------------------------------------
 // Reference:

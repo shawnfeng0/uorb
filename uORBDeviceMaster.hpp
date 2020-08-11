@@ -63,14 +63,16 @@ class uorb::DeviceMaster {
    * @return node if exists, nullptr otherwise
    */
   uorb::DeviceNode *GetDeviceNode(const orb_metadata &meta, uint8_t instance);
+
+ private:
   uorb::DeviceNode *GetDeviceNodeLocked(const orb_metadata &meta,
                                         uint8_t instance) const;
 
- private:
-  static DeviceMaster instance_;
   // Private constructor, uORB::Manager takes care of its creation
   DeviceMaster() = default;
   ~DeviceMaster() = default;
+
+  static DeviceMaster instance_;
 
   std::list<uorb::DeviceNode *> _node_list;
   base::Mutex _lock; /**< lock to protect access to all class members

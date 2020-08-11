@@ -39,10 +39,9 @@
 
 #pragma once
 
-#include <inttypes.h>
-#include <stdbool.h>
+#include <cinttypes>
 
-#include "visibility.h"
+#include "base/visibility.h"
 
 __BEGIN_DECLS
 

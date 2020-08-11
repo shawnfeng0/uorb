@@ -42,6 +42,7 @@
 #include <base/orb_log.h>
 
 #include "uORB.h"
+#include "uORBDeviceMaster.hpp"
 #include "uORBDeviceNode.hpp"
 
 namespace uorb {

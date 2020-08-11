@@ -33,9 +33,11 @@
 
 #pragma once
 
-#include "uORBDeviceMaster.hpp"
+#include "base/orb_mutex.hpp"
+#include "uORB.h"
 
 namespace uorb {
+class DeviceMaster;
 
 /**
  * Per-object device instance.
@@ -123,7 +125,7 @@ class DeviceNode {
   uint8_t *data_{nullptr}; /**< allocated object buffer */
   uint16_t queue_size_;    /**< maximum number of elements in the queue */
   unsigned generation_{0}; /**< object generation count */
-  bool queue_is_full_ = false;
+  bool queue_is_full_{false};
 
   base::Mutex lock_; /**< lock to protect access to all class members
   (also for derived classes) */

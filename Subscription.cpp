@@ -37,6 +37,7 @@
  */
 
 #include "Subscription.hpp"
+#include "uORBDeviceMaster.hpp"
 
 namespace uorb {
 
