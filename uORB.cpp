@@ -38,7 +38,6 @@
 
 #include "uORB.h"
 
-#include <base/orb_errno.h>
-#include <base/orb_log.h>
-
-#include "uORBDeviceNode.hpp"
+#include "DeviceNode.hpp"
+#include "base/errno.h"
+#include "base/log.h"

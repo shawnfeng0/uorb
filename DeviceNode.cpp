@@ -31,10 +31,10 @@
  *
  ****************************************************************************/
 
-#include "uORBDeviceNode.hpp"
+#include "DeviceNode.hpp"
 
-#include "base/orb_errno.h"
-#include "base/orb_log.h"
+#include "base/errno.h"
+#include "base/log.h"
 
 uorb::DeviceNode::DeviceNode(const struct orb_metadata &meta, uint8_t instance,
                              uint16_t queue_size)

@@ -33,7 +33,7 @@
 
 #pragma once
 
-#include "base/orb_mutex.hpp"
+#include "base/mutex.hpp"
 #include "uORB.h"
 
 namespace uorb {

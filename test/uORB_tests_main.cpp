@@ -37,7 +37,7 @@
 #include <string.h>
 
 #ifndef __PX4_QURT
-#include "base/orb_log.h"
+#include "base/log.h"
 #include "uORBTest_UnitTest.hpp"
 #endif
 

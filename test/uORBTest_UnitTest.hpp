@@ -33,14 +33,14 @@
 
 #ifndef _uORBTest_UnitTest_hpp_
 #define _uORBTest_UnitTest_hpp_
+#include <unistd.h>
+
+#include "base/errno.h"
+#include "base/log.h"
 #include "base/orb_defines.h"
-#include "base/orb_errno.h"
-#include "base/orb_log.h"
+#include "posix_task.h"
 #include "uORB.h"
 #include "uORBCommon.hpp"
-#include "posix_task.h"
-
-#include <unistd.h>
 
 struct orb_test {
 	int val;

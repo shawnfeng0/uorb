@@ -9,7 +9,7 @@
 #include <Publication.hpp>
 #include <Subscription.hpp>
 
-#include "base/orb_time.h"
+#include "base/time.h"
 #include "sample/ulog/src/ulog.h"
 
 void *adviser_cpuload(void *) {

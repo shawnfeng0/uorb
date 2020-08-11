@@ -38,8 +38,8 @@
 
 #pragma once
 
+#include "DeviceNode.hpp"
 #include "uORB.h"
-#include "uORBDeviceNode.hpp"
 
 namespace uorb {
 

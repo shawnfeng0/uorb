@@ -38,12 +38,12 @@
 
 #pragma once
 
-#include <base/orb_errno.h>
-#include <base/orb_log.h>
+#include <base/errno.h>
+#include <base/log.h>
 
+#include "DeviceMaster.hpp"
+#include "DeviceNode.hpp"
 #include "uORB.h"
-#include "uORBDeviceMaster.hpp"
-#include "uORBDeviceNode.hpp"
 
 namespace uorb {
 
