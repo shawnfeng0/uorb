@@ -39,5 +39,5 @@
 #include "uORB.h"
 
 #include "DeviceNode.hpp"
-#include "base/errno.h"
-#include "base/log.h"
+#include "uorb/base/errno.h"
+#include "uorb/base/log.h"

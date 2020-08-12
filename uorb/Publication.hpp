@@ -38,8 +38,8 @@
 
 #pragma once
 
-#include "base/errno.h"
-#include "base/log.h"
+#include "uorb/base/errno.h"
+#include "uorb/base/log.h"
 
 #include "DeviceMaster.hpp"
 #include "DeviceNode.hpp"

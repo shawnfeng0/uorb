@@ -3,13 +3,13 @@
 //
 
 #include <pthread.h>
-#include <uORB/topics/cpuload.h>
+#include <uorb/topics/cpuload.h>
 #include <unistd.h>
 
-#include <Publication.hpp>
-#include <Subscription.hpp>
+#include <uorb/Publication.hpp>
+#include <uorb/Subscription.hpp>
 
-#include "base/time.h"
+#include "uorb/base/time.h"
 #include "sample/ulog/src/ulog.h"
 
 void *adviser_cpuload(void *) {

@@ -8,9 +8,9 @@
 
 #include <pthread.h>
 
-#include "base/condition_variable.hpp"
-#include "base/errno.h"
-#include "base/visibility.h"
+#include "condition_variable.hpp"
+#include "errno.h"
+#include "visibility.h"
 
 //---------------------------------------------------------
 // Reference:

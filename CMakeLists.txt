@@ -31,7 +31,7 @@
 #
 ############################################################################
 
-project(uORB)
+project(uorb)
 cmake_minimum_required(VERSION 3.15)
 
 set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
@@ -41,8 +41,8 @@ find_package(Threads REQUIRED)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 # uorb library
-aux_source_directory(${CMAKE_SOURCE_DIR} UORB_SOURCE)
-aux_source_directory(${CMAKE_SOURCE_DIR}/base UORB_SOURCE)
+aux_source_directory(${CMAKE_SOURCE_DIR}/uorb UORB_SOURCE)
+aux_source_directory(${CMAKE_SOURCE_DIR}/uorb/base UORB_SOURCE)
 aux_source_directory(${CMAKE_SOURCE_DIR}/sample/ulog/src UORB_SOURCE)
 add_definitions(-DDEBUG_ORB)
 add_library(uorb ${UORB_SOURCE})

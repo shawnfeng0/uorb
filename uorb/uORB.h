@@ -41,7 +41,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "base/visibility.h"
+#include "uorb/base/visibility.h"
 
 /**
  * Object metadata.

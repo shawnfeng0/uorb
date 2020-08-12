@@ -68,7 +68,7 @@ topic_name = spec.short_name
 @# Generic Includes
 @##############################
 
-#include <uORB.h>
+#include <uorb/uORB.h>
 #include <inttypes.h>
 
 @##############################
@@ -80,7 +80,7 @@ for field in spec.parsed_fields():
         if (not field.is_header):
             (package, name) = genmsg.names.package_resource_name(field.base_type)
             package = package or spec.package # convert '' to package
-            print('#include <uORB/topics/%s.h>'%(name))
+            print('#include <uorb/topics/%s.h>'%(name))
 }@
 
 /* register this as object request broker structure */

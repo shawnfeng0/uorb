@@ -36,7 +36,7 @@
 #include <cstdint>
 #include <list>
 
-#include "base/mutex.hpp"
+#include "uorb/base/mutex.hpp"
 #include "uORB.h"
 
 namespace uorb {
@@ -50,7 +50,7 @@ class DeviceMaster;
 class uorb::DeviceMaster {
  public:
   /**
-   * Method to get the singleton instance for the uORB::DeviceMaster.
+   * Method to get the singleton instance for the uorb::DeviceMaster.
    * @return DeviceMaster instance reference
    */
   static inline DeviceMaster &get_instance() { return instance_; }
@@ -87,7 +87,7 @@ class uorb::DeviceMaster {
   DeviceNode *GetDeviceNodeLocked(const orb_metadata &meta,
                                   uint8_t instance) const;
 
-  // Private constructor, uORB::Manager takes care of its creation
+  // Private constructor, uorb::Manager takes care of its creation
   DeviceMaster() = default;
   ~DeviceMaster() = default;
 

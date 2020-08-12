@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2016 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,64 +31,69 @@
  *
  ****************************************************************************/
 
-/**
- * @file drv_hrt.h
- *
- * High-resolution timer with callouts and timekeeping.
- */
-
 #pragma once
 
 #include <cinttypes>
+#include <cstddef>
 
-#include "base/visibility.h"
+#include "atomic.hpp"
 
-__BEGIN_DECLS
+namespace uorb {
 
-/**
- * Absolute time, in microsecond units.
- *
- * Absolute time is measured from some arbitrary epoch shortly after
- * system startup.  It should never wrap or go backwards.
- */
-typedef uint64_t orb_abstime;
+namespace base {
+template <size_t N>
+class AtomicBitset {
+ public:
+  AtomicBitset() = default;
 
-/**
- * Get absolute time in [us] (does not wrap).
- */
-__EXPORT extern orb_abstime orb_absolute_time(void);
+  size_t count() const {
+    size_t total = 0;
 
-/**
- * Compute the delta between a timestamp taken in the past
- * and now.
- *
- * This function is not interrupt save.
- */
-static inline orb_abstime orb_elapsed_time(const orb_abstime *then) {
-  return orb_absolute_time() - *then;
-}
+    for (const auto &x : _data) {
+      uint32_t y = x.load();
 
-__END_DECLS
+      while (y) {
+        total += y & 1u;
+        y >>= 1u;
+      }
+    }
 
-#ifdef __cplusplus
+    return total;
+  }
 
-namespace time_literals {
+  size_t size() const { return N; }
 
-// User-defined integer literals for different time units.
-// The base unit is orb_abstime in microseconds
+  bool operator[](size_t position) const {
+    return _data[array_index(position)].load() & element_mask(position);
+  }
 
-constexpr orb_abstime operator"" _s(unsigned long long seconds) {
-  return orb_abstime(seconds * 1000000ULL);
-}
+  void set(size_t pos, bool val = true) {
+    const uint32_t bitmask = element_mask(pos);
 
-constexpr orb_abstime operator"" _ms(unsigned long long seconds) {
-  return orb_abstime(seconds * 1000ULL);
-}
+    if (val) {
+      _data[array_index(pos)].fetch_or(bitmask);
 
-constexpr orb_abstime operator"" _us(unsigned long long seconds) {
-  return orb_abstime(seconds);
-}
+    } else {
+      _data[array_index(pos)].fetch_and(~bitmask);
+    }
+  }
 
-} /* namespace time_literals */
+ private:
+  static constexpr uint8_t BITS_PER_ELEMENT = 32;
+  static constexpr size_t ARRAY_SIZE = ((N % BITS_PER_ELEMENT) == 0)
+                                           ? (N / BITS_PER_ELEMENT)
+                                           : (N / BITS_PER_ELEMENT + 1);
+  static constexpr size_t ALLOCATED_BITS = ARRAY_SIZE * BITS_PER_ELEMENT;
 
-#endif /* __cplusplus */
+  size_t array_index(size_t position) const {
+    return position / BITS_PER_ELEMENT;
+  }
+  uint32_t element_mask(size_t position) const {
+    return (1u << (position % BITS_PER_ELEMENT));
+  }
+
+  uorb::base::atomic<uint32_t> _data[ARRAY_SIZE];
+};
+
+}  // namespace base
+}  // namespace uorb

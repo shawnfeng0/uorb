@@ -33,10 +33,10 @@
 
 #include "DeviceMaster.hpp"
 
-#include <base/errno.h>
+#include "uorb/base/errno.h"
 
 #include "DeviceNode.hpp"
-#include "base/log.h"
+#include "uorb/base/log.h"
 
 uorb::DeviceMaster uorb::DeviceMaster::instance_;
 

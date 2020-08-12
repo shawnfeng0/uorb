@@ -44,8 +44,8 @@
  *
  ****************************************************************************/
 
-#include <uORB.h>
-#include <uORBTopics.h>
+#include <uorb/uORB.h>
+#include <uorb/uORBTopics.h>
 @{
 msg_names = [mn.replace(".msg", "") for mn in msgs]
 msgs_count = len(msg_names)
@@ -54,7 +54,7 @@ msg_names_all.sort()
 msgs_count_all = len(msg_names_all)
 }@
 @[for msg_name in msg_names]@
-#include <uORB/topics/@(msg_name).h>
+#include <uorb/topics/@(msg_name).h>
 @[end for]
 
 const constexpr struct orb_metadata *const uorb_topics_list[] = {

@@ -77,8 +77,8 @@ if(NOT EXTERNAL_MODULES_LOCATION STREQUAL "")
 endif()
 
 # headers
-set(msg_out_path ${CMAKE_CURRENT_SOURCE_DIR}/uORB/topics)
-set(msg_source_out_path	${CMAKE_CURRENT_SOURCE_DIR}/uORB/topics_sources)
+set(msg_out_path ${CMAKE_CURRENT_SOURCE_DIR}/uorb/topics)
+set(msg_source_out_path	${CMAKE_CURRENT_SOURCE_DIR}/uorb/topics_sources)
 
 set(uorb_headers)
 set(uorb_sources ${msg_source_out_path}/uORBTopics.cpp)
