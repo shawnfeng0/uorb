@@ -36,7 +36,6 @@
 #include "uorb/base/errno.h"
 
 #include "uorb/DeviceNode.hpp"
-#include "uorb/base/log.h"
 
 uorb::DeviceMaster uorb::DeviceMaster::instance_;
 

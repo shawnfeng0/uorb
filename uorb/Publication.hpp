@@ -41,7 +41,6 @@
 #include "uorb/DeviceMaster.hpp"
 #include "uorb/DeviceNode.hpp"
 #include "uorb/base/errno.h"
-#include "uorb/base/log.h"
 #include "uorb/uORB.h"
 
 namespace uorb {
@@ -84,10 +83,6 @@ class Publication : public PublicationBase {
   bool advertise() {
     auto &device_master = DeviceMaster::get_instance();
     dev_ = device_master.CreateAdvertiser(meta_, nullptr, ORB_QSIZE);
-
-    if (!dev_) {
-      ORB_ERR("%s advertise failed (%i)", meta_.o_name, orb_errno);
-    }
 
     return dev_ != nullptr;
   }

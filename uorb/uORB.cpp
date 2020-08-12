@@ -42,7 +42,6 @@
 #include "uorb/DeviceNode.hpp"
 #include "uorb/SubscriptionInterval.h"
 #include "uorb/base/errno.h"
-#include "uorb/base/log.h"
 
 using namespace uorb;
 
@@ -73,7 +72,6 @@ orb_advert_t orb_advertise_multi_queue(const struct orb_metadata *meta,
   auto *dev_ = device_master.CreateAdvertiser(meta_, instance, queue_size);
 
   if (!dev_) {
-    ORB_ERR("%s advertise failed (%i)", meta_.o_name, orb_errno);
     return nullptr;
   }
 

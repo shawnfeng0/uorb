@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2015 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2020 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -43,8 +43,6 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 # uorb library
 aux_source_directory(${CMAKE_SOURCE_DIR}/uorb UORB_SOURCE)
 aux_source_directory(${CMAKE_SOURCE_DIR}/uorb/base UORB_SOURCE)
-aux_source_directory(${CMAKE_SOURCE_DIR}/sample/ulog/src UORB_SOURCE)
-add_definitions(-DDEBUG_ORB)
 add_library(uorb ${UORB_SOURCE})
 set_target_properties(uorb PROPERTIES
         CMAKE_CXX_STANDARD 11)
@@ -54,6 +52,7 @@ target_compile_features(uorb INTERFACE
 # uorb sample
 aux_source_directory(${CMAKE_SOURCE_DIR}/sample SAMPLE_SOURCE)
 aux_source_directory(${CMAKE_SOURCE_DIR}/sample/topic_source SAMPLE_SOURCE)
+aux_source_directory(${CMAKE_SOURCE_DIR}/sample/ulog/src  SAMPLE_SOURCE)
 add_executable(uorb_sample ${SAMPLE_SOURCE})
 add_subdirectory(${CMAKE_SOURCE_DIR}/sample/msg)
 target_include_directories(uorb_sample PRIVATE ${CMAKE_SOURCE_DIR}/sample/msg)
