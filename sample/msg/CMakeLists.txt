@@ -92,21 +92,23 @@ if (px4_constrained_flash_build)
 	set(added_arguments --constrained-flash)
 endif()
 
+set(tools_root ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/msg)
+
 # Generate uORB headers
 add_custom_command(OUTPUT ${uorb_headers}
-	COMMAND ${PYTHON_EXECUTABLE} tools/px_generate_uorb_topic_files.py
+	COMMAND ${PYTHON_EXECUTABLE} ${tools_root}/tools/px_generate_uorb_topic_files.py
 		--headers
 		-f ${msg_files}
 		-i ${CMAKE_CURRENT_SOURCE_DIR}
 		-o ${msg_out_path}
-		-e templates/uorb
+		-e ${tools_root}/templates/uorb
 		-t ${CMAKE_CURRENT_BINARY_DIR}/tmp/headers
 		-q
 		${added_arguments}
 	DEPENDS
 		${msg_files}
-		templates/uorb/msg.h.em
-		tools/px_generate_uorb_topic_files.py
+		${tools_root}/templates/uorb/msg.h.em
+		${tools_root}/tools/px_generate_uorb_topic_files.py
 	COMMENT "Generating uORB topic headers"
 	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 	VERBATIM
@@ -115,19 +117,19 @@ add_custom_target(uorb_headers DEPENDS ${uorb_headers})
 
 # Generate uORB sources
 add_custom_command(OUTPUT ${uorb_sources}
-	COMMAND ${PYTHON_EXECUTABLE} tools/px_generate_uorb_topic_files.py
+	COMMAND ${PYTHON_EXECUTABLE} ${tools_root}/tools/px_generate_uorb_topic_files.py
 		--sources
 		-f ${msg_files}
 		-i ${CMAKE_CURRENT_SOURCE_DIR}
 		-o ${msg_source_out_path}
-		-e templates/uorb
+		-e ${tools_root}/templates/uorb
 		-t ${CMAKE_CURRENT_BINARY_DIR}/tmp/sources
 		-q
 		${added_arguments}
 	DEPENDS
 		${msg_files}
-		templates/uorb/msg.cpp.em
-		tools/px_generate_uorb_topic_files.py
+		${tools_root}/templates/uorb/msg.cpp.em
+		${tools_root}/tools/px_generate_uorb_topic_files.py
 	COMMENT "Generating uORB topic sources"
 	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 	VERBATIM
