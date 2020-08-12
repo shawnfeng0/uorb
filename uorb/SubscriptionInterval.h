@@ -40,8 +40,8 @@
 
 #include <uorb/base/time.h>
 
-#include "uorb/DeviceNode.hpp"
-#include "uorb/Subscription.hpp"
+#include "uorb/DeviceNode.h"
+#include "uorb/Subscription.h"
 #include "uorb/uORB.h"
 
 namespace uorb {

@@ -1,6 +1,6 @@
 @###############################################
 @#
-@# EmPy template for generating uORBTopics.cpp file
+@# EmPy template for generating uORBTopics.cc file
 @# for logging purposes
 @#
 @###############################################

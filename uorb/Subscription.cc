@@ -36,9 +36,9 @@
  *
  */
 
-#include "Subscription.hpp"
+#include "Subscription.h"
 
-#include "uorb/DeviceMaster.hpp"
+#include "uorb/DeviceMaster.h"
 
 namespace uorb {
 

@@ -31,7 +31,7 @@
  *
  ****************************************************************************/
 
-#include "uorb/DeviceNode.hpp"
+#include "uorb/DeviceNode.h"
 
 #include <cstring>
 

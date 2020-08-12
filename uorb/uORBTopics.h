@@ -31,8 +31,7 @@
  *
  ****************************************************************************/
 
-#ifndef MODULES_UORB_UORBTOPICS_H_
-#define MODULES_UORB_UORBTOPICS_H_
+#pragma once
 
 #include <stddef.h>
 
@@ -42,5 +41,3 @@
  * Returns array of topics metadata
  */
 extern const struct orb_metadata *const *orb_get_topics() __EXPORT;
-
-#endif /* MODULES_UORB_UORBTOPICS_H_ */

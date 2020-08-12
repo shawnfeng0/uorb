@@ -36,7 +36,7 @@
 #include <cinttypes>
 #include <cstddef>
 
-#include "atomic.hpp"
+#include "atomic.h"
 
 namespace uorb {
 

@@ -36,7 +36,7 @@
 #include <cstdint>
 #include <list>
 
-#include "uorb/base/mutex.hpp"
+#include "uorb/base/mutex.h"
 #include "uorb/uORB.h"
 
 namespace uorb {

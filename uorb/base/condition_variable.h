@@ -5,7 +5,7 @@
 #include <time.h>
 
 #include "errno.h"
-#include "mutex.hpp"
+#include "mutex.h"
 
 namespace uorb {
 namespace base {

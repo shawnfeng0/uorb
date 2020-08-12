@@ -79,9 +79,9 @@ __copyright__ = "Copyright (C) 2013-2016 PX4 Development Team."
 __license__ = "BSD"
 __email__ = "thomasgubler@gmail.com"
 
-TEMPLATE_FILE = ['msg.h.em', 'msg.cpp.em']
-TOPICS_LIST_TEMPLATE_FILE = 'uORBTopics.cpp.em'
-OUTPUT_FILE_EXT = ['.h', '.cpp']
+TEMPLATE_FILE = ['msg.h.em', 'msg.cc.em']
+TOPICS_LIST_TEMPLATE_FILE = 'uORBTopics.cc.em'
+OUTPUT_FILE_EXT = ['.h', '.cc']
 INCL_DEFAULT = ['std_msgs:./msg/std_msgs']
 PACKAGE = 'px4'
 TOPICS_TOKEN = '# TOPICS '

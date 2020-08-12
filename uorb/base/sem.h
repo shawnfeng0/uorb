@@ -8,7 +8,7 @@
 
 #include <pthread.h>
 
-#include "condition_variable.hpp"
+#include "condition_variable.h"
 #include "errno.h"
 #include "visibility.h"
 

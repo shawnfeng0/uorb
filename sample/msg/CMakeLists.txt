@@ -81,11 +81,11 @@ set(msg_out_path ${CMAKE_CURRENT_SOURCE_DIR}/uorb/topics)
 set(msg_source_out_path	${CMAKE_CURRENT_SOURCE_DIR}/uorb/topics_sources)
 
 set(uorb_headers)
-set(uorb_sources ${msg_source_out_path}/uORBTopics.cpp)
+set(uorb_sources ${msg_source_out_path}/uORBTopics.cc)
 foreach(msg_file ${msg_files})
 	get_filename_component(msg ${msg_file} NAME_WE)
 	list(APPEND uorb_headers ${msg_out_path}/${msg}.h)
-	list(APPEND uorb_sources ${msg_source_out_path}/${msg}.cpp)
+	list(APPEND uorb_sources ${msg_source_out_path}/${msg}.cc)
 endforeach()
 
 if (px4_constrained_flash_build)
@@ -128,7 +128,7 @@ add_custom_command(OUTPUT ${uorb_sources}
 		${added_arguments}
 	DEPENDS
 		${msg_files}
-		${tools_root}/templates/uorb/msg.cpp.em
+		${tools_root}/templates/uorb/msg.cc.em
 		${tools_root}/tools/px_generate_uorb_topic_files.py
 	COMMENT "Generating uORB topic sources"
 	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}

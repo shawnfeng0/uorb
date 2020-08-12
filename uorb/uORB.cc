@@ -38,8 +38,8 @@
 
 #include "uorb/uORB.h"
 
-#include "uorb/DeviceMaster.hpp"
-#include "uorb/DeviceNode.hpp"
+#include "uorb/DeviceMaster.h"
+#include "uorb/DeviceNode.h"
 #include "uorb/SubscriptionInterval.h"
 #include "uorb/base/errno.h"
 
