@@ -123,12 +123,12 @@ __BEGIN_DECLS
  * a file-descriptor-based handle would not otherwise be in scope for the
  * publisher.
  */
-typedef void *orb_advert_t;
+typedef struct {} * orb_advert_t;
 
 /**
  * TODO:
  */
-typedef void *orb_subscriber_t;
+typedef struct {} * orb_subscriber_t;
 
 /**
  * TODO:
