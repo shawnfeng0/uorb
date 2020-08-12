@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2015 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -38,6 +38,168 @@
 
 #include "uorb/uORB.h"
 
+#include "uorb/DeviceMaster.hpp"
 #include "uorb/DeviceNode.hpp"
+#include "uorb/SubscriptionInterval.h"
 #include "uorb/base/errno.h"
 #include "uorb/base/log.h"
+
+using namespace uorb;
+
+orb_advert_t orb_advertise(const struct orb_metadata *meta, const void *data) {
+  return orb_advertise_multi_queue(meta, data, nullptr, 1);
+}
+
+orb_advert_t orb_advertise_queue(const struct orb_metadata *meta,
+                                 const void *data, unsigned int queue_size) {
+  return orb_advertise_multi_queue(meta, data, nullptr, queue_size);
+}
+
+orb_advert_t orb_advertise_multi(const struct orb_metadata *meta,
+                                 const void *data, unsigned int *instance) {
+  return orb_advertise_multi_queue(meta, data, instance, 1);
+}
+
+orb_advert_t orb_advertise_multi_queue(const struct orb_metadata *meta,
+                                       const void *data, unsigned int *instance,
+                                       unsigned int queue_size) {
+  if (!meta) {
+    orb_errno = EINVAL;
+    return nullptr;
+  }
+  auto &meta_ = *meta;
+
+  auto &device_master = DeviceMaster::get_instance();
+  auto *dev_ = device_master.CreateAdvertiser(meta_, instance, queue_size);
+
+  if (!dev_) {
+    ORB_ERR("%s advertise failed (%i)", meta_.o_name, orb_errno);
+    return nullptr;
+  }
+
+  if (data) dev_->Publish(meta_, data);
+
+  return dev_;
+}
+
+int orb_unadvertise(orb_advert_t handle) {
+  if (!handle) {
+    orb_errno = EINVAL;
+    return -1;
+  }
+  auto &dev = *(DeviceNode *)handle;
+  dev.mark_as_unadvertised();
+  return ORB_OK;
+}
+
+int orb_publish(const struct orb_metadata *meta, orb_advert_t handle,
+                const void *data) {
+  if (!meta || !handle || !data) {
+    orb_errno = EINVAL;
+    return ORB_ERROR;
+  }
+
+  auto *dev = (DeviceNode *)handle;
+
+  return dev->Publish(*meta, data) ? ORB_OK : ORB_ERROR;
+}
+
+orb_subscriber_t orb_subscribe(const struct orb_metadata *meta) {
+  return orb_subscribe_multi(meta, 0);
+}
+
+orb_subscriber_t orb_subscribe_multi(const struct orb_metadata *meta,
+                                     unsigned instance) {
+  if (!meta) {
+    orb_errno = EINVAL;
+    return nullptr;
+  }
+
+  auto *sub = new SubscriptionInterval(*meta, instance);
+  if (!sub) {
+    orb_errno = ENOMEM;
+    return nullptr;
+  }
+
+  return sub;
+}
+
+int orb_unsubscribe(orb_subscriber_t *handle) {
+  if (!handle) {
+    orb_errno = EINVAL;
+    return ORB_ERROR;
+  }
+
+  if (!*handle) {
+    orb_errno = EINVAL;
+    return ORB_ERROR;
+  }
+
+  delete (SubscriptionInterval *)*handle;
+  return ORB_OK;
+}
+
+int orb_copy(const struct orb_metadata *meta, orb_subscriber_t handle,
+             void *buffer) {
+  if (!meta || !handle || !buffer) {
+    orb_errno = EINVAL;
+    return ORB_ERROR;
+  }
+
+  auto &sub = *(SubscriptionInterval *)handle;
+  return sub.copy(buffer) ? ORB_OK : ORB_ERROR;
+}
+
+int orb_check(orb_subscriber_t handle, bool *updated) {
+  if (!handle || !updated) {
+    orb_errno = EINVAL;
+    return ORB_ERROR;
+  }
+  auto &sub = *(SubscriptionInterval *)handle;
+  *updated = sub.updated();
+  return ORB_OK;
+}
+
+int orb_exists(const struct orb_metadata *meta, int instance) {
+  if (!meta) {
+    orb_errno = EINVAL;
+    return ORB_ERROR;
+  }
+
+  auto &master = DeviceMaster::get_instance();
+  return master.GetDeviceNode(*meta, instance) ? ORB_OK : ORB_ERROR;
+}
+
+int orb_group_count(const struct orb_metadata *meta) {
+  if (!meta) {
+    orb_errno = EINVAL;
+    return ORB_ERROR;
+  }
+  int instance = 0;
+
+  while (ORB_OK == orb_exists(meta, instance)) {
+    ++instance;
+  }
+
+  return instance;
+}
+
+int orb_set_interval(orb_subscriber_t handle, unsigned interval_ms) {
+  if (!handle) {
+    orb_errno = EINVAL;
+    return ORB_ERROR;
+  }
+  auto &sub = *(SubscriptionInterval *)handle;
+  sub.set_interval_ms(interval_ms);
+  return ORB_OK;
+}
+
+int orb_get_interval(orb_subscriber_t handle, unsigned *interval) {
+  if (!handle || !interval) {
+    orb_errno = EINVAL;
+    return ORB_ERROR;
+  }
+  auto &sub = *(SubscriptionInterval *)handle;
+  *interval = sub.get_interval_ms();
+  return ORB_OK;
+}

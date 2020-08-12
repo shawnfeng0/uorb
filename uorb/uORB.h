@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2015 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -41,6 +41,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "uorb/base/errno.h"
 #include "uorb/base/visibility.h"
 
 /**
@@ -55,6 +56,9 @@ struct orb_metadata {
 };
 
 typedef const struct orb_metadata *orb_id_t;
+
+#define ORB_OK (0)
+#define ORB_ERROR (-1)
 
 /**
  * Maximum number of multi topic instances
@@ -120,5 +124,172 @@ __BEGIN_DECLS
  * publisher.
  */
 typedef void *orb_advert_t;
+
+/**
+ * TODO:
+ */
+typedef void *orb_subscriber_t;
+
+/**
+ * TODO:
+ * @param meta
+ * @param data
+ * @return
+ */
+extern orb_advert_t orb_advertise(const struct orb_metadata *meta,
+                                  const void *data) __EXPORT;
+
+/**
+ * TODO:
+ * @param meta
+ * @param data
+ * @param queue_size
+ * @return
+ */
+extern orb_advert_t orb_advertise_queue(const struct orb_metadata *meta,
+                                        const void *data,
+                                        unsigned int queue_size) __EXPORT;
+
+/**
+ * TODO:
+ * @param meta
+ * @param data
+ * @param instance
+ * @return
+ */
+extern orb_advert_t orb_advertise_multi(const struct orb_metadata *meta,
+                                        const void *data,
+                                        unsigned int *instance) __EXPORT;
+
+/**
+ * TODO:
+ * @param meta
+ * @param data
+ * @param instance
+ * @param queue_size
+ * @return
+ */
+extern orb_advert_t orb_advertise_multi_queue(const struct orb_metadata *meta,
+                                              const void *data,
+                                              unsigned int *instance,
+                                              unsigned int queue_size) __EXPORT;
+
+/**
+ * TODO:
+ * @param handle
+ * @return
+ */
+extern int orb_unadvertise(orb_advert_t handle) __EXPORT;
+
+/**
+ * TODO:
+ * @param meta
+ * @param handle
+ * @param data
+ * @return
+ */
+extern int orb_publish(const struct orb_metadata *meta, orb_advert_t handle,
+                       const void *data) __EXPORT;
+
+/**
+ * Advertise as the publisher of a topic.
+ *
+ * This performs the initial advertisement of a topic; it creates the topic
+ * node in /obj if required and publishes the initial data.
+ *
+ * @see uORB::Manager::orb_advertise_multi() for meaning of the individual
+ * parameters
+ */
+static inline int orb_publish_auto(const struct orb_metadata *meta,
+                                   orb_advert_t *handle, const void *data,
+                                   unsigned int *instance) {
+  if (!meta || !handle) {
+    orb_errno = EINVAL;
+    return ORB_ERROR;
+  }
+
+  if (!*handle) {
+    *handle = orb_advertise_multi(meta, data, instance);
+    return (*handle) ? ORB_OK : ORB_ERROR;
+
+  } else {
+    return orb_publish(meta, *handle, data);
+  }
+}
+
+/**
+ * TODO:
+ * @param meta
+ * @return
+ */
+extern orb_subscriber_t orb_subscribe(const struct orb_metadata *meta) __EXPORT;
+
+/**
+ * TODO:
+ * @param meta
+ * @param instance
+ * @return
+ */
+extern orb_subscriber_t orb_subscribe_multi(const struct orb_metadata *meta,
+                                            unsigned instance) __EXPORT;
+
+/**
+ * TODO:
+ * @param handle
+ * @return
+ */
+extern int orb_unsubscribe(orb_subscriber_t *handle) __EXPORT;
+
+/**
+ * TODO:
+ * @param meta
+ * @param handle
+ * @param buffer
+ * @return
+ */
+extern int orb_copy(const struct orb_metadata *meta, orb_subscriber_t handle,
+                    void *buffer) __EXPORT;
+
+/**
+ * TODO:
+ * @param handle
+ * @param updated
+ * @return
+ */
+extern int orb_check(orb_subscriber_t handle, bool *updated) __EXPORT;
+
+/**
+ * TODO:
+ * @param meta
+ * @param instance
+ * @return
+ */
+extern int orb_exists(const struct orb_metadata *meta, int instance) __EXPORT;
+
+/**
+ * Get the number of published instances of a topic group
+ *
+ * @param meta    ORB topic metadata.
+ * @return    The number of published instances of this topic
+ */
+extern int orb_group_count(const struct orb_metadata *meta) __EXPORT;
+
+/**
+ * TODO:
+ * @param handle
+ * @param interval_ms
+ * @return
+ */
+extern int orb_set_interval(orb_subscriber_t handle,
+                            unsigned interval_ms) __EXPORT;
+
+/**
+ * TODO:
+ * @param handle
+ * @param interval
+ * @return
+ */
+extern int orb_get_interval(orb_subscriber_t handle,
+                            unsigned *interval) __EXPORT;
 
 __END_DECLS
