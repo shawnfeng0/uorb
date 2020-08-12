@@ -176,10 +176,10 @@ extern orb_advert_t orb_advertise_multi_queue(const struct orb_metadata *meta,
 
 /**
  * TODO:
- * @param handle
+ * @param handle_ptr
  * @return
  */
-extern int orb_unadvertise(orb_advert_t handle) __EXPORT;
+extern int orb_unadvertise(orb_advert_t *handle_ptr) __EXPORT;
 
 /**
  * TODO:
@@ -235,10 +235,10 @@ extern orb_subscriber_t orb_subscribe_multi(const struct orb_metadata *meta,
 
 /**
  * TODO:
- * @param handle
+ * @param handle_ptr
  * @return
  */
-extern int orb_unsubscribe(orb_subscriber_t *handle) __EXPORT;
+extern int orb_unsubscribe(orb_subscriber_t *handle_ptr) __EXPORT;
 
 /**
  * TODO:

@@ -80,13 +80,24 @@ orb_advert_t orb_advertise_multi_queue(const struct orb_metadata *meta,
   return dev_;
 }
 
-int orb_unadvertise(orb_advert_t handle) {
-  if (!handle) {
+int orb_unadvertise(orb_advert_t *handle_ptr) {
+  if (!handle_ptr) {
     orb_errno = EINVAL;
-    return -1;
+    return ORB_ERROR;
   }
+
+  if (!*handle_ptr) {
+    orb_errno = EINVAL;
+    return ORB_ERROR;
+  }
+
+  orb_advert_t &handle = *handle_ptr;
+
   auto &dev = *(DeviceNode *)handle;
   dev.mark_as_unadvertised();
+
+  handle = nullptr;
+
   return ORB_OK;
 }
 
@@ -122,18 +133,22 @@ orb_subscriber_t orb_subscribe_multi(const struct orb_metadata *meta,
   return sub;
 }
 
-int orb_unsubscribe(orb_subscriber_t *handle) {
-  if (!handle) {
+int orb_unsubscribe(orb_subscriber_t *handle_ptr) {
+  if (!handle_ptr) {
     orb_errno = EINVAL;
     return ORB_ERROR;
   }
 
-  if (!*handle) {
+  if (!*handle_ptr) {
     orb_errno = EINVAL;
     return ORB_ERROR;
   }
 
-  delete (SubscriptionInterval *)*handle;
+  orb_subscriber_t &handle = *handle_ptr;
+  delete (SubscriptionInterval *)handle;
+
+  handle = nullptr;
+
   return ORB_OK;
 }
 
