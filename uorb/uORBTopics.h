@@ -36,7 +36,7 @@
 
 #include <stddef.h>
 
-#include "uORB.h"
+#include "uorb/uORB.h"
 
 /*
  * Returns array of topics metadata

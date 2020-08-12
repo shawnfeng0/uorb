@@ -36,8 +36,8 @@
  * A lightweight object broker.
  */
 
-#include "uORB.h"
+#include "uorb/uORB.h"
 
-#include "DeviceNode.hpp"
+#include "uorb/DeviceNode.hpp"
 #include "uorb/base/errno.h"
 #include "uorb/base/log.h"

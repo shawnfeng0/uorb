@@ -38,12 +38,11 @@
 
 #pragma once
 
+#include "uorb/DeviceMaster.hpp"
+#include "uorb/DeviceNode.hpp"
 #include "uorb/base/errno.h"
 #include "uorb/base/log.h"
-
-#include "DeviceMaster.hpp"
-#include "DeviceNode.hpp"
-#include "uORB.h"
+#include "uorb/uORB.h"
 
 namespace uorb {
 

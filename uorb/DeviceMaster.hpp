@@ -37,7 +37,7 @@
 #include <list>
 
 #include "uorb/base/mutex.hpp"
-#include "uORB.h"
+#include "uorb/uORB.h"
 
 namespace uorb {
 class DeviceNode;

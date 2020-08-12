@@ -31,7 +31,7 @@
  *
  ****************************************************************************/
 
-#include "uORB.h"
+#include "uorb/uORB.h"
 #include <pthread.h>
 #include <stdio.h>
 #include <string.h>

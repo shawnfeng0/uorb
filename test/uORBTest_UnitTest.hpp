@@ -39,7 +39,7 @@
 #include "base/log.h"
 #include "base/orb_defines.h"
 #include "posix_task.h"
-#include "uORB.h"
+#include "uorb/uORB.h"
 #include "uORBCommon.hpp"
 
 struct orb_test {
