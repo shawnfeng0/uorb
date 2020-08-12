@@ -39,7 +39,7 @@
 
 #pragma once
 
-#include <cinttypes>
+#include <inttypes.h>
 
 #include "visibility.h"
 

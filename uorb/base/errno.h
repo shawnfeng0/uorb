@@ -73,8 +73,8 @@
 #endif
 
 /* The error code set by various library functions.  */
-extern int *orb_errno_location();
+extern int *__orb_errno_location();
 
-#define orb_errno (*orb_errno_location())
+#define orb_errno (*__orb_errno_location())
 
 #endif  // UORB_ORB_ERRNO_H
