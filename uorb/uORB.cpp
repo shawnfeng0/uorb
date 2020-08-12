@@ -80,17 +80,17 @@ orb_advert_t orb_advertise_multi_queue(const struct orb_metadata *meta,
   return (orb_advert_t)dev_;
 }
 
-int orb_unadvertise(orb_advert_t *handle_ptr) {
+bool orb_unadvertise(orb_advert_t *handle_ptr) {
   if (!handle_ptr) {
     orb_errno = EINVAL;
-    return ORB_ERROR;
+    return false;
   }
 
   orb_advert_t &handle = *handle_ptr;
 
   if (!handle) {
     orb_errno = EINVAL;
-    return ORB_ERROR;
+    return false;
   }
 
   auto &dev = *(DeviceNode *)handle;
@@ -98,19 +98,19 @@ int orb_unadvertise(orb_advert_t *handle_ptr) {
 
   handle = nullptr;
 
-  return ORB_OK;
+  return true;
 }
 
-int orb_publish(const struct orb_metadata *meta, orb_advert_t handle,
+bool orb_publish(const struct orb_metadata *meta, orb_advert_t handle,
                 const void *data) {
   if (!meta || !handle || !data) {
     orb_errno = EINVAL;
-    return ORB_ERROR;
+    return false;
   }
 
   auto *dev = (DeviceNode *)handle;
 
-  return dev->Publish(*meta, data) ? ORB_OK : ORB_ERROR;
+  return dev->Publish(*meta, data);
 }
 
 orb_subscriber_t orb_subscribe(const struct orb_metadata *meta) {
@@ -133,87 +133,85 @@ orb_subscriber_t orb_subscribe_multi(const struct orb_metadata *meta,
   return (orb_subscriber_t)sub;
 }
 
-int orb_unsubscribe(orb_subscriber_t *handle_ptr) {
+bool orb_unsubscribe(orb_subscriber_t *handle_ptr) {
   if (!handle_ptr) {
     orb_errno = EINVAL;
-    return ORB_ERROR;
+    return false;
   }
 
   orb_subscriber_t &handle = *handle_ptr;
 
   if (!handle) {
     orb_errno = EINVAL;
-    return ORB_ERROR;
+    return false;
   }
 
   delete (SubscriptionInterval *)handle;
 
   handle = nullptr;
 
-  return ORB_OK;
+  return true;
 }
 
-int orb_copy(const struct orb_metadata *meta, orb_subscriber_t handle,
+bool orb_copy(const struct orb_metadata *meta, orb_subscriber_t handle,
              void *buffer) {
   if (!meta || !handle || !buffer) {
     orb_errno = EINVAL;
-    return ORB_ERROR;
+    return false;
   }
 
   auto &sub = *(SubscriptionInterval *)handle;
-  return sub.copy(buffer) ? ORB_OK : ORB_ERROR;
+  return sub.copy(buffer);
 }
 
-int orb_check(orb_subscriber_t handle, bool *updated) {
-  if (!handle || !updated) {
+bool orb_check_updated(orb_subscriber_t handle) {
+  if (!handle) {
     orb_errno = EINVAL;
-    return ORB_ERROR;
+    return false;
   }
   auto &sub = *(SubscriptionInterval *)handle;
-  *updated = sub.updated();
-  return ORB_OK;
+  return sub.updated();
 }
 
-int orb_exists(const struct orb_metadata *meta, int instance) {
+bool orb_exists(const struct orb_metadata *meta, unsigned int instance) {
   if (!meta) {
     orb_errno = EINVAL;
-    return ORB_ERROR;
+    return false;
   }
 
   auto &master = DeviceMaster::get_instance();
-  return master.GetDeviceNode(*meta, instance) ? ORB_OK : ORB_ERROR;
+  return master.GetDeviceNode(*meta, instance) != nullptr;
 }
 
-int orb_group_count(const struct orb_metadata *meta) {
+unsigned int orb_group_count(const struct orb_metadata *meta) {
   if (!meta) {
     orb_errno = EINVAL;
-    return ORB_ERROR;
+    return false;
   }
-  int instance = 0;
+  unsigned int instance = 0;
 
-  while (ORB_OK == orb_exists(meta, instance)) {
+  while (orb_exists(meta, instance)) {
     ++instance;
   }
 
   return instance;
 }
 
-int orb_set_interval(orb_subscriber_t handle, unsigned interval_ms) {
+bool orb_set_interval(orb_subscriber_t handle, unsigned interval_ms) {
   if (!handle) {
     orb_errno = EINVAL;
-    return ORB_ERROR;
+    return false;
   }
   auto &sub = *(SubscriptionInterval *)handle;
   sub.set_interval_ms(interval_ms);
-  return ORB_OK;
+  return true;
 }
 
-int orb_get_interval(orb_subscriber_t handle, unsigned *interval) {
-  if (!handle || !interval) {
+unsigned int orb_get_interval(orb_subscriber_t handle) {
+  if (!handle) {
     orb_errno = EINVAL;
-    return ORB_ERROR;
+    return false;
   }
   auto &sub = *(SubscriptionInterval *)handle;
-  *interval = sub.get_interval_ms();
-  return ORB_OK;
+  return sub.get_interval_ms();
 }

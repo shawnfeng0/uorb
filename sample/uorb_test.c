@@ -17,7 +17,7 @@ void *adviser_cpuload(void *arg) {
     cpuload.timestamp = orb_absolute_time();
     cpuload.load++;
     cpuload.ram_usage++;
-    if (ORB_OK != orb_publish(ORB_ID(cpuload), cpu_load_pub, &cpuload)) {
+    if (!orb_publish(ORB_ID(cpuload), cpu_load_pub, &cpuload)) {
       LOG_WARN("publish error");
     }
     usleep(1 * 1000 * 1000);
@@ -39,8 +39,8 @@ void *cpuload_update_poll(void *arg) {
   for (int i = 0; i < 10; i++) {
     sleep(sleep_time_s);
     LOG_INFO("TOPIC: cpuload #%d", i);
-    bool update;
-    if (orb_check(cpu_load_sub_data, &update) == ORB_OK && update) {
+    
+    if (orb_check_updated(cpu_load_sub_data)) {
       struct cpuload_s cpu_loader;
       orb_copy(ORB_ID(cpuload), cpu_load_sub_data, &cpu_loader);
       LOG_MULTI_TOKEN(cpu_loader.timestamp, cpu_loader.load,

@@ -55,16 +55,10 @@ struct orb_metadata {
   const char *o_fields;  /**< semicolon separated list of fields (with type) */
 };
 
-typedef const struct orb_metadata *orb_id_t;
-
-#define ORB_OK (0)
-#define ORB_ERROR (-1)
-
 /**
  * Maximum number of multi topic instances
  */
-#define ORB_MULTI_MAX_INSTANCES \
-  4  // This must be < 10 (because it's the last char of the node path)
+#define ORB_MULTI_MAX_INSTANCES 4
 
 /**
  * Generates a pointer to the uORB metadata structure for
@@ -179,7 +173,7 @@ extern orb_advert_t orb_advertise_multi_queue(const struct orb_metadata *meta,
  * @param handle_ptr
  * @return
  */
-extern int orb_unadvertise(orb_advert_t *handle_ptr) __EXPORT;
+extern bool orb_unadvertise(orb_advert_t *handle_ptr) __EXPORT;
 
 /**
  * TODO:
@@ -188,7 +182,7 @@ extern int orb_unadvertise(orb_advert_t *handle_ptr) __EXPORT;
  * @param data
  * @return
  */
-extern int orb_publish(const struct orb_metadata *meta, orb_advert_t handle,
+extern bool orb_publish(const struct orb_metadata *meta, orb_advert_t handle,
                        const void *data) __EXPORT;
 
 /**
@@ -200,17 +194,17 @@ extern int orb_publish(const struct orb_metadata *meta, orb_advert_t handle,
  * @see uORB::Manager::orb_advertise_multi() for meaning of the individual
  * parameters
  */
-static inline int orb_publish_auto(const struct orb_metadata *meta,
+static inline bool orb_publish_auto(const struct orb_metadata *meta,
                                    orb_advert_t *handle, const void *data,
                                    unsigned int *instance) {
   if (!meta || !handle) {
     orb_errno = EINVAL;
-    return ORB_ERROR;
+    return 0;
   }
 
   if (!*handle) {
     *handle = orb_advertise_multi(meta, data, instance);
-    return (*handle) ? ORB_OK : ORB_ERROR;
+    return (*handle) ? 1 : 0;
 
   } else {
     return orb_publish(meta, *handle, data);
@@ -238,7 +232,7 @@ extern orb_subscriber_t orb_subscribe_multi(const struct orb_metadata *meta,
  * @param handle_ptr
  * @return
  */
-extern int orb_unsubscribe(orb_subscriber_t *handle_ptr) __EXPORT;
+extern bool orb_unsubscribe(orb_subscriber_t *handle_ptr) __EXPORT;
 
 /**
  * TODO:
@@ -247,7 +241,7 @@ extern int orb_unsubscribe(orb_subscriber_t *handle_ptr) __EXPORT;
  * @param buffer
  * @return
  */
-extern int orb_copy(const struct orb_metadata *meta, orb_subscriber_t handle,
+extern bool orb_copy(const struct orb_metadata *meta, orb_subscriber_t handle,
                     void *buffer) __EXPORT;
 
 /**
@@ -256,7 +250,7 @@ extern int orb_copy(const struct orb_metadata *meta, orb_subscriber_t handle,
  * @param updated
  * @return
  */
-extern int orb_check(orb_subscriber_t handle, bool *updated) __EXPORT;
+extern bool orb_check_updated(orb_subscriber_t handle) __EXPORT;
 
 /**
  * TODO:
@@ -264,7 +258,8 @@ extern int orb_check(orb_subscriber_t handle, bool *updated) __EXPORT;
  * @param instance
  * @return
  */
-extern int orb_exists(const struct orb_metadata *meta, int instance) __EXPORT;
+extern bool orb_exists(const struct orb_metadata *meta,
+                       unsigned int instance) __EXPORT;
 
 /**
  * Get the number of published instances of a topic group
@@ -272,7 +267,7 @@ extern int orb_exists(const struct orb_metadata *meta, int instance) __EXPORT;
  * @param meta    ORB topic metadata.
  * @return    The number of published instances of this topic
  */
-extern int orb_group_count(const struct orb_metadata *meta) __EXPORT;
+extern unsigned int orb_group_count(const struct orb_metadata *meta) __EXPORT;
 
 /**
  * TODO:
@@ -280,7 +275,7 @@ extern int orb_group_count(const struct orb_metadata *meta) __EXPORT;
  * @param interval_ms
  * @return
  */
-extern int orb_set_interval(orb_subscriber_t handle,
+extern bool orb_set_interval(orb_subscriber_t handle,
                             unsigned interval_ms) __EXPORT;
 
 /**
@@ -289,7 +284,6 @@ extern int orb_set_interval(orb_subscriber_t handle,
  * @param interval
  * @return
  */
-extern int orb_get_interval(orb_subscriber_t handle,
-                            unsigned *interval) __EXPORT;
+extern unsigned int orb_get_interval(orb_subscriber_t handle) __EXPORT;
 
 __END_DECLS
