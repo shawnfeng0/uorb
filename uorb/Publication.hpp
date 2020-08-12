@@ -102,14 +102,13 @@ class PublicationData : public Publication<T, queue_size> {
   PublicationData() = default;
 
   T &get() { return data_; }
-  void set(const T &data) { data_ = data; }
+  auto set(const T &data) -> decltype(*this) {
+    data_ = data;
+    return *this;
+  }
 
   // Publishes the embedded struct.
-  bool update() { return Publication<T, queue_size>::publish(data_); }
-  bool update(const T &data) {
-    data_ = data;
-    return Publication<T, queue_size>::publish(data_);
-  }
+  bool publish() { return Publication<T, queue_size>::publish(data_); }
 
  private:
   T data_{};

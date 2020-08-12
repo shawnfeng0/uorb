@@ -19,7 +19,7 @@ void *adviser_cpuload(void *) {
     cpuload_pub.get().timestamp = orb_absolute_time();
     cpuload_pub.get().load++;
     cpuload_pub.get().ram_usage++;
-    if (!cpuload_pub.update()) {
+    if (!cpuload_pub.publish()) {
       LOG_WARN("publish error");
     }
     usleep(1 * 1000 * 1000);
