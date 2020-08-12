@@ -39,7 +39,7 @@
 uorb::DeviceMaster uorb::DeviceMaster::instance_;
 
 uorb::DeviceNode *uorb::DeviceMaster::CreateAdvertiser(
-    const orb_metadata &meta, const unsigned int *instance,
+    const orb_metadata &meta, unsigned int *instance,
     uint16_t queue_size) {
   /* try for topic groups */
   const unsigned max_group_tries = (!instance) ? ORB_MULTI_MAX_INSTANCES : 1;
@@ -81,6 +81,7 @@ uorb::DeviceNode *uorb::DeviceMaster::CreateAdvertiser(
     return nullptr;
   }
 
+  if (instance) *instance = group_tries;
   return device_node;
 }
 

@@ -69,7 +69,7 @@ class uorb::DeviceMaster {
    * DeviceNode that can be used to publish to the topic.
    */
   DeviceNode *CreateAdvertiser(const orb_metadata &meta,
-                               const unsigned int *instance,
+                               unsigned int *instance,
                                uint16_t queue_size);
 
   /**
