@@ -69,7 +69,7 @@ uorb::DeviceNode *uorb::DeviceMaster::CreateAdvertiser(
         return nullptr;
       }
       device_node->mark_as_advertised();
-      node_list_.push_back(device_node);
+      node_list_.Add(device_node);
       break;  // Create new device
     }
     group_tries++;
@@ -95,7 +95,7 @@ uorb::DeviceNode *uorb::DeviceMaster::GetDeviceNodeLocked(
     const orb_metadata &meta, uint8_t instance) const {
   // We can safely return the node that can be used by any thread, because a
   // DeviceNode never gets deleted.
-  for (auto node : this->node_list_) {
+  for (auto node : node_list_) {
     if (node->IsSameWith(meta, instance)) return node;
   }
 

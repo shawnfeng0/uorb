@@ -33,6 +33,7 @@
 
 #pragma once
 
+#include "uorb/base/list.hpp"
 #include "uorb/base/mutex.h"
 #include "uorb/uORB.h"
 
@@ -42,8 +43,9 @@ class DeviceMaster;
 /**
  * Per-object device instance.
  */
-class DeviceNode {
+class DeviceNode : public ListNode<DeviceNode *> {
   friend DeviceMaster;
+
  public:
   /* do not allow copying this class */
   // no copy, assignment, move, move assignment

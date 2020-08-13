@@ -36,6 +36,7 @@
 #include <cstdint>
 #include <list>
 
+#include "uorb/base/list.hpp"
 #include "uorb/base/mutex.h"
 #include "uorb/uORB.h"
 
@@ -93,7 +94,7 @@ class uorb::DeviceMaster {
 
   static DeviceMaster instance_;
 
-  std::list<DeviceNode *> node_list_;
+  List<DeviceNode *> node_list_;
   base::Mutex lock_; /**< lock to protect access to all class members
                               (also for derived classes) */
 };
