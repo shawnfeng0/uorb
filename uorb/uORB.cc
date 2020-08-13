@@ -158,7 +158,11 @@ bool orb_exists(const struct orb_metadata *meta, unsigned int instance) {
   ORB_ASSERT(meta, return false);
 
   auto &master = DeviceMaster::get_instance();
-  return master.GetDeviceNode(*meta, instance) != nullptr;
+  auto *dev = master.GetDeviceNode(*meta, instance);
+
+  if (dev) return dev->is_advertised();
+
+  return false;
 }
 
 unsigned int orb_group_count(const struct orb_metadata *meta) {
