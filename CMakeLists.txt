@@ -34,9 +34,7 @@
 project(uorb)
 cmake_minimum_required(VERSION 3.15)
 
-set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
-set(THREADS_PREFER_PTHREAD_FLAG TRUE)
-find_package(Threads REQUIRED)
+set(UORB_BUILD_EXAMPLES "Build examples" ON)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -49,16 +47,9 @@ set_target_properties(uorb PROPERTIES
 target_compile_features(uorb INTERFACE
         cxx_noexcept)
 
-# uorb sample
-aux_source_directory(${CMAKE_SOURCE_DIR}/sample SAMPLE_SOURCE)
-aux_source_directory(${CMAKE_SOURCE_DIR}/sample/topic_source SAMPLE_SOURCE)
-aux_source_directory(${CMAKE_SOURCE_DIR}/sample/ulog/src  SAMPLE_SOURCE)
-add_executable(uorb_sample ${SAMPLE_SOURCE})
-add_subdirectory(${CMAKE_SOURCE_DIR}/sample/msg)
-target_include_directories(uorb_sample PRIVATE ${CMAKE_SOURCE_DIR}/sample/msg)
-target_link_libraries(uorb_sample uorb_msgs)
-target_link_libraries(uorb_sample uorb)
-target_link_libraries(uorb_sample Threads::Threads)
+if (UORB_BUILD_EXAMPLES)
+    add_subdirectory(examples)
+endif ()
 
 # uorb test source
 #aux_source_directory(${CMAKE_SOURCE_DIR}/test TEST_SOURCE)

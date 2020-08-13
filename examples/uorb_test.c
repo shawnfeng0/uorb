@@ -7,7 +7,7 @@
 #include <unistd.h>
 
 #include "uorb/base/time.h"
-#include "sample/ulog/src/ulog.h"
+#include "ulog/ulog.h"
 
 void *adviser_cpuload(void *arg) {
   struct cpuload_s cpuload;
@@ -18,14 +18,14 @@ void *adviser_cpuload(void *arg) {
     cpuload.load++;
     cpuload.ram_usage++;
     if (!orb_publish(ORB_ID(cpuload), cpu_load_pub, &cpuload)) {
-      LOG_WARN("publish error");
+      LOGGER_WARN("publish error");
     }
     usleep(1 * 1000 * 1000);
   }
 
   orb_unadvertise(&cpu_load_pub);
 
-  LOG_WARN("Publication over.");
+  LOGGER_WARN("Publication over.");
   return NULL;
 }
 
@@ -34,23 +34,23 @@ void *cpuload_update_poll(void *arg) {
 
   uint32_t sleep_time_s = (arg) ? *(int32_t *)arg : 0;
 
-  LOG_INFO("orb_subcribe, cycle: %d", sleep_time_s);
+  LOGGER_INFO("orb_subcribe, cycle: %d", sleep_time_s);
 
   for (int i = 0; i < 10; i++) {
     sleep(sleep_time_s);
-    LOG_INFO("TOPIC: cpuload #%d", i);
+    LOGGER_INFO("TOPIC: cpuload #%d", i);
     
     if (orb_check_updated(cpu_load_sub_data)) {
       struct cpuload_s cpu_loader;
       orb_copy(ORB_ID(cpuload), cpu_load_sub_data, &cpu_loader);
-      LOG_MULTI_TOKEN(cpu_loader.timestamp, cpu_loader.load,
+      LOGGER_MULTI_TOKEN(cpu_loader.timestamp, cpu_loader.load,
                       cpu_loader.ram_usage);
     }
   }
 
   orb_unsubscribe(&cpu_load_sub_data);
 
-  LOG_WARN("subscription over");
+  LOGGER_WARN("subscription over");
   return NULL;
 }
 
