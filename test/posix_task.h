@@ -21,8 +21,9 @@
 
 typedef int (*px4_main_t)(int argc, char *argv[]);
 
+#define PX4_DEBUG(...) (void *)0;
+
 #define PX4_INFO LOGGER_INFO
-#define PX4_DEBUG LOGGER_DEBUG
 #define PX4_ERR LOGGER_DEBUG
 #define PX4_STORAGEDIR "/tmp/"
 

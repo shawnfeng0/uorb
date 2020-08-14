@@ -31,7 +31,7 @@
  *
  ****************************************************************************/
 
-#include <string.h>
+#include <cstring>
 
 #include "uORBTest_UnitTest.hpp"
 
@@ -47,9 +47,8 @@ int main(int argc, char **argv) {
    */
   if (argc == 1) {
     uORBTest::UnitTest &t = uORBTest::UnitTest::instance();
-    int rc = t.test();
 
-    if (rc == true) {
+    if (t.test()) {
       PX4_INFO("PASS");
       return 0;
 

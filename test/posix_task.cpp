@@ -75,6 +75,7 @@ pthread_t px4_task_spawn_cmd(const char *name, int scheduler, int priority,
   auto *taskdata = (pthdata_t *)malloc(structsize + len);
 
   if (taskdata == nullptr) {
+    ORB_ERR("No memory");
     return -ENOMEM;
   }
 
@@ -179,6 +180,7 @@ pthread_t px4_task_spawn_cmd(const char *name, int scheduler, int priority,
       }
 
     } else {
+      ORB_ERR("px4_task_spawn_cmd: failed to create thread %d %d\n", rv, errno);
       pthread_attr_destroy(&attr);
       free(taskdata);
       return (rv < 0) ? rv : -rv;

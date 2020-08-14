@@ -441,12 +441,12 @@ int uORBTest::UnitTest::test_multi2() {
   }
 
   char *const args[1] = {nullptr};
-  int pubsub_task = px4_task_spawn_cmd(
+  auto pub_sub_task = px4_task_spawn_cmd(
       "uorb_test_multi", SCHED_DEFAULT, SCHED_PRIORITY_MAX - 5, 3000,
       (px4_main_t)&uORBTest::UnitTest::pub_test_multi2_entry, args);
 
-  if (pubsub_task < 0) {
-    return test_fail("failed launching task");
+  if (pub_sub_task < 0) {
+    return test_fail("%s: failed launching task", __FUNCTION__);
   }
 
   orb_abstime last_time = 0;
@@ -713,12 +713,12 @@ int uORBTest::UnitTest::test_queue_poll_notify() {
   _thread_should_exit = false;
 
   char *const args[1] = {nullptr};
-  int pubsub_task = px4_task_spawn_cmd(
+  auto pub_sub_task = px4_task_spawn_cmd(
       "uorb_test_queue", SCHED_DEFAULT, SCHED_PRIORITY_MIN + 5, 3000,
       (px4_main_t)&uORBTest::UnitTest::pub_test_queue_entry, args);
 
-  if (pubsub_task < 0) {
-    return test_fail("failed launching task");
+  if (pub_sub_task < 0) {
+    return test_fail("%s: failed launching task", __FUNCTION__);
   }
 
   int next_expected_val = 0;
