@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2016 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012 - 2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,63 +32,26 @@
  ****************************************************************************/
 
 /**
- * @file drv_hrt.h
+ * @file drv_hrt.cpp
  *
  * High-resolution timer with callouts and timekeeping.
  */
 
-#pragma once
+#include "uorb/base/abs_time.h"
 
-#include <inttypes.h>
+#include <ctime>
 
-#include "visibility.h"
-
-__BEGIN_DECLS
-
-/**
- * Absolute time, in microsecond units.
- *
- * Absolute time is measured from some arbitrary epoch shortly after
- * system startup.  It should never wrap or go backwards.
+/*
+ * Get absolute time. unit: us
  */
-typedef uint64_t orb_abstime;
+orb_abstime orb_absolute_time() {
+  struct timespec ts {};
+  orb_abstime result;
 
-/**
- * Get absolute time in [us] (does not wrap).
- */
-__EXPORT extern orb_abstime orb_absolute_time(void);
+  clock_gettime(CLOCK_MONOTONIC, &ts);
 
-/**
- * Compute the delta between a timestamp taken in the past
- * and now.
- *
- * This function is not interrupt save.
- */
-static inline orb_abstime orb_elapsed_time(const orb_abstime *then) {
-  return orb_absolute_time() - *then;
+  result = (orb_abstime)(ts.tv_sec) * 1000000;
+  result += ts.tv_nsec / 1000;
+
+  return result;
 }
-
-__END_DECLS
-
-#ifdef __cplusplus
-
-namespace time_literals {
-
-// User-defined integer literals for different time units.
-// The base unit is orb_abstime in microseconds
-
-constexpr orb_abstime operator"" _s(unsigned long long seconds) {
-  return orb_abstime(seconds * 1000000ULL);
-}
-
-constexpr orb_abstime operator"" _ms(unsigned long long seconds) {
-  return orb_abstime(seconds * 1000ULL);
-}
-
-constexpr orb_abstime operator"" _us(unsigned long long seconds) {
-  return orb_abstime(seconds);
-}
-
-} /* namespace time_literals */
-
-#endif /* __cplusplus */

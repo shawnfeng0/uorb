@@ -38,6 +38,8 @@
 
 #include "uorb/uORB.h"
 
+#include <cstdio>
+
 #include "uorb/DeviceMaster.h"
 #include "uorb/DeviceNode.h"
 #include "uorb/SubscriptionInterval.h"
@@ -61,6 +63,14 @@ using namespace uorb;
   })
 
 #endif
+
+class SubscriberC : public SubscriptionInterval {
+ public:
+  explicit SubscriberC(const orb_metadata &meta, uint32_t interval_us = 0,
+                       uint8_t instance = 0)
+      : SubscriptionInterval(meta, interval_us, instance) {}
+  auto get_node() { return node_; }
+};
 
 orb_advert_t orb_advertise(const struct orb_metadata *meta, const void *data) {
   return orb_advertise_multi_queue(meta, data, nullptr, 1);
@@ -97,7 +107,7 @@ bool orb_unadvertise(orb_advert_t *handle_ptr) {
   orb_advert_t &handle = *handle_ptr;
   ORB_ASSERT(handle, return false);
 
-  auto &dev = *(DeviceNode *)handle;
+  auto &dev = *(uorb::DeviceNode *)handle;
   dev.mark_as_unadvertised();
 
   handle = nullptr;
@@ -109,7 +119,7 @@ bool orb_publish(const struct orb_metadata *meta, orb_advert_t handle,
                  const void *data) {
   ORB_ASSERT(meta && handle && data, return false);
 
-  auto *dev = (DeviceNode *)handle;
+  auto *dev = (uorb::DeviceNode *)handle;
   return dev->Publish(*meta, data);
 }
 
@@ -121,7 +131,7 @@ orb_subscriber_t orb_subscribe_multi(const struct orb_metadata *meta,
                                      unsigned instance) {
   ORB_ASSERT(meta, return nullptr);
 
-  auto *sub = new SubscriptionInterval(*meta, instance);
+  auto *sub = new SubscriberC(*meta, 0, instance);
   ORB_ASSERT(sub, return nullptr);
 
   return (orb_subscriber_t)sub;
@@ -133,7 +143,7 @@ bool orb_unsubscribe(orb_subscriber_t *handle_ptr) {
   orb_subscriber_t &handle = *handle_ptr;
   ORB_ASSERT(handle, return false);
 
-  delete (SubscriptionInterval *)handle;
+  delete (SubscriberC *)handle;
 
   handle = nullptr;
 
@@ -144,13 +154,13 @@ bool orb_copy(const struct orb_metadata *meta, orb_subscriber_t handle,
               void *buffer) {
   ORB_ASSERT(meta && handle && buffer, return false);
 
-  auto &sub = *(SubscriptionInterval *)handle;
+  auto &sub = *(SubscriberC *)handle;
   return sub.copy(buffer);
 }
 
 bool orb_check_updated(orb_subscriber_t handle) {
   ORB_ASSERT(handle, return false);
-  auto &sub = *(SubscriptionInterval *)handle;
+  auto &sub = *(SubscriberC *)handle;
   return sub.updated();
 }
 
@@ -179,13 +189,67 @@ unsigned int orb_group_count(const struct orb_metadata *meta) {
 
 bool orb_set_interval(orb_subscriber_t handle, unsigned interval_ms) {
   ORB_ASSERT(handle, return false);
-  auto &sub = *(SubscriptionInterval *)handle;
+  auto &sub = *(SubscriberC *)handle;
   sub.set_interval_ms(interval_ms);
   return true;
 }
 
 unsigned int orb_get_interval(orb_subscriber_t handle) {
   ORB_ASSERT(handle, return false);
-  auto &sub = *(SubscriptionInterval *)handle;
+  auto &sub = *(SubscriberC *)handle;
   return sub.get_interval_ms();
+}
+
+int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
+  ORB_ASSERT(fds && nfds, orb_errno = EINVAL; return -1);
+
+  uorb::DeviceNode::SemaphoreCallback semaphore_callback(0);
+  int num = 0;  // Number of new messages
+
+  for (unsigned i = 0; i < nfds; i++) {
+    orb_subscriber_t &subscriber = fds[i].fd;
+    if (!subscriber) continue;
+
+    auto &sub = *((SubscriberC *)subscriber);
+    if (!sub.get_node()) sub.subscribe();
+    if (!sub.get_node()) continue;
+
+    unsigned &event = fds[i].events;
+    unsigned &revent = fds[i].revents;
+
+    // Maybe there is new data before the callback is registered
+    if (sub.updated()) {
+      revent = event & POLLIN;
+      ++num;
+    } else {
+      sub.get_node()->RegisterCallback(&semaphore_callback);
+      revent = 0;
+    }
+  }
+
+  // No new data, waiting for update
+  if (0 == num) semaphore_callback.try_acquire_for(timeout_ms);
+
+  // Cancel registration callback, re-count the number of new messages
+  num = 0;
+  for (unsigned i = 0; i < nfds; i++) {
+    orb_subscriber_t &subscriber = fds[i].fd;
+    if (!subscriber) continue;
+
+    auto &sub = *((SubscriberC *)subscriber);
+    if (!sub.get_node()) sub.subscribe();
+    if (!sub.get_node()) continue;
+
+    unsigned &event = fds[i].events;
+    unsigned &revent = fds[i].revents;
+
+    sub.get_node()->UnregisterCallback(&semaphore_callback);
+
+    if (sub.updated()) {
+      revent |= event & POLLIN;
+      ++num;
+    }
+  }
+
+  return num;
 }

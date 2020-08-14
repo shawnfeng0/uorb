@@ -78,7 +78,7 @@ class Subscription {
   /**
    * Check if there is a new update.
    */
-  bool updated() {
+  virtual bool updated() {
     return advertised() ? (node_->published_message_count() != last_generation_)
                         : false;
   }
@@ -87,26 +87,22 @@ class Subscription {
    * Update the struct
    * @param data The uORB message struct we are updating.
    */
-  bool update(void *dst) { return updated() ? copy(dst) : false; }
+  virtual bool update(void *dst) { return updated() ? copy(dst) : false; }
 
   /**
    * Copy the struct
    * @param data The uORB message struct we are updating.
    */
-  bool copy(void *dst) {
+  virtual bool copy(void *dst) {
     return advertised() ? node_->Copy(dst, last_generation_) : false;
   }
 
-  uint8_t get_instance() const { return instance_; }
-  unsigned get_last_generation() const { return last_generation_; }
-
  protected:
-  DeviceNode *node_{nullptr};
-
   unsigned last_generation_{0}; /**< last generation the subscriber has seen */
 
   const orb_metadata &meta_;
-  uint8_t instance_{0};
+  const uint8_t instance_{0};
+  DeviceNode *node_{nullptr};
 };
 
 // Subscription wrapper class with data
@@ -119,9 +115,7 @@ class SubscriptionData : public Subscription {
    * @param instance The instance for multi sub.
    */
   explicit SubscriptionData(uint8_t instance = 0)
-      : Subscription(T::get_metadata(), instance) {
-    copy(&data_);
-  }
+      : Subscription(T::get_metadata(), instance) {}
 
   ~SubscriptionData() = default;
 

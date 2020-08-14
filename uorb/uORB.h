@@ -108,7 +108,7 @@ struct orb_metadata {
 __BEGIN_DECLS
 
 /**
- * ORB topic advertiser handle.
+ * ORB topic advertiser handle, and hide implementation details.
  *
  * Advertiser handles are global; once obtained they can be shared freely
  * and do not need to be closed or released.
@@ -117,20 +117,34 @@ __BEGIN_DECLS
  * a file-descriptor-based handle would not otherwise be in scope for the
  * publisher.
  *
- * Using struct {} * enables the compiler to give hints when implicitly
- * converting the publisher and subscriber types to avoid using the wrong API.
+ * Why not use void* but named struct* ?
+ * void * will be implicitly converted with other void* types, and no warning
+ * can be given when using the wrong API. And struct* can give warnings.
  */
-typedef struct {
-} * orb_advert_t;
+typedef struct orb_advert *orb_advert_t;
 
 /**
- * ORB topic subscriber handle.
+ * ORB topic subscriber handle, and hide implementation details.
  *
- * Using struct {} * enables the compiler to give hints when implicitly
- * converting the publisher and subscriber types to avoid using the wrong API.
+ * Why not use void* but named struct* ?
+ * void * will be implicitly converted with other void* types, and no warning
+ * can be given when using the wrong API. And struct* can give warnings.
  */
-typedef struct {
-} * orb_subscriber_t;
+typedef struct orb_subscriber *orb_subscriber_t;
+
+#ifndef POLLIN
+#define POLLIN (0x01u)
+#endif
+
+/**
+ * The auxiliary data structure used to use orb_poll, similar to the poll()
+ * function of POSIX.
+ */
+struct orb_pollfd {
+  orb_subscriber_t fd;  // A handle returned from orb_subscribe.
+  unsigned events;      // The input event flags
+  unsigned revents;     // The output event flags
+};
 
 /**
  * return orb_advertise_multi_queue(meta, data, nullptr, 1);
@@ -211,8 +225,8 @@ extern bool orb_unadvertise(orb_advert_t *handle_ptr) __EXPORT;
  * will be notified.  Subscribers that are not waiting can check the topic
  * for updates using orb_check.
  *
- * @param meta    The uORB metadata (usually from the ORB_ID() macro)
- *      for the topic.
+ * @param meta    The uORB metadata (usually from the ORB_ID() macro) for the
+ * topic.
  * @param handle  The handle returned from orb_advertise.
  * @param data    A pointer to the data to be published.
  * @return    true on success, false with orb_errno set accordingly.
@@ -234,7 +248,7 @@ static inline bool orb_publish_auto(const struct orb_metadata *meta,
                                     unsigned int *instance) {
   if (!meta || !handle) {
     orb_errno = EINVAL;
-    return 0;
+    return false;
   }
 
   if (!*handle) {
@@ -245,6 +259,7 @@ static inline bool orb_publish_auto(const struct orb_metadata *meta,
     return orb_publish(meta, *handle, data);
   }
 }
+
 /**
  * return orb_subscribe_multi(meta, 0);
  * @see orb_subscribe_multi()
@@ -380,5 +395,29 @@ extern bool orb_set_interval(orb_subscriber_t handle,
  * @return  The interval period in milliseconds.
  */
 extern unsigned int orb_get_interval(orb_subscriber_t handle) __EXPORT;
+
+/**
+ * Similar to the poll() function of POSIX.
+ *
+ * If none of the defined events have occurred on any selected handle, poll()
+ * shall wait at least timeout milliseconds for an event to occur on any of the
+ * selected handles.
+ *
+ * @param fds       A set of subscriber handles.
+ * @param nfds      The number of orb_pollfd structures in the fds array.
+ * @param timeout_ms   Maximum waiting time for poll.
+ * If the value of timeout is 0, poll() shall return immediately.
+ * If the value of timeout is −1, poll() shall block until a requested event
+ * occurs or until the call is interrupted.
+ *
+ * @return  Upon successful completion, poll() shall return a
+ * non-negative value. A positive value indicates the total number of file
+ * descriptors that have been selected (that is, handle for which the
+ * revents member is non-zero). A value of 0 indicates  that the call timed out
+ * and no handle have been selected. Upon failure, poll() shall return
+ * −1 and set orb_errno to indicate the error.
+ */
+extern int orb_poll(struct orb_pollfd *fds, unsigned int nfds,
+                    int timeout_ms) __EXPORT;
 
 __END_DECLS

@@ -3,11 +3,11 @@
 //
 
 #include <pthread.h>
-#include <uorb/topics/cpuload.h>
 #include <unistd.h>
+#include <uorb/topics/cpuload.h>
 
-#include "uorb/base/time.h"
 #include "ulog/ulog.h"
+#include "uorb/base/abs_time.h"
 
 void *adviser_cpuload(void *arg) {
   struct cpuload_s cpuload;
@@ -18,7 +18,7 @@ void *adviser_cpuload(void *arg) {
     cpuload.load++;
     cpuload.ram_usage++;
     if (!orb_publish(ORB_ID(cpuload), cpu_load_pub, &cpuload)) {
-      LOGGER_WARN("publish error");
+      LOGGER_ERROR("Publish error");
     }
     usleep(1 * 1000 * 1000);
   }
@@ -32,19 +32,22 @@ void *adviser_cpuload(void *arg) {
 void *cpuload_update_poll(void *arg) {
   orb_subscriber_t cpu_load_sub_data = orb_subscribe(ORB_ID(cpuload));
 
-  uint32_t sleep_time_s = (arg) ? *(int32_t *)arg : 0;
+  while (true) {
+#ifndef ARRAY_SIZE
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
+#endif
 
-  LOGGER_INFO("orb_subcribe, cycle: %d", sleep_time_s);
-
-  for (int i = 0; i < 10; i++) {
-    sleep(sleep_time_s);
-    LOGGER_INFO("TOPIC: cpuload #%d", i);
-    
-    if (orb_check_updated(cpu_load_sub_data)) {
+    struct orb_pollfd pollfds[] = {{.fd = cpu_load_sub_data, .events = POLLIN}};
+    int timeout = 2000;
+    LOGGER_INFO("Wait...");
+    if (0 < orb_poll(pollfds, ARRAY_SIZE(pollfds), timeout)) {
       struct cpuload_s cpu_loader;
       orb_copy(ORB_ID(cpuload), cpu_load_sub_data, &cpu_loader);
       LOGGER_MULTI_TOKEN(cpu_loader.timestamp, cpu_loader.load,
-                      cpu_loader.ram_usage);
+                         cpu_loader.ram_usage);
+    } else {
+      LOGGER_ERROR("Got no data within %d milliseconds", timeout);
+      break;
     }
   }
 

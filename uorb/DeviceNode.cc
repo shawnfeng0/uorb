@@ -131,6 +131,10 @@ bool uorb::DeviceNode::Publish(const orb_metadata &meta, const void *data) {
   // Mark advertise status
   if (!advertised_) advertised_ = true;
 
+  for (auto callback : callbacks_) {
+    callback->call();
+  }
+
   return true;
 }
 
@@ -151,4 +155,27 @@ bool uorb::DeviceNode::IsSameWith(const orb_metadata &meta,
 
 bool uorb::DeviceNode::IsSameWith(const orb_metadata &meta) const {
   return &meta_ == &meta;
+}
+
+bool uorb::DeviceNode::RegisterCallback(Callback *callback) {
+  if (!callback) {
+    orb_errno = EINVAL;
+    return false;
+  }
+
+  base::MutexGuard lg(lock_);
+
+  // prevent duplicate registrations
+  for (auto existing_callback : callbacks_) {
+    if (callback == existing_callback) {
+      return true;
+    }
+  }
+
+  return callbacks_.Add(callback);
+}
+
+void uorb::DeviceNode::UnregisterCallback(Callback *callback) {
+  base::MutexGuard lg(lock_);
+  callbacks_.Remove(callback);
 }

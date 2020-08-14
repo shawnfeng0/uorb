@@ -35,6 +35,7 @@
 
 #include "uorb/base/list.hpp"
 #include "uorb/base/mutex.h"
+#include "uorb/base/sem.h"
 #include "uorb/uORB.h"
 
 namespace uorb {
@@ -47,6 +48,17 @@ class DeviceNode : public ListNode<DeviceNode *> {
   friend DeviceMaster;
 
  public:
+  class Callback : public ListNode<Callback *> {
+   public:
+    virtual void call() = 0;
+  };
+
+  class SemaphoreCallback : public base::Semaphore, public Callback {
+   public:
+    explicit SemaphoreCallback(unsigned count) : Semaphore(count) {}
+    void call() override { release(); }
+  };
+
   /* do not allow copying this class */
   // no copy, assignment, move, move assignment
   DeviceNode(const DeviceNode &) = delete;
@@ -76,8 +88,15 @@ class DeviceNode : public ListNode<DeviceNode *> {
    */
   void ReduceSubscriberCount();
 
+  // Whether meta and instance are the same as the current one
   bool IsSameWith(const orb_metadata &meta, uint8_t instance) const;
   bool IsSameWith(const orb_metadata &meta) const;
+
+  // add item to list of work items to schedule on node update
+  bool RegisterCallback(Callback *callback);
+
+  // remove item from list of work items
+  void UnregisterCallback(Callback *callback);
 
   /**
    * Return true if this topic has been advertised.
@@ -133,6 +152,7 @@ class DeviceNode : public ListNode<DeviceNode *> {
   (also for derived classes) */
 
   uint8_t subscriber_count_{0};
+  List<Callback *> callbacks_;
 
   bool advertised_{false}; /**< has ever been advertised (not necessarily
                               published data yet) */

@@ -43,10 +43,8 @@ class Semaphore {
   void acquire() {
     // http://stackoverflow.com/questions/2013181/gdb-causes-sem-wait-to-fail-with-eintr-error
 #if defined(__unix__)
-    int rc;
-    do {
-      rc = sem_wait(&m_sema);
-    } while (rc == -1 && errno == EINTR);
+    while (-1 == sem_wait(&m_sema) && errno == EINTR)
+      ;
 #else
     sem_wait(&m_sema);
 #endif
@@ -57,9 +55,9 @@ class Semaphore {
 
   // tries to decrement the internal counter, blocking for up to a duration time
   bool try_acquire_for(int time_ms) {
-    struct timespec abstime {};
-    GenerateFutureTime(CLOCK_REALTIME, time_ms, abstime);
-    return try_acquire_until(abstime);
+    struct timespec abs_time {};
+    GenerateFutureTime(CLOCK_REALTIME, time_ms, abs_time);
+    return try_acquire_until(abs_time);
   }
 
  private:
@@ -67,13 +65,14 @@ class Semaphore {
 
   // Hide this function in case the client is not sure which clockid to use
   // tries to decrement the internal counter, blocking until a point in time
-  bool try_acquire_until(const struct timespec &abstime) {
-    return sem_timedwait(&m_sema, &abstime) == 0;
+  bool try_acquire_until(const struct timespec &abs_time) {
+    return sem_timedwait(&m_sema, &abs_time) == 0;
   }
 
   // Increase time_ms time based on the current clockid time
-  inline void GenerateFutureTime(clockid_t clockid, unsigned long time_ms,
-                                 struct timespec &out) {
+  static inline void GenerateFutureTime(clockid_t clockid,
+                                        unsigned long time_ms,
+                                        struct timespec &out) {
     // Calculate an absolute time in the future
     const decltype(out.tv_nsec) kSec2Nsec = 1000 * 1000 * 1000;
     clock_gettime(clockid, &out);

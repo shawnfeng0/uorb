@@ -38,16 +38,15 @@
 
 #pragma once
 
-#include <uorb/base/time.h>
-
 #include "uorb/DeviceNode.h"
 #include "uorb/Subscription.h"
+#include "uorb/base/abs_time.h"
 #include "uorb/uORB.h"
 
 namespace uorb {
 
 // Base subscription wrapper class
-class SubscriptionInterval {
+class SubscriptionInterval : public Subscription {
  private:
   template <typename Tp>
   constexpr Tp constrain(Tp val, Tp min_val, Tp max_val) {
@@ -65,20 +64,16 @@ class SubscriptionInterval {
    */
   explicit SubscriptionInterval(const orb_metadata &meta,
                                 uint32_t interval_us = 0, uint8_t instance = 0)
-      : subscription_{meta, instance}, interval_us_(interval_us) {}
+      : Subscription(meta, instance), interval_us_(interval_us) {}
 
   ~SubscriptionInterval() = default;
-
-  bool subscribe() { return subscription_.subscribe(); }
-
-  bool advertised() { return subscription_.advertised(); }
 
   /**
    * Check if there is a new update.
    * */
-  bool updated() {
+  bool updated() override {
     if (advertised() && (orb_elapsed_time(&last_update_) >= interval_us_)) {
-      return subscription_.updated();
+      return Subscription::updated();
     }
 
     return false;
@@ -89,7 +84,7 @@ class SubscriptionInterval {
    * @param dst The destination pointer where the struct will be copied.
    * @return true only if topic was updated and copied successfully.
    */
-  bool update(void *dst) {
+  bool update(void *dst) override {
     if (updated()) {
       return copy(dst);
     }
@@ -102,8 +97,8 @@ class SubscriptionInterval {
    * @param dst The destination pointer where the struct will be copied.
    * @return true only if topic was copied successfully.
    */
-  bool copy(void *dst) {
-    if (subscription_.copy(dst)) {
+  bool copy(void *dst) override {
+    if (Subscription::copy(dst)) {
       const orb_abstime now = orb_absolute_time();
       // shift last update time forward, but don't let it get further behind
       // than the interval
@@ -115,12 +110,8 @@ class SubscriptionInterval {
     return false;
   }
 
-  uint8_t get_instance() const { return subscription_.get_instance(); }
   uint32_t get_interval_us() const { return interval_us_; }
   uint32_t get_interval_ms() const { return interval_us_ / 1000; }
-  unsigned get_last_generation() const {
-    return subscription_.get_last_generation();
-  }
 
   /**
    * Set the interval in microseconds
@@ -135,7 +126,6 @@ class SubscriptionInterval {
   void set_interval_ms(uint32_t interval) { interval_us_ = interval * 1000; }
 
  protected:
-  Subscription subscription_;
   orb_abstime last_update_{0};  // last update in microseconds
   uint32_t interval_us_{0};     // maximum update interval in microseconds
 };

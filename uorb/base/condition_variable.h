@@ -34,8 +34,8 @@ class ConditionVariable {
     pthread_cond_wait(&cond_, lock.native_handle());
   }
 
-  template <typename _Predicate>
-  void wait(Mutex &lock, _Predicate p) {
+  template <typename Predicate>
+  void wait(Mutex &lock, Predicate p) {
     while (!p()) wait(lock);
   }
 
@@ -45,8 +45,8 @@ class ConditionVariable {
   }
 
   // Return true if successful
-  template <typename _Predicate>
-  bool wait_until(Mutex &lock, const struct timespec &atime, _Predicate p) {
+  template <typename Predicate>
+  bool wait_until(Mutex &lock, const struct timespec &atime, Predicate p) {
     // Not returned until timeout or other error
     while (!p())
       if (!wait_until(lock, atime)) return p();
@@ -61,8 +61,8 @@ class ConditionVariable {
   }
 
   // Return true if successful
-  template <typename _Predicate>
-  bool wait_for(Mutex &lock, unsigned long time_ms, _Predicate p) {
+  template <typename Predicate>
+  bool wait_for(Mutex &lock, unsigned long time_ms, Predicate p) {
     struct timespec atime {};
     GenerateFutureTime(clock_id, time_ms, atime);
 
