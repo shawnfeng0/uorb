@@ -31,10 +31,10 @@
  *
  ****************************************************************************/
 
-#include "uorb/DeviceMaster.h"
+#include "uorb/device_master.h"
 
-#include "uorb/DeviceNode.h"
 #include "uorb/base/errno.h"
+#include "uorb/device_node.h"
 
 uorb::DeviceMaster uorb::DeviceMaster::instance_;
 

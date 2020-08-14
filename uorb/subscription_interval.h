@@ -38,10 +38,10 @@
 
 #pragma once
 
-#include "uorb/DeviceNode.h"
-#include "uorb/Subscription.h"
 #include "uorb/base/abs_time.h"
-#include "uorb/uORB.h"
+#include "uorb/device_node.h"
+#include "uorb/subscription.h"
+#include "uorb/uorb.h"
 
 namespace uorb {
 

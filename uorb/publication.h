@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2015 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,13 +31,85 @@
  *
  ****************************************************************************/
 
+/**
+ * @file Publication.hpp
+ *
+ */
+
 #pragma once
 
-#include <stddef.h>
+#include "uorb/base/errno.h"
+#include "uorb/device_master.h"
+#include "uorb/device_node.h"
+#include "uorb/uorb.h"
 
-#include "uorb/uORB.h"
+namespace uorb {
 
-/*
- * Returns array of topics metadata
+class PublicationBase {
+ protected:
+  explicit PublicationBase(const orb_metadata &meta) : meta_(meta) {}
+
+  ~PublicationBase() {
+    if (dev_) dev_->mark_as_unadvertised();
+  }
+
+  uorb::DeviceNode *dev_{nullptr};
+  const orb_metadata &meta_;
+};
+
+/**
+ * uORB publication wrapper class
  */
-extern const struct orb_metadata *const *orb_get_topics() __EXPORT;
+template <typename T, uint8_t ORB_QSIZE = 1>
+class Publication : public PublicationBase {
+ public:
+  Publication() : PublicationBase(T::get_metadata()) {}
+
+  /**
+   * Publish the struct
+   * @param data The uORB message struct we are updating.
+   */
+  bool publish(const T &data) {
+    if (!dev_) advertise();
+
+    if (dev_) {
+      return dev_->Publish(meta_, &data);
+    }
+
+    return false;
+  }
+
+ private:
+  bool advertise() {
+    auto &device_master = DeviceMaster::get_instance();
+    dev_ = device_master.CreateAdvertiser(meta_, nullptr, ORB_QSIZE);
+
+    return dev_ != nullptr;
+  }
+};
+
+/**
+ * The publication class with data embedded.
+ */
+template <typename T, uint8_t queue_size = 1>
+class PublicationData : public Publication<T, queue_size> {
+ public:
+  PublicationData() = default;
+
+  T &get() { return data_; }
+  auto set(const T &data) -> decltype(*this) {
+    data_ = data;
+    return *this;
+  }
+
+  // Publishes the embedded struct.
+  bool publish() { return Publication<T, queue_size>::publish(data_); }
+
+ private:
+  T data_{};
+};
+
+template <class T>
+using PublicationQueued = Publication<T, T::ORB_QUEUE_LENGTH>;
+
+}  // namespace uorb

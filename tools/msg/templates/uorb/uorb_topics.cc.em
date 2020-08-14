@@ -1,6 +1,19 @@
+@###############################################
+@#
+@# EmPy template for generating uorb_topics.cc file
+@# for logging purposes
+@#
+@###############################################
+@# Start of Template
+@#
+@# Context:
+@#  - msgs (List) list of all msg files
+@#  - multi_topics (List) list of all multi-topic names
+@#  - ids (List) list of all RTPS msg ids
+@###############################################
 /****************************************************************************
  *
- *   Copyright (c) 2012-2020 PX4 Development Team. All rights reserved.
+ *   Copyright (C) 2013-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,46 +44,26 @@
  *
  ****************************************************************************/
 
-/**
- * @file Subscription.cpp
- *
- */
+#include <uorb/uorb.h>
+#include <uorb/uorb_topics.h>
+@{
+msg_names = [mn.replace(".msg", "") for mn in msgs]
+msgs_count = len(msg_names)
+msg_names_all = list(set(msg_names + multi_topics)) # set() filters duplicates
+msg_names_all.sort()
+msgs_count_all = len(msg_names_all)
+}@
+@[for msg_name in msg_names]@
+#include <uorb/topics/@(msg_name).h>
+@[end for]
 
-#include "Subscription.h"
+const constexpr struct orb_metadata *const uorb_topics_list[] = {
+@[for idx, msg_name in enumerate(msg_names_all, 1)]@
+	ORB_ID(@(msg_name))@[if idx != msgs_count_all], @[end if]
+@[end for]
+};
 
-#include "uorb/DeviceMaster.h"
-
-namespace uorb {
-
-bool Subscription::subscribe() {
-  // check if already subscribed
-  if (node_) {
-    return true;
-  }
-
-  DeviceMaster &device_master = uorb::DeviceMaster::get_instance();
-
-  node_ = device_master.GetDeviceNode(meta_, instance_);
-
-  if (!node_) {
-    return false;
-  }
-
-  node_->IncreaseSubscriberCount();
-
-  // If there were any previous publications, allow the subscriber to read
-  // them
-  const unsigned curr_gen = node_->published_message_count();
-  const uint8_t q_size = node_->get_queue_size();
-
-  if (q_size < curr_gen) {
-    last_generation_ = curr_gen - q_size;
-
-  } else {
-    last_generation_ = 0;
-  }
-
-  return true;
+const struct orb_metadata *const *orb_get_topics()
+{
+	return uorb_topics_list;
 }
-
-}  // namespace uorb

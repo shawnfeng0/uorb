@@ -33,10 +33,10 @@
 
 #pragma once
 
-#include "uorb/base/list.hpp"
+#include "uorb/base/intrusive_list.h"
 #include "uorb/base/mutex.h"
-#include "uorb/base/sem.h"
-#include "uorb/uORB.h"
+#include "uorb/base/semaphore.h"
+#include "uorb/uorb.h"
 
 namespace uorb {
 class DeviceMaster;

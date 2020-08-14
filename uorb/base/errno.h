@@ -5,6 +5,10 @@
 #ifndef UORB_ORB_ERRNO_H
 #define UORB_ORB_ERRNO_H
 
+#if defined(__unix__)
+#include <errno.h>
+#endif
+
 #ifndef ENOENT
 #define ENOENT 2 /* No such file or directory */
 #endif

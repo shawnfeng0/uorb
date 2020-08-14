@@ -66,7 +66,7 @@ topic_name = spec.short_name
 @# Generic Includes
 @##############################
 
-#include <uorb/uORB.h>
+#include <uorb/uorb.h>
 #include <inttypes.h>
 
 @##############################

@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012 - 2020 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2015 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,27 +31,13 @@
  *
  ****************************************************************************/
 
-/**
- * @file drv_hrt.cpp
- *
- * High-resolution timer with callouts and timekeeping.
- */
+#pragma once
 
-#include "uorb/base/abs_time.h"
+#include <stddef.h>
 
-#include <ctime>
+#include "uorb/uorb.h"
 
 /*
- * Get absolute time. unit: us
+ * Returns array of topics metadata
  */
-orb_abstime orb_absolute_time() {
-  struct timespec ts {};
-  orb_abstime result;
-
-  clock_gettime(CLOCK_MONOTONIC, &ts);
-
-  result = (orb_abstime)(ts.tv_sec) * 1000000;
-  result += ts.tv_nsec / 1000;
-
-  return result;
-}
+extern const struct orb_metadata *const *orb_get_topics() __EXPORT;

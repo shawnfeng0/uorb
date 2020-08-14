@@ -6,23 +6,17 @@
 
 #pragma once
 
-#include <pthread.h>
-
-#include "condition_variable.h"
-#include "errno.h"
-#include "visibility.h"
-
 //---------------------------------------------------------
 // Reference:
 // https://github.com/preshing/cpp11-on-multicore/blob/master/common/sema.h
 // Semaphore (POSIX, Linux)
 //---------------------------------------------------------
 
-#if defined(__unix__)
-#include <errno.h>
-#endif
+#include <pthread.h>
 #include <semaphore.h>
-#include <stdint.h>
+
+#include <cerrno>
+#include <cstdint>
 
 namespace uorb {
 namespace base {

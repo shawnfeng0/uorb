@@ -32,18 +32,16 @@
  ****************************************************************************/
 
 /**
- * @file uORB.cpp
+ * @file uorb.cpp
  * A lightweight object broker.
  */
 
-#include "uorb/uORB.h"
+#include "uorb/uorb.h"
 
-#include <cstdio>
-
-#include "uorb/DeviceMaster.h"
-#include "uorb/DeviceNode.h"
-#include "uorb/SubscriptionInterval.h"
 #include "uorb/base/errno.h"
+#include "uorb/device_master.h"
+#include "uorb/device_node.h"
+#include "uorb/subscription_interval.h"
 
 using namespace uorb;
 

@@ -40,8 +40,9 @@
 #pragma once
 
 #include <inttypes.h>
+#include <time.h>
 
-#include "visibility.h"
+#include "uorb/base/visibility.h"
 
 __BEGIN_DECLS
 
@@ -56,13 +57,21 @@ typedef uint64_t orb_abstime;
 /**
  * Get absolute time in [us] (does not wrap).
  */
-__EXPORT extern orb_abstime orb_absolute_time(void);
+static inline orb_abstime orb_absolute_time() {
+  struct timespec ts = {};
+  orb_abstime result;
+
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+
+  result = (orb_abstime)(ts.tv_sec) * 1000000;
+  result += ts.tv_nsec / 1000;
+
+  return result;
+}
 
 /**
  * Compute the delta between a timestamp taken in the past
  * and now.
- *
- * This function is not interrupt save.
  */
 static inline orb_abstime orb_elapsed_time(const orb_abstime *then) {
   return then ? orb_absolute_time() - *then : 0;

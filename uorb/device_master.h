@@ -36,9 +36,9 @@
 #include <cstdint>
 #include <list>
 
-#include "uorb/base/list.hpp"
+#include "uorb/base/intrusive_list.h"
 #include "uorb/base/mutex.h"
-#include "uorb/uORB.h"
+#include "uorb/uorb.h"
 
 namespace uorb {
 class DeviceNode;

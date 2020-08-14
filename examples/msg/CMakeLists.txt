@@ -81,7 +81,7 @@ set(msg_out_path ${CMAKE_CURRENT_SOURCE_DIR}/uorb/topics)
 set(msg_source_out_path	${CMAKE_CURRENT_SOURCE_DIR}/uorb/topics_sources)
 
 set(uorb_headers)
-set(uorb_sources ${msg_source_out_path}/uORBTopics.cc)
+set(uorb_sources ${msg_source_out_path}/uorb_topics.cc)
 foreach(msg_file ${msg_files})
 	get_filename_component(msg ${msg_file} NAME_WE)
 	list(APPEND uorb_headers ${msg_out_path}/${msg}.h)

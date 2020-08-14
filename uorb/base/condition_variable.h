@@ -4,8 +4,8 @@
 #include <stdint.h>
 #include <time.h>
 
-#include "errno.h"
-#include "mutex.h"
+#include "uorb/base/errno.h"
+#include "uorb/base/mutex.h"
 
 namespace uorb {
 namespace base {

@@ -80,7 +80,7 @@ __license__ = "BSD"
 __email__ = "thomasgubler@gmail.com"
 
 TEMPLATE_FILE = ['msg.h.em', 'msg.cc.em']
-TOPICS_LIST_TEMPLATE_FILE = 'uORBTopics.cc.em'
+TOPICS_LIST_TEMPLATE_FILE = 'uorb_topics.cc.em'
 OUTPUT_FILE_EXT = ['.h', '.cc']
 INCL_DEFAULT = ['std_msgs:./msg/std_msgs']
 PACKAGE = 'px4'

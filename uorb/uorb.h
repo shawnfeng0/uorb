@@ -34,7 +34,7 @@
 #pragma once
 
 /**
- * @file uORB.h
+ * @file uorb.h
  * API for the uORB lightweight object broker.
  */
 
@@ -185,8 +185,8 @@ extern orb_advert_t orb_advertise_multi(const struct orb_metadata *meta,
  * ORB_MULTI_MAX_INSTANCES), which is useful for scenarios where multiple
  * publishers publish the same topic.
  *
- * @param meta    The uORB metadata (usually from the ORB_ID() macro)
- *      for the topic.
+ * @param meta    The uORB metadata (usually from the ORB_ID() macro) for the
+ * topic.
  * @param data    A pointer to the initial data to be published. For topics
  * updated by interrupt handlers, the advertisement must be performed from
  * non-interrupt context.
@@ -240,8 +240,7 @@ extern bool orb_publish(const struct orb_metadata *meta, orb_advert_t handle,
  * This performs the initial advertisement of a topic; it creates the topic
  * node if required and publishes the initial data.
  *
- * @see uORB::Manager::orb_advertise_multi() for meaning of the individual
- * parameters
+ * @see orb_advertise_multi() for meaning of the individual parameters
  */
 static inline bool orb_publish_auto(const struct orb_metadata *meta,
                                     orb_advert_t *handle, const void *data,
