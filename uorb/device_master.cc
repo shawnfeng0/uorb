@@ -38,9 +38,9 @@
 
 uorb::DeviceMaster uorb::DeviceMaster::instance_;
 
-uorb::DeviceNode *uorb::DeviceMaster::CreateAdvertiser(
-    const orb_metadata &meta, unsigned int *instance,
-    uint16_t queue_size) {
+uorb::DeviceNode *uorb::DeviceMaster::CreateAdvertiser(const orb_metadata &meta,
+                                                       unsigned int *instance,
+                                                       uint16_t queue_size) {
   /* try for topic groups */
   const unsigned max_group_tries = (!instance) ? ORB_MULTI_MAX_INSTANCES : 1;
   const bool is_single_instance_advertiser = !instance;
@@ -58,6 +58,7 @@ uorb::DeviceNode *uorb::DeviceMaster::CreateAdvertiser(
     device_node = GetDeviceNodeLocked(meta, group_tries);
     if (device_node &&
         (!device_node->is_advertised() || is_single_instance_advertiser)) {
+      device_node->set_queue_size(queue_size);
       device_node->mark_as_advertised();
       break;  // Find a unadvertised device or single instance device
     }
@@ -100,4 +101,29 @@ uorb::DeviceNode *uorb::DeviceMaster::GetDeviceNodeLocked(
   }
 
   return nullptr;
+}
+
+uorb::DeviceNode *uorb::DeviceMaster::OpenDeviceNode(const orb_metadata &meta,
+                                                     unsigned int instance) {
+  if (instance >= ORB_MULTI_MAX_INSTANCES) {
+    return nullptr;
+  }
+
+  uorb::base::MutexGuard lg(lock_);
+
+  DeviceNode *device_node = GetDeviceNodeLocked(meta, instance);
+  if (device_node) {
+    return device_node;
+  }
+
+  device_node = new DeviceNode(meta, instance);
+
+  if (!device_node) {
+    orb_errno = ENOMEM;
+    return nullptr;
+  }
+
+  node_list_.Add(device_node);
+
+  return device_node;  // Create new device
 }

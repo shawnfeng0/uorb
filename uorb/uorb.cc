@@ -202,7 +202,7 @@ int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
   ORB_ASSERT(fds && nfds, orb_errno = EINVAL; return -1);
 
   uorb::DeviceNode::SemaphoreCallback semaphore_callback(0);
-  int num = 0;  // Number of new messages
+  int updated_num = 0;  // Number of new messages
 
   for (unsigned i = 0; i < nfds; i++) {
     orb_subscriber_t &subscriber = fds[i].fd;
@@ -218,7 +218,7 @@ int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
     // Maybe there is new data before the callback is registered
     if (sub.updated()) {
       revent = event & POLLIN;
-      ++num;
+      ++updated_num;
     } else {
       sub.get_node()->RegisterCallback(&semaphore_callback);
       revent = 0;
@@ -226,10 +226,10 @@ int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
   }
 
   // No new data, waiting for update
-  if (0 == num) semaphore_callback.try_acquire_for(timeout_ms);
+  if (0 == updated_num) semaphore_callback.try_acquire_for(timeout_ms);
 
   // Cancel registration callback, re-count the number of new messages
-  num = 0;
+  updated_num = 0;
   for (unsigned i = 0; i < nfds; i++) {
     orb_subscriber_t &subscriber = fds[i].fd;
     if (!subscriber) continue;
@@ -245,9 +245,9 @@ int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
 
     if (sub.updated()) {
       revent |= event & POLLIN;
-      ++num;
+      ++updated_num;
     }
   }
 
-  return num;
+  return updated_num;
 }

@@ -118,7 +118,19 @@ class DeviceNode : public ListNode<DeviceNode *> {
   void mark_as_unadvertised() { advertised_ = false; }
   void mark_as_advertised() { advertised_ = true; }
 
+  unsigned oldest_data_index() const {
+    return (queue_size_ < generation_) ? generation_ - queue_size_ : 0;
+  }
+
   uint16_t get_queue_size() const { return queue_size_; }
+  bool set_queue_size(uint16_t queue_size) {
+    if (data_ || queue_size_ > queue_size) {
+      return false;
+    }
+
+    queue_size_ = queue_size;
+    return true;
+  }
 
   unsigned published_message_count() const { return generation_; }
 

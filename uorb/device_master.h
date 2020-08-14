@@ -69,9 +69,10 @@ class uorb::DeviceMaster {
    * @return nullptr on error, and set errno to orb_errno. Otherwise returns a
    * DeviceNode that can be used to publish to the topic.
    */
-  DeviceNode *CreateAdvertiser(const orb_metadata &meta,
-                               unsigned int *instance,
+  DeviceNode *CreateAdvertiser(const orb_metadata &meta, unsigned int *instance,
                                uint16_t queue_size);
+
+  DeviceNode *OpenDeviceNode(const orb_metadata &meta, unsigned int instance);
 
   /**
    * Public interface for GetDeviceNodeLocked(). Takes care of synchronization.

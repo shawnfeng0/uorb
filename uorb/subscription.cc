@@ -50,7 +50,7 @@ bool Subscription::subscribe() {
 
   DeviceMaster &device_master = uorb::DeviceMaster::get_instance();
 
-  node_ = device_master.GetDeviceNode(meta_, instance_);
+  node_ = device_master.OpenDeviceNode(meta_, instance_);
 
   if (!node_) {
     return false;
@@ -58,17 +58,8 @@ bool Subscription::subscribe() {
 
   node_->IncreaseSubscriberCount();
 
-  // If there were any previous publications, allow the subscriber to read
-  // them
-  const unsigned curr_gen = node_->published_message_count();
-  const uint8_t q_size = node_->get_queue_size();
-
-  if (q_size < curr_gen) {
-    last_generation_ = curr_gen - q_size;
-
-  } else {
-    last_generation_ = 0;
-  }
+  // If there were any previous publications, allow the subscriber to read them
+  last_generation_ = node_->oldest_data_index();
 
   return true;
 }

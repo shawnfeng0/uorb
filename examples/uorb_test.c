@@ -11,7 +11,7 @@
 
 void *adviser_cpuload(void *arg) {
   struct cpuload_s cpuload;
-  orb_advert_t cpu_load_pub = orb_advertise(ORB_ID(cpuload), NULL);
+  orb_advert_t cpu_load_pub = orb_advertise_queue(ORB_ID(cpuload), NULL, 3);
 
   for (int i = 0; i < 10; i++) {
     cpuload.timestamp = orb_absolute_time();
@@ -30,23 +30,25 @@ void *adviser_cpuload(void *arg) {
 }
 
 void *cpuload_update_poll(void *arg) {
+  int sleep_time = *(int *)arg;
+  sleep(sleep_time);
+
   orb_subscriber_t cpu_load_sub_data = orb_subscribe(ORB_ID(cpuload));
 
-  while (true) {
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 #endif
 
+  while (true) {
     struct orb_pollfd pollfds[] = {{.fd = cpu_load_sub_data, .events = POLLIN}};
     int timeout = 2000;
-    LOGGER_INFO("Wait...");
     if (0 < orb_poll(pollfds, ARRAY_SIZE(pollfds), timeout)) {
       struct cpuload_s cpu_loader;
       orb_copy(ORB_ID(cpuload), cpu_load_sub_data, &cpu_loader);
       LOGGER_MULTI_TOKEN(cpu_loader.timestamp, cpu_loader.load,
                          cpu_loader.ram_usage);
     } else {
-      LOGGER_ERROR("Got no data within %d milliseconds", timeout);
+      LOGGER_WARN("Got no data within %d milliseconds", timeout);
       break;
     }
   }
