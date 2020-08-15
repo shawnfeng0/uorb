@@ -55,11 +55,11 @@ static inline bool is_in_range(const T &left, const T &value, const T &right) {
 }
 
 bool uorb::DeviceNode::Copy(void *dst, unsigned &sub_generation) {
-  base::MutexGuard lg(lock_);
-
   if ((dst == nullptr) || (data_ == nullptr) || (generation_ == 0)) {
     return false;
   }
+
+  base::ReaderLockGuard lg(lock_);
 
   if (generation_ == sub_generation) {
     /* The subscriber already read the latest message, but nothing new was
@@ -105,7 +105,7 @@ bool uorb::DeviceNode::Publish(const orb_metadata &meta, const void *data) {
     return false;
   }
 
-  base::MutexGuard lg(lock_);
+  base::WriteLockGuard lg(lock_);
 
   if (nullptr == data_) {
     data_ = new uint8_t[meta_.o_size * queue_size_];
@@ -138,12 +138,12 @@ bool uorb::DeviceNode::Publish(const orb_metadata &meta, const void *data) {
 }
 
 void uorb::DeviceNode::IncreaseSubscriberCount() {
-  base::MutexGuard lg(lock_);
+  base::WriteLockGuard lg(lock_);
   subscriber_count_++;
 }
 
 void uorb::DeviceNode::ReduceSubscriberCount() {
-  base::MutexGuard lg(lock_);
+  base::WriteLockGuard lg(lock_);
   subscriber_count_--;
 }
 
@@ -162,7 +162,7 @@ bool uorb::DeviceNode::RegisterCallback(Callback *callback) {
     return false;
   }
 
-  base::MutexGuard lg(lock_);
+  base::WriteLockGuard lg(lock_);
 
   // prevent duplicate registrations
   for (auto existing_callback : callbacks_) {
@@ -175,6 +175,6 @@ bool uorb::DeviceNode::RegisterCallback(Callback *callback) {
 }
 
 void uorb::DeviceNode::UnregisterCallback(Callback *callback) {
-  base::MutexGuard lg(lock_);
+  base::WriteLockGuard lg(lock_);
   callbacks_.Remove(callback);
 }

@@ -36,6 +36,7 @@
 #include "uorb/base/condition_variable.h"
 #include "uorb/base/intrusive_list.h"
 #include "uorb/base/mutex.h"
+#include "uorb/base/rw_mutex.h"
 #include "uorb/uorb.h"
 
 namespace uorb {
@@ -161,7 +162,7 @@ class DeviceNode : public ListNode<DeviceNode *> {
   unsigned generation_{0}; /**< object generation count */
   bool queue_is_full_{false};
 
-  base::Mutex lock_; /**< lock to protect access to all class members
+  base::RwMutex lock_; /**< lock to protect access to all class members
   (also for derived classes) */
 
   uint8_t subscriber_count_{0};

@@ -38,6 +38,7 @@
 
 #include "uorb/base/intrusive_list.h"
 #include "uorb/base/mutex.h"
+#include "uorb/base/rw_mutex.h"
 #include "uorb/uorb.h"
 
 namespace uorb {
@@ -96,6 +97,6 @@ class uorb::DeviceMaster {
   static DeviceMaster instance_;
 
   List<DeviceNode *> node_list_;
-  base::Mutex lock_; /**< lock to protect access to all class members
-                              (also for derived classes) */
+  base::RwMutex lock_; /**< lock to protect access to all class members
+                             (also for derived classes) */
 };
