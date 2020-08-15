@@ -33,9 +33,9 @@
 
 #pragma once
 
+#include "uorb/base/condition_variable.h"
 #include "uorb/base/intrusive_list.h"
 #include "uorb/base/mutex.h"
-#include "uorb/base/semaphore.h"
 #include "uorb/uorb.h"
 
 namespace uorb {
@@ -53,9 +53,10 @@ class DeviceNode : public ListNode<DeviceNode *> {
     virtual void call() = 0;
   };
 
-  class SemaphoreCallback : public base::Semaphore, public Callback {
+  class SemaphoreCallback : public base::SimpleSemaphore<CLOCK_MONOTONIC>,
+                            public Callback {
    public:
-    explicit SemaphoreCallback(unsigned count) : Semaphore(count) {}
+    explicit SemaphoreCallback(unsigned count) : SimpleSemaphore(count) {}
     void call() override { release(); }
   };
 
