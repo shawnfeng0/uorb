@@ -27,7 +27,12 @@ static void *entry_adapter(void *ptr) {
   }
   auto &data = *(pthread_data_t *)ptr;
 
-  int rv = pthread_setname_np(pthread_self(), data.name);
+  // The method of thread name setting is not compatible
+  //  int rv = pthread_setname_np(pthread_self(), data.name);
+  //
+  //  if (rv) {
+  //    ORB_ERROR("failed to set name of thread %d %d\n", rv, errno);
+  //  }
 
   if (rv) {
     ORB_ERROR("failed to set name of thread %d %d\n", rv, errno);
@@ -38,13 +43,11 @@ static void *entry_adapter(void *ptr) {
   pthread_exit(nullptr);
 }
 
-pthread_t task_spawn_cmd(const char *name, int scheduler, int priority,
-                         int stack_size, thread_entry_t entry,
+pthread_t task_spawn_cmd(const char *name, int stack_size, thread_entry_t entry,
                          char *const *argv) {
   int i;
   int argc = 0;
   unsigned int len = 0;
-  struct sched_param param = {};
   char *p = (char *)argv;
 
   // Calculate argc
@@ -99,8 +102,6 @@ pthread_t task_spawn_cmd(const char *name, int scheduler, int priority,
     return (rv < 0) ? rv : -rv;
   }
 
-#ifndef __PX4_DARWIN
-
   if (stack_size < PTHREAD_STACK_MIN) {
     stack_size = PTHREAD_STACK_MIN;
   }
@@ -109,74 +110,20 @@ pthread_t task_spawn_cmd(const char *name, int scheduler, int priority,
 
   if (rv != 0) {
     ORB_ERROR("pthread_attr_setstacksize to %d returned error (%d)", stack_size,
-            rv);
-    pthread_attr_destroy(&attr);
-    free(task_data);
-    return (rv < 0) ? rv : -rv;
-  }
-
-#endif
-
-  rv = pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
-
-  if (rv != 0) {
-    ORB_ERROR("failed to set inherit sched");
-    pthread_attr_destroy(&attr);
-    free(task_data);
-    return (rv < 0) ? rv : -rv;
-  }
-
-  rv = pthread_attr_setschedpolicy(&attr, scheduler);
-
-  if (rv != 0) {
-    ORB_ERROR("failed to set sched policy");
-    pthread_attr_destroy(&attr);
-    free(task_data);
-    return (rv < 0) ? rv : -rv;
-  }
-
-#ifdef __PX4_CYGWIN
-  /* Priorities on Windows are defined a lot differently */
-  priority = SCHED_PRIORITY_DEFAULT;
-#endif
-
-  param.sched_priority = priority;
-
-  rv = pthread_attr_setschedparam(&attr, &param);
-
-  if (rv != 0) {
-    ORB_ERROR("failed to set sched param");
-    ORB_INFO("%s", strerror(rv));
+              rv);
     pthread_attr_destroy(&attr);
     free(task_data);
     return (rv < 0) ? rv : -rv;
   }
 
   pthread_t task_id = 0;
-
   rv = pthread_create(&task_id, &attr, &entry_adapter, (void *)task_data);
+  pthread_attr_destroy(&attr);
 
   if (rv != 0) {
-    if (rv == EPERM) {
-      // printf("WARNING: NOT RUNNING AS ROOT, UNABLE TO RUN REALTIME
-      // THREADS\n");
-      rv = pthread_create(&task_id, nullptr, &entry_adapter, (void *)task_data);
-
-      if (rv != 0) {
-        ORB_ERROR("failed to create thread %d %d\n", rv, errno);
-        pthread_attr_destroy(&attr);
-        free(task_data);
-        return (rv < 0) ? rv : -rv;
-      }
-
-    } else {
-      ORB_ERROR("failed to create thread %d %d\n", rv, errno);
-      pthread_attr_destroy(&attr);
-      free(task_data);
-      return (rv < 0) ? rv : -rv;
-    }
+    ORB_ERROR("failed to create thread %d %d\n", rv, errno);
+    free(task_data);
+    return (rv < 0) ? rv : -rv;
   }
-
-  pthread_attr_destroy(&attr);
   return task_id;
 }

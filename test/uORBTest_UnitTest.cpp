@@ -443,7 +443,7 @@ int uORBTest::UnitTest::test_multi2() {
 
   char *const args[1] = {nullptr};
   auto pub_sub_task = task_spawn_cmd(
-      "uorb_test_multi", SCHED_DEFAULT, SCHED_PRIORITY_MAX - 5, 3000,
+      "uorb_test_multi", 3000,
       (thread_entry_t)&uORBTest::UnitTest::pub_test_multi2_entry, args);
 
   if (pub_sub_task < 0) {
@@ -715,7 +715,7 @@ int uORBTest::UnitTest::test_queue_poll_notify() {
 
   char *const args[1] = {nullptr};
   auto pub_sub_task = task_spawn_cmd(
-      "uorb_test_queue", SCHED_DEFAULT, SCHED_PRIORITY_MIN + 5, 3000,
+      "uorb_test_queue", 3000,
       (thread_entry_t)&uORBTest::UnitTest::pub_test_queue_entry, args);
 
   if (pub_sub_task < 0) {
