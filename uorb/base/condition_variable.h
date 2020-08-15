@@ -31,7 +31,7 @@ class ConditionVariable {
   void notify_all() noexcept { pthread_cond_broadcast(&cond_); }
 
   void wait(Mutex &lock) noexcept {
-    pthread_cond_wait(&cond_, lock.native_handle());
+    pthread_cond_wait(&cond_, lock.GetNativeHandle());
   }
 
   template <typename Predicate>
@@ -41,7 +41,7 @@ class ConditionVariable {
 
   // Return true if successful
   bool wait_until(Mutex &lock, const struct timespec &atime) {
-    return pthread_cond_timedwait(&cond_, lock.native_handle(), &atime) == 0;
+    return pthread_cond_timedwait(&cond_, lock.GetNativeHandle(), &atime) == 0;
   }
 
   // Return true if successful

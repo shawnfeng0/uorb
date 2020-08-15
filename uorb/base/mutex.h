@@ -1,74 +1,70 @@
 #pragma once
 
+//---------------------------------------------------------
+// Reference:
+// https://github.com/google/glog/blob/master/src/base/mutex.h
+//---------------------------------------------------------
+
 #include <pthread.h>
 
 namespace uorb {
 namespace base {
 
-// Common base class for Mutex
-class _mutex_base {
- protected:
-#ifdef PTHREAD_MUTEX_INITIALIZER
-  pthread_mutex_t mutex_ = PTHREAD_MUTEX_INITIALIZER;
-  constexpr _mutex_base() noexcept = default;
-#else
-  pthread_mutex_t mutex_;
-
-  __mutex_base() noexcept {
-    // XXX EAGAIN, ENOMEM, EPERM, EBUSY(may), EINVAL(may)
-    pthread_mutex_init((&mutex_), nullptr);
-  }
-
-  ~__mutex_base() noexcept { pthread_mutex_destroy(&mutex_); }
-#endif
-
- public:
-  _mutex_base(const _mutex_base &) = delete;
-  _mutex_base &operator=(const _mutex_base &) = delete;
-};
-
 /// The standard Mutex type.
-class Mutex : private _mutex_base {
+class Mutex {
+#define SAFE_PTHREAD_MUTEX(fncall)          \
+  do { /* run fncall if is_safe_ is true */ \
+    if (is_safe_) fncall(&mutex_);          \
+  } while (0)
+
  public:
 #ifdef PTHREAD_MUTEX_INITIALIZER
-  constexpr
-#endif
-      Mutex() noexcept = default;
+  constexpr Mutex() noexcept = default;
   ~Mutex() = default;
-
+#else
+  Mutex() noexcept {
+    SetIsSafe();
+    pthread_mutex_init(&mutex_, nullptr);
+  }
+  ~Mutex() noexcept { SAFE_PTHREAD_MUTEX(pthread_mutex_destroy); }
+#endif
   Mutex(const Mutex &) = delete;
   Mutex &operator=(const Mutex &) = delete;
 
-  void lock() {
-    // XXX EINVAL, EAGAIN, EBUSY, EINVAL, EDEADLK(may)
-    pthread_mutex_lock(&mutex_);
+  void lock() { SAFE_PTHREAD_MUTEX(pthread_mutex_lock); }
+  void unlock() { SAFE_PTHREAD_MUTEX(pthread_mutex_unlock); }
+
+  bool tryLock() noexcept {
+    return is_safe_ ? 0 == pthread_mutex_trylock(&mutex_) : true;
   }
 
-  bool try_lock() noexcept {
-    // XXX EINVAL, EAGAIN, EBUSY
-    return !pthread_mutex_trylock(&mutex_);
-  }
+  pthread_mutex_t *GetNativeHandle() noexcept { return &mutex_; }
 
-  void unlock() {
-    // XXX EINVAL, EAGAIN, EPERM
-    pthread_mutex_unlock(&mutex_);
-  }
+ private:
+#ifdef PTHREAD_MUTEX_INITIALIZER
+  pthread_mutex_t mutex_ = PTHREAD_MUTEX_INITIALIZER;
+  volatile bool is_safe_{true};
+#else
+  pthread_mutex_t mutex_{};
 
-  pthread_mutex_t *native_handle() noexcept { return &mutex_; }
+  // We want to make sure that the compiler sets is_safe_ to true only
+  // when we tell it to, and never makes assumptions is_safe_ is
+  // always true.  volatile is the most reliable way to do that.
+  volatile bool is_safe_{};
+  inline void SetIsSafe() { is_safe_ = true; }
+#endif
 };
 
-/** @brief A simple scoped lock type.
+/**
+ * @brief A simple scoped lock type.
  *
  * A LockGuard controls Mutex ownership within a scope, releasing
  * ownership in the destructor.
  */
-template <typename Mutex>
+template <typename MutexType>
 class LockGuard {
  public:
-  typedef Mutex MutexType;
-
   explicit LockGuard(MutexType &m) : mutex_(m) { mutex_.lock(); }
-
   ~LockGuard() { mutex_.unlock(); }
 
   LockGuard(const LockGuard &) = delete;
