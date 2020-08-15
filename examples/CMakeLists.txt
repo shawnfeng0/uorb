@@ -5,6 +5,7 @@ target_include_directories(uorb_sample PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 # uorb library
 target_link_libraries(uorb_sample uorb)
+target_include_directories(uorb_sample PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
 # ulog library
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ulog)

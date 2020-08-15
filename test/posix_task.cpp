@@ -5,26 +5,28 @@
 #include "posix_task.h"
 
 #include <pthread.h>
-#include <stdlib.h>
 
+#include <cerrno>
 #include <climits>
+#include <cstdlib>
 #include <cstring>
-#include <string>
 
-#include "base/errno.h"
-#include "base/log.h"
+#include "ulog/ulog.h"
+
+#define ORB_ERR LOGGER_ERROR
+#define ORB_DEBUG LOGGER_DEBUG
+#define ORB_INFO LOGGER_INFO
 
 typedef struct {
   px4_main_t entry;
-  char name[16]; //pthread_setname_np is restricted to 16 chars
+  char name[16];  // pthread_setname_np is restricted to 16 chars
   int argc;
   char *argv[];
   // strings are allocated after the struct data
 } pthdata_t;
 
-static void *entry_adapter(void *ptr)
-{
-  auto *data = (pthdata_t *) ptr;
+static void *entry_adapter(void *ptr) {
+  auto *data = (pthdata_t *)ptr;
 
   int rv;
 
@@ -36,7 +38,8 @@ static void *entry_adapter(void *ptr)
 #endif
 
   if (rv) {
-    ORB_ERR("px4_task_spawn_cmd: failed to set name of thread %d %d\n", rv, errno);
+    ORB_ERR("px4_task_spawn_cmd: failed to set name of thread %d %d\n", rv,
+            errno);
   }
 
   data->entry(data->argc, data->argv);
@@ -45,9 +48,9 @@ static void *entry_adapter(void *ptr)
   pthread_exit(nullptr);
 }
 
-pthread_t px4_task_spawn_cmd(const char *name, int scheduler, int priority, int stack_size, px4_main_t entry,
-                              char *const argv[])
-{
+pthread_t px4_task_spawn_cmd(const char *name, int scheduler, int priority,
+                             int stack_size, px4_main_t entry,
+                             char *const argv[]) {
   int i;
   int argc = 0;
   unsigned int len = 0;
@@ -113,7 +116,8 @@ pthread_t px4_task_spawn_cmd(const char *name, int scheduler, int priority, int 
   rv = pthread_attr_setstacksize(&attr, stack_size);
 
   if (rv != 0) {
-    ORB_ERR("pthread_attr_setstacksize to %d returned error (%d)", stack_size, rv);
+    ORB_ERR("pthread_attr_setstacksize to %d returned error (%d)", stack_size,
+            rv);
     pthread_attr_destroy(&attr);
     free(taskdata);
     return (rv < 0) ? rv : -rv;
@@ -141,7 +145,7 @@ pthread_t px4_task_spawn_cmd(const char *name, int scheduler, int priority, int 
 
 #ifdef __PX4_CYGWIN
   /* Priorities on Windows are defined a lot differently */
-	priority = SCHED_PRIORITY_DEFAULT;
+  priority = SCHED_PRIORITY_DEFAULT;
 #endif
 
   param.sched_priority = priority;
@@ -151,7 +155,6 @@ pthread_t px4_task_spawn_cmd(const char *name, int scheduler, int priority, int 
   if (rv != 0) {
     ORB_ERR("px4_task_spawn_cmd: failed to set sched param");
     ORB_INFO("%s", strerror(rv));
-    LOG_TOKEN(priority);
     pthread_attr_destroy(&attr);
     free(taskdata);
     return (rv < 0) ? rv : -rv;
@@ -159,16 +162,17 @@ pthread_t px4_task_spawn_cmd(const char *name, int scheduler, int priority, int 
 
   pthread_t taskid = 0;
 
-  rv = pthread_create(&taskid, &attr, &entry_adapter, (void *) taskdata);
+  rv = pthread_create(&taskid, &attr, &entry_adapter, (void *)taskdata);
 
   if (rv != 0) {
-
     if (rv == EPERM) {
-      //printf("WARNING: NOT RUNING AS ROOT, UNABLE TO RUN REALTIME THREADS\n");
-      rv = pthread_create(&taskid, nullptr, &entry_adapter, (void *) taskdata);
+      // printf("WARNING: NOT RUNING AS ROOT, UNABLE TO RUN REALTIME
+      // THREADS\n");
+      rv = pthread_create(&taskid, nullptr, &entry_adapter, (void *)taskdata);
 
       if (rv != 0) {
-        ORB_ERR("px4_task_spawn_cmd: failed to create thread %d %d\n", rv, errno);
+        ORB_ERR("px4_task_spawn_cmd: failed to create thread %d %d\n", rv,
+                errno);
         pthread_attr_destroy(&attr);
         free(taskdata);
         return (rv < 0) ? rv : -rv;

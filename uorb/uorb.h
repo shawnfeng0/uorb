@@ -146,6 +146,8 @@ struct orb_pollfd {
   unsigned revents;     // The output event flags
 };
 
+typedef struct orb_pollfd orb_pollfd_struct_t;
+
 /**
  * return orb_advertise_multi_queue(meta, data, nullptr, 1);
  * @see orb_advertise_multi_queue()

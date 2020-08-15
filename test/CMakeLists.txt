@@ -31,23 +31,25 @@
 #
 ############################################################################
 
-project(uorb)
-cmake_minimum_required(VERSION 3.15)
+# uorb test source
+aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR} TEST_SOURCE)
+add_executable(uorb_test ${TEST_SOURCE})
+target_include_directories(uorb_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
-set(UORB_BUILD_EXAMPLES "Build examples" ON)
+# uorb
+target_link_libraries(uorb_test uorb)
+target_include_directories(uorb_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../..)
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+# orb message meta data
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/msg)
+target_link_libraries(uorb_test uorb_msgs)
+target_include_directories(uorb_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/msg)
 
-# uorb library
-aux_source_directory(${CMAKE_SOURCE_DIR}/uorb UORB_SOURCE)
-aux_source_directory(${CMAKE_SOURCE_DIR}/uorb/base UORB_SOURCE)
-add_library(uorb ${UORB_SOURCE})
-set_target_properties(uorb PROPERTIES
-        CMAKE_CXX_STANDARD 11)
-target_compile_features(uorb INTERFACE
-        cxx_noexcept)
+# ulog library
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../examples/ulog ${CMAKE_CURRENT_BINARY_DIR}/ulog)
+target_link_libraries(uorb_test ulog)
+target_include_directories(uorb_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../examples/ulog/include)
 
-if (UORB_BUILD_EXAMPLES)
-#    add_subdirectory(examples)
-    add_subdirectory(test)
-endif ()
+# pthread
+find_package(Threads REQUIRED)
+target_link_libraries(uorb_test Threads::Threads)
