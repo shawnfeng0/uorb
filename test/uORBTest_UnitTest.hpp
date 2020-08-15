@@ -123,9 +123,9 @@ int uORBTest::UnitTest::latency_test(orb_id_t T, bool print) {
   // Can't pass a pointer in args, must be a null terminated
   // array of strings because the strings are copied to
   // prevent access if the caller data goes out of scope
-  auto pub_sub_task = px4_task_spawn_cmd(
+  auto pub_sub_task = task_spawn_cmd(
       "uorb_latency", SCHED_DEFAULT, SCHED_PRIORITY_MAX, 3000,
-      (px4_main_t)&uORBTest::UnitTest::pub_sub_test_threadEntry, args);
+      (thread_entry_t)&uORBTest::UnitTest::pub_sub_test_threadEntry, args);
 
   /* give the test task some data */
   while (!pub_sub_test_passed) {

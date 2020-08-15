@@ -70,16 +70,16 @@ int uORBTest::UnitTest::pub_sub_latency_main() {
   fds[2].fd = test_multi_sub_large;
   fds[2].events = POLLIN;
 
-  const unsigned maxruns = 1000;
+  const unsigned max_runs = 1000;
   unsigned timingsgroup = 0;
   int current_value = t.val;
   int num_missed = 0;
 
   // timings has to be on the heap to keep frame size below 2048 bytes
-  auto *timings = new unsigned[maxruns]{};
+  auto *timings = new unsigned[max_runs]{};
   unsigned timing_min = 9999999, timing_max = 0;
 
-  for (unsigned i = 0; i < maxruns; i++) {
+  for (unsigned i = 0; i < max_runs; i++) {
     /* wait for up to 500ms for data */
     int pret = orb_poll(&fds[0], (sizeof(fds) / sizeof(fds[0])), 500);
 
@@ -97,7 +97,7 @@ int uORBTest::UnitTest::pub_sub_latency_main() {
     }
 
     if (pret < 0) {
-      PX4_ERR("poll error %d, %d", pret, errno);
+      ORB_ERROR("poll error %d, %d", pret, errno);
       continue;
     }
 
@@ -123,16 +123,17 @@ int uORBTest::UnitTest::pub_sub_latency_main() {
 
   if (pub_sub_test_print) {
     char fname[32]{};
-    sprintf(fname, PX4_STORAGEDIR "/uorb_timings%u.txt", timingsgroup);
+    sprintf(fname,
+            "/tmp/" "/uorb_timings%u.txt", timingsgroup);
     FILE *f = fopen(fname, "w");
 
     if (f == nullptr) {
-      PX4_ERR("Error opening file!");
+      ORB_ERROR("Error opening file!");
       delete[] timings;
       return false;
     }
 
-    for (unsigned i = 0; i < maxruns; i++) {
+    for (unsigned i = 0; i < max_runs; i++) {
       fprintf(f, "%u\n", timings[i]);
     }
 
@@ -140,25 +141,25 @@ int uORBTest::UnitTest::pub_sub_latency_main() {
   }
 
   float std_dev = 0.f;
-  float mean = latency_integral / maxruns;
+  float mean = latency_integral / max_runs;
 
-  for (unsigned i = 0; i < maxruns; i++) {
+  for (unsigned i = 0; i < max_runs; i++) {
     float diff = (float)timings[i] - mean;
     std_dev += diff * diff;
   }
 
   delete[] timings;
 
-  PX4_INFO("mean:    %8.4f us", static_cast<double>(mean));
-  PX4_INFO("std dev: %8.4f us",
-           static_cast<double>(sqrtf(std_dev / (maxruns - 1))));
-  PX4_INFO("min:     %3i us", timing_min);
-  PX4_INFO("max:     %3i us", timing_max);
-  PX4_INFO("missed topic updates: %i", num_missed);
+  ORB_INFO("mean:    %8.4f us", static_cast<double>(mean));
+  ORB_INFO("std dev: %8.4f us",
+           static_cast<double>(sqrtf(std_dev / (max_runs - 1))));
+  ORB_INFO("min:     %3i us", timing_min);
+  ORB_INFO("max:     %3i us", timing_max);
+  ORB_INFO("missed topic updates: %i", num_missed);
 
   pub_sub_test_passed = true;
 
-  pub_sub_test_res = static_cast<float>(latency_integral / maxruns) <= 100.0f;
+  pub_sub_test_res = static_cast<float>(latency_integral / max_runs) <= 100.0f;
 
   return pub_sub_test_res;
 }
@@ -388,7 +389,7 @@ int uORBTest::UnitTest::pub_test_multi2_main() {
 
     if (idx != i) {
       _thread_should_exit = true;
-      PX4_ERR("Got wrong instance! should be: %i, but is %i", i, idx);
+      ORB_ERROR("Got wrong instance! should be: %i, but is %i", i, idx);
       return -1;
     }
   }
@@ -441,9 +442,9 @@ int uORBTest::UnitTest::test_multi2() {
   }
 
   char *const args[1] = {nullptr};
-  auto pub_sub_task = px4_task_spawn_cmd(
+  auto pub_sub_task = task_spawn_cmd(
       "uorb_test_multi", SCHED_DEFAULT, SCHED_PRIORITY_MAX - 5, 3000,
-      (px4_main_t)&uORBTest::UnitTest::pub_test_multi2_entry, args);
+      (thread_entry_t)&uORBTest::UnitTest::pub_test_multi2_entry, args);
 
   if (pub_sub_task < 0) {
     return test_fail("%s: failed launching task", __FUNCTION__);
@@ -468,7 +469,7 @@ int uORBTest::UnitTest::test_multi2() {
 
       last_time = msg.timestamp;
 
-      PX4_DEBUG("got message (val=%i, idx=%i, t=%" PRIu64 ")", msg.val,
+      ORB_DEBUG("got message (val=%i, idx=%i, t=%" PRIu64 ")", msg.val,
                 orb_data_next, msg.timestamp);
       orb_data_next = (orb_data_next + 1) % num_instances;
     }
@@ -713,9 +714,9 @@ int uORBTest::UnitTest::test_queue_poll_notify() {
   _thread_should_exit = false;
 
   char *const args[1] = {nullptr};
-  auto pub_sub_task = px4_task_spawn_cmd(
+  auto pub_sub_task = task_spawn_cmd(
       "uorb_test_queue", SCHED_DEFAULT, SCHED_PRIORITY_MIN + 5, 3000,
-      (px4_main_t)&uORBTest::UnitTest::pub_test_queue_entry, args);
+      (thread_entry_t)&uORBTest::UnitTest::pub_test_queue_entry, args);
 
   if (pub_sub_task < 0) {
     return test_fail("%s: failed launching task", __FUNCTION__);

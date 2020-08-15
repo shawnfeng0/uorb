@@ -39,7 +39,7 @@ extern "C" {
 __EXPORT int main(int argc, char **argv);
 }
 
-static void usage() { PX4_INFO("Usage: uorb_tests [latency_test]"); }
+static void usage() { ORB_INFO("Usage: uorb_tests [latency_test]"); }
 
 int main(int argc, char **argv) {
   /*
@@ -49,11 +49,11 @@ int main(int argc, char **argv) {
     uORBTest::UnitTest &t = uORBTest::UnitTest::instance();
 
     if (t.test()) {
-      PX4_INFO("PASS");
+      ORB_INFO("PASS");
       return 0;
 
     } else {
-      PX4_ERR("FAIL");
+      ORB_ERROR("FAIL");
       return -1;
     }
   }

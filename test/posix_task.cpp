@@ -13,44 +13,34 @@
 
 #include "ulog/ulog.h"
 
-#define ORB_ERR LOGGER_ERROR
-#define ORB_DEBUG LOGGER_DEBUG
-#define ORB_INFO LOGGER_INFO
-
 typedef struct {
-  px4_main_t entry;
+  thread_entry_t entry;
   char name[16];  // pthread_setname_np is restricted to 16 chars
   int argc;
   char *argv[];
   // strings are allocated after the struct data
-} pthdata_t;
+} pthread_data_t;
 
 static void *entry_adapter(void *ptr) {
-  auto *data = (pthdata_t *)ptr;
+  if (!ptr) {
+    return nullptr;
+  }
+  auto &data = *(pthread_data_t *)ptr;
 
-  int rv;
-
-  // set the threads name
-#ifdef __PX4_DARWIN
-  rv = pthread_setname_np(data->name);
-#else
-  rv = pthread_setname_np(pthread_self(), data->name);
-#endif
+  int rv = pthread_setname_np(pthread_self(), data.name);
 
   if (rv) {
-    ORB_ERR("px4_task_spawn_cmd: failed to set name of thread %d %d\n", rv,
-            errno);
+    ORB_ERROR("failed to set name of thread %d %d\n", rv, errno);
   }
 
-  data->entry(data->argc, data->argv);
+  data.entry(data.argc, data.argv);
   free(ptr);
-  ORB_DEBUG("Before px4_task_exit");
   pthread_exit(nullptr);
 }
 
-pthread_t px4_task_spawn_cmd(const char *name, int scheduler, int priority,
-                             int stack_size, px4_main_t entry,
-                             char *const argv[]) {
+pthread_t task_spawn_cmd(const char *name, int scheduler, int priority,
+                         int stack_size, thread_entry_t entry,
+                         char *const *argv) {
   int i;
   int argc = 0;
   unsigned int len = 0;
@@ -69,33 +59,34 @@ pthread_t px4_task_spawn_cmd(const char *name, int scheduler, int priority,
     len += strlen(p) + 1;
   }
 
-  unsigned long structsize = sizeof(pthdata_t) + (argc + 1) * sizeof(char *);
+  unsigned long struct_size =
+      sizeof(pthread_data_t) + (argc + 1) * sizeof(char *);
 
   // not safe to pass stack data to the thread creation
-  auto *taskdata = (pthdata_t *)malloc(structsize + len);
+  auto *task_data = (pthread_data_t *)malloc(struct_size + len);
 
-  if (taskdata == nullptr) {
-    ORB_ERR("No memory");
+  if (task_data == nullptr) {
+    ORB_ERROR("No memory");
     return -ENOMEM;
   }
 
-  memset(taskdata, 0, structsize + len);
-  unsigned long offset = ((unsigned long)taskdata) + structsize;
+  memset(task_data, 0, struct_size + len);
+  unsigned long offset = ((unsigned long)task_data) + struct_size;
 
-  strncpy(taskdata->name, name, 16);
-  taskdata->name[15] = 0;
-  taskdata->entry = entry;
-  taskdata->argc = argc;
+  strncpy(task_data->name, name, 16);
+  task_data->name[15] = 0;
+  task_data->entry = entry;
+  task_data->argc = argc;
 
   for (i = 0; i < argc; i++) {
     ORB_DEBUG("arg %d %s\n", i, argv[i]);
-    taskdata->argv[i] = (char *)offset;
+    task_data->argv[i] = (char *)offset;
     strcpy((char *)offset, argv[i]);
     offset += strlen(argv[i]) + 1;
   }
 
   // Must add NULL at end of argv
-  taskdata->argv[argc] = (char *)nullptr;
+  task_data->argv[argc] = (char *)nullptr;
 
   ORB_DEBUG("starting task %s", name);
 
@@ -103,8 +94,8 @@ pthread_t px4_task_spawn_cmd(const char *name, int scheduler, int priority,
   int rv = pthread_attr_init(&attr);
 
   if (rv != 0) {
-    ORB_ERR("px4_task_spawn_cmd: failed to init thread attrs");
-    free(taskdata);
+    ORB_ERROR("failed to init thread attrs");
+    free(task_data);
     return (rv < 0) ? rv : -rv;
   }
 
@@ -117,10 +108,10 @@ pthread_t px4_task_spawn_cmd(const char *name, int scheduler, int priority,
   rv = pthread_attr_setstacksize(&attr, stack_size);
 
   if (rv != 0) {
-    ORB_ERR("pthread_attr_setstacksize to %d returned error (%d)", stack_size,
+    ORB_ERROR("pthread_attr_setstacksize to %d returned error (%d)", stack_size,
             rv);
     pthread_attr_destroy(&attr);
-    free(taskdata);
+    free(task_data);
     return (rv < 0) ? rv : -rv;
   }
 
@@ -129,18 +120,18 @@ pthread_t px4_task_spawn_cmd(const char *name, int scheduler, int priority,
   rv = pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
 
   if (rv != 0) {
-    ORB_ERR("px4_task_spawn_cmd: failed to set inherit sched");
+    ORB_ERROR("failed to set inherit sched");
     pthread_attr_destroy(&attr);
-    free(taskdata);
+    free(task_data);
     return (rv < 0) ? rv : -rv;
   }
 
   rv = pthread_attr_setschedpolicy(&attr, scheduler);
 
   if (rv != 0) {
-    ORB_ERR("px4_task_spawn_cmd: failed to set sched policy");
+    ORB_ERROR("failed to set sched policy");
     pthread_attr_destroy(&attr);
-    free(taskdata);
+    free(task_data);
     return (rv < 0) ? rv : -rv;
   }
 
@@ -154,39 +145,38 @@ pthread_t px4_task_spawn_cmd(const char *name, int scheduler, int priority,
   rv = pthread_attr_setschedparam(&attr, &param);
 
   if (rv != 0) {
-    ORB_ERR("px4_task_spawn_cmd: failed to set sched param");
+    ORB_ERROR("failed to set sched param");
     ORB_INFO("%s", strerror(rv));
     pthread_attr_destroy(&attr);
-    free(taskdata);
+    free(task_data);
     return (rv < 0) ? rv : -rv;
   }
 
-  pthread_t taskid = 0;
+  pthread_t task_id = 0;
 
-  rv = pthread_create(&taskid, &attr, &entry_adapter, (void *)taskdata);
+  rv = pthread_create(&task_id, &attr, &entry_adapter, (void *)task_data);
 
   if (rv != 0) {
     if (rv == EPERM) {
-      // printf("WARNING: NOT RUNING AS ROOT, UNABLE TO RUN REALTIME
+      // printf("WARNING: NOT RUNNING AS ROOT, UNABLE TO RUN REALTIME
       // THREADS\n");
-      rv = pthread_create(&taskid, nullptr, &entry_adapter, (void *)taskdata);
+      rv = pthread_create(&task_id, nullptr, &entry_adapter, (void *)task_data);
 
       if (rv != 0) {
-        ORB_ERR("px4_task_spawn_cmd: failed to create thread %d %d\n", rv,
-                errno);
+        ORB_ERROR("failed to create thread %d %d\n", rv, errno);
         pthread_attr_destroy(&attr);
-        free(taskdata);
+        free(task_data);
         return (rv < 0) ? rv : -rv;
       }
 
     } else {
-      ORB_ERR("px4_task_spawn_cmd: failed to create thread %d %d\n", rv, errno);
+      ORB_ERROR("failed to create thread %d %d\n", rv, errno);
       pthread_attr_destroy(&attr);
-      free(taskdata);
+      free(task_data);
       return (rv < 0) ? rv : -rv;
     }
   }
 
   pthread_attr_destroy(&attr);
-  return taskid;
+  return task_id;
 }
