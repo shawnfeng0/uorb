@@ -67,7 +67,7 @@ class SubscriberC : public SubscriptionInterval {
   explicit SubscriberC(const orb_metadata &meta, uint32_t interval_us = 0,
                        uint8_t instance = 0)
       : SubscriptionInterval(meta, interval_us, instance) {}
-  auto get_node() { return node_; }
+  auto &get_node() { return node_; }
 };
 
 orb_advert_t orb_advertise(const struct orb_metadata *meta, const void *data) {
@@ -117,8 +117,8 @@ bool orb_publish(const struct orb_metadata *meta, orb_advert_t handle,
                  const void *data) {
   ORB_ASSERT(meta && handle && data, return false);
 
-  auto *dev = (uorb::DeviceNode *)handle;
-  return dev->Publish(*meta, data);
+  auto &dev = *(uorb::DeviceNode *)handle;
+  return dev.Publish(*meta, data);
 }
 
 orb_subscriber_t orb_subscribe(const struct orb_metadata *meta) {
@@ -142,7 +142,6 @@ bool orb_unsubscribe(orb_subscriber_t *handle_ptr) {
   ORB_ASSERT(handle, return false);
 
   delete (SubscriberC *)handle;
-
   handle = nullptr;
 
   return true;

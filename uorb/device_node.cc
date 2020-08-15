@@ -94,7 +94,6 @@ bool uorb::DeviceNode::Copy(void *dst, unsigned &sub_generation) {
 }
 
 bool uorb::DeviceNode::Publish(const orb_metadata &meta, const void *data) {
-  /* check if the device handle is initialized and data is valid */
   if (data == nullptr) {
     orb_errno = EFAULT;
     return false;
