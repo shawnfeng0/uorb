@@ -28,11 +28,7 @@ static void *entry_adapter(void *ptr) {
   auto &data = *(pthread_data_t *)ptr;
 
   // The method of thread name setting is not compatible
-  //  int rv = pthread_setname_np(pthread_self(), data.name);
-  //
-  //  if (rv) {
-  //    ORB_ERROR("failed to set name of thread %d %d\n", rv, errno);
-  //  }
+  int rv = pthread_setname_np(pthread_self(), data.name);
 
   if (rv) {
     ORB_ERROR("failed to set name of thread %d %d\n", rv, errno);
@@ -43,7 +39,7 @@ static void *entry_adapter(void *ptr) {
   pthread_exit(nullptr);
 }
 
-pthread_t task_spawn_cmd(const char *name, int stack_size, thread_entry_t entry,
+pthread_t task_spawn_cmd(const char *name, thread_entry_t entry,
                          char *const *argv) {
   int i;
   int argc = 0;
@@ -93,32 +89,8 @@ pthread_t task_spawn_cmd(const char *name, int stack_size, thread_entry_t entry,
 
   ORB_DEBUG("starting task %s", name);
 
-  pthread_attr_t attr;
-  int rv = pthread_attr_init(&attr);
-
-  if (rv != 0) {
-    ORB_ERROR("failed to init thread attrs");
-    free(task_data);
-    return (rv < 0) ? rv : -rv;
-  }
-
-  if (stack_size < PTHREAD_STACK_MIN) {
-    stack_size = PTHREAD_STACK_MIN;
-  }
-
-  rv = pthread_attr_setstacksize(&attr, stack_size);
-
-  if (rv != 0) {
-    ORB_ERROR("pthread_attr_setstacksize to %d returned error (%d)", stack_size,
-              rv);
-    pthread_attr_destroy(&attr);
-    free(task_data);
-    return (rv < 0) ? rv : -rv;
-  }
-
   pthread_t task_id = 0;
-  rv = pthread_create(&task_id, &attr, &entry_adapter, (void *)task_data);
-  pthread_attr_destroy(&attr);
+  int rv = pthread_create(&task_id, nullptr, &entry_adapter, (void *)task_data);
 
   if (rv != 0) {
     ORB_ERROR("failed to create thread %d %d\n", rv, errno);

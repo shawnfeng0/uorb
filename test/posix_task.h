@@ -15,5 +15,5 @@ typedef int (*thread_entry_t)(int argc, char *argv[]);
 #define ORB_INFO LOGGER_INFO
 #define ORB_ERROR LOGGER_ERROR
 
-pthread_t task_spawn_cmd(const char* name, int stack_size, thread_entry_t entry,
+pthread_t task_spawn_cmd(const char* name, thread_entry_t entry,
                          char* const* argv);

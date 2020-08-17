@@ -124,7 +124,7 @@ int uORBTest::UnitTest::latency_test(orb_id_t T, bool print) {
   // array of strings because the strings are copied to
   // prevent access if the caller data goes out of scope
   auto pub_sub_task = task_spawn_cmd(
-      "uorb_latency", 3000,
+      "uorb_latency",
       (thread_entry_t)&uORBTest::UnitTest::pub_sub_test_threadEntry, args);
 
   /* give the test task some data */

@@ -67,7 +67,7 @@ class SubscriberC : public SubscriptionInterval {
   explicit SubscriberC(const orb_metadata &meta, uint32_t interval_us = 0,
                        uint8_t instance = 0)
       : SubscriptionInterval(meta, interval_us, instance) {}
-  auto &get_node() { return node_; }
+  auto get_node() -> decltype(node_) { return node_; }
 };
 
 orb_advert_t orb_advertise(const struct orb_metadata *meta, const void *data) {

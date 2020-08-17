@@ -71,7 +71,7 @@ int uORBTest::UnitTest::pub_sub_latency_main() {
   fds[2].events = POLLIN;
 
   const unsigned max_runs = 1000;
-  unsigned timingsgroup = 0;
+  unsigned timings_group = 0;
   int current_value = t.val;
   int num_missed = 0;
 
@@ -85,15 +85,15 @@ int uORBTest::UnitTest::pub_sub_latency_main() {
 
     if (fds[0].revents & POLLIN) {
       orb_copy(ORB_ID(orb_test), test_multi_sub, &t);
-      timingsgroup = 0;
+      timings_group = 0;
 
     } else if (fds[1].revents & POLLIN) {
       orb_copy(ORB_ID(orb_test_medium), test_multi_sub_medium, &t);
-      timingsgroup = 1;
+      timings_group = 1;
 
     } else if (fds[2].revents & POLLIN) {
       orb_copy(ORB_ID(orb_test_large), test_multi_sub_large, &t);
-      timingsgroup = 2;
+      timings_group = 2;
     }
 
     if (pret < 0) {
@@ -124,7 +124,9 @@ int uORBTest::UnitTest::pub_sub_latency_main() {
   if (pub_sub_test_print) {
     char fname[32]{};
     sprintf(fname,
-            "/tmp/" "/uorb_timings%u.txt", timingsgroup);
+            "/tmp/"
+            "/uorb_timings%u.txt",
+            timings_group);
     FILE *f = fopen(fname, "w");
 
     if (f == nullptr) {
@@ -443,7 +445,7 @@ int uORBTest::UnitTest::test_multi2() {
 
   char *const args[1] = {nullptr};
   auto pub_sub_task = task_spawn_cmd(
-      "uorb_test_multi", 3000,
+      "uorb_test_multi",
       (thread_entry_t)&uORBTest::UnitTest::pub_test_multi2_entry, args);
 
   if (pub_sub_task < 0) {
@@ -462,7 +464,7 @@ int uORBTest::UnitTest::test_multi2() {
       orb_copy(ORB_ID(orb_test_medium_multi), orb_data_cur_fd, &msg);
 
       if (last_time >= msg.timestamp && last_time != 0) {
-        return test_fail("Timestamp not increasing! (%" PRIu64 " >= %" PRIu64
+        return test_fail("Timestamp not increasing! (%" "ld" " >= %" "ld"
                          ")",
                          last_time, msg.timestamp);
       }
@@ -715,7 +717,7 @@ int uORBTest::UnitTest::test_queue_poll_notify() {
 
   char *const args[1] = {nullptr};
   auto pub_sub_task = task_spawn_cmd(
-      "uorb_test_queue", 3000,
+      "uorb_test_queue",
       (thread_entry_t)&uORBTest::UnitTest::pub_test_queue_entry, args);
 
   if (pub_sub_task < 0) {
