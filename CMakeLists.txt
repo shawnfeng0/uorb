@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2020 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2020 Shawn Feng. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -34,6 +34,8 @@
 project(uorb)
 cmake_minimum_required(VERSION 3.15)
 
+option(UORB_BUILD_EXAMPLES "Build examples" ON)
+
 if(CMAKE_TOOLCHAIN_FILE)
     set(LIBRARY_OUTPUT_PATH_ROOT ${CMAKE_BINARY_DIR} CACHE PATH "root for library output, set this to change where android libs are compiled to")
     # get absolute path, but get_filename_component ABSOLUTE only refer with source dir, so find_file here :(
@@ -42,7 +44,10 @@ if(CMAKE_TOOLCHAIN_FILE)
     message(STATUS "CMAKE_TOOLCHAIN_FILE = ${CMAKE_TOOLCHAIN_FILE}")
 endif()
 
-set(UORB_BUILD_EXAMPLES "Build examples" ON)
+if(NOT DEFINED CMAKE_INSTALL_PREFIX)
+    set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/install" CACHE PATH "Installation Directory")
+    message(STATUS "CMAKE_INSTALL_PREFIX = ${CMAKE_INSTALL_PREFIX}")
+endif()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -50,10 +55,11 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 aux_source_directory(${CMAKE_SOURCE_DIR}/uorb UORB_SOURCE)
 aux_source_directory(${CMAKE_SOURCE_DIR}/uorb/base UORB_SOURCE)
 add_library(uorb ${UORB_SOURCE})
-set_target_properties(uorb PROPERTIES
-        CMAKE_CXX_STANDARD 11)
-target_compile_features(uorb INTERFACE
-        cxx_noexcept)
+
+set_property(TARGET uorb PROPERTY PUBLIC_HEADER uorb/uorb.h)
+install(TARGETS uorb
+        ARCHIVE DESTINATION lib
+        PUBLIC_HEADER DESTINATION include/uorb)
 
 if (UORB_BUILD_EXAMPLES)
 #    add_subdirectory(examples)
