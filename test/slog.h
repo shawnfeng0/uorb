@@ -26,11 +26,11 @@
 #define LOGGER_ERROR_COLOR "\x1b[31;1m"
 #define LOGGER_FATAL_COLOR "\x1b[35;1m"
 
-#define LOGGER_OUT(level, fmt, ...)                                    \
-  do {                                                                 \
-    printf("%s%s/(%s:%d %s) %s" fmt "\r\n", LOGGER_RESET_COLOR,        \
-           LOGGER_LEVEL_##level, __FILENAME__, __LINE__, __FUNCTION__, \
-           LOGGER_##level##_COLOR, ##__VA_ARGS__);                     \
+#define LOGGER_OUT(level, fmt, ...)                                          \
+  do {                                                                       \
+    printf("%s%s/(%s:%d %s) %s" fmt LOGGER_RESET_COLOR "\r\n",               \
+           LOGGER_RESET_COLOR, LOGGER_LEVEL_##level, __FILENAME__, __LINE__, \
+           __FUNCTION__, LOGGER_##level##_COLOR, ##__VA_ARGS__);             \
   } while (0)
 
 #define LOGGER_TRACE(fmt, ...) LOGGER_OUT(TRACE, fmt, ##__VA_ARGS__)

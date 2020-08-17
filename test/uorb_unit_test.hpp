@@ -1,0 +1,201 @@
+/****************************************************************************
+ *
+ *   Copyright (c) 2012-2015 PX4 Development Team. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in
+ *    the documentation and/or other materials provided with the
+ *    distribution.
+ * 3. Neither the name PX4 nor the names of its contributors may be
+ *    used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ ****************************************************************************/
+
+#pragma once
+
+#include <uorb/base/abs_time.h>
+#include <uorb/topics/orb_test.h>
+#include <uorb/topics/orb_test_large.h>
+#include <uorb/topics/orb_test_medium.h>
+#include <uorb/uorb.h>
+
+typedef const orb_metadata *orb_id_t;
+
+#include <gtest/gtest.h>
+#include <cmath>
+#include <unistd.h>
+
+#include <cerrno>
+#include <thread>
+
+#include "slog.h"
+
+#define ORB_DEBUG(...) ((void *)0)
+#define ORB_INFO LOGGER_INFO
+#define ORB_ERROR LOGGER_ERROR
+
+namespace uORBTest {
+class UnitTest;
+}
+
+class uORBTest::UnitTest : public testing::Test {
+ public:
+  template <typename S>
+  void latency_test(orb_id_t T);
+
+  // Disallow copy
+  UnitTest(const uORBTest::UnitTest & /*unused*/) = delete;
+  void SetUp() override {}
+  void TearDown() override {}
+  void TestBody() override {}
+  UnitTest() = default;
+
+  static int test_note(const char *fmt, ...);
+};
+
+template <typename S>
+void uORBTest::UnitTest::latency_test(orb_id_t T) {
+  S t{};
+  t.val = 308;
+  t.timestamp = orb_absolute_time();
+
+  orb_advert_t pfd0 = orb_advertise(T, &t);
+
+  ASSERT_NE(pfd0, nullptr) << "orb_advertise failed: " << errno;
+
+  bool pub_sub_test_passed = false;
+
+  /* test pub / sub latency */
+
+  // Can't pass a pointer in args, must be a null terminated
+  // array of strings because the strings are copied to
+  // prevent access if the caller data goes out of scope
+  std::thread pub_sub_latency_thread{[&]() {
+    /* poll on test topic and output latency */
+    float latency_integral = 0.0f;
+
+    /* wakeup source(s) */
+    orb_pollfd_struct_t fds[3];
+
+    auto test_multi_sub = orb_subscribe_multi(ORB_ID(orb_test), 0);
+    auto test_multi_sub_medium =
+        orb_subscribe_multi(ORB_ID(orb_test_medium), 0);
+    auto test_multi_sub_large = orb_subscribe_multi(ORB_ID(orb_test_large), 0);
+
+    orb_test_large_s t{};
+
+    /* clear all ready flags */
+    orb_copy(ORB_ID(orb_test), test_multi_sub, &t);
+    orb_copy(ORB_ID(orb_test_medium), test_multi_sub_medium, &t);
+    orb_copy(ORB_ID(orb_test_large), test_multi_sub_large, &t);
+
+    fds[0].fd = test_multi_sub;
+    fds[0].events = POLLIN;
+    fds[1].fd = test_multi_sub_medium;
+    fds[1].events = POLLIN;
+    fds[2].fd = test_multi_sub_large;
+    fds[2].events = POLLIN;
+
+    const unsigned max_runs = 1000;
+    int current_value = t.val;
+    int num_missed = 0;
+
+    // timings has to be on the heap to keep frame size below 2048 bytes
+    auto *timings = new unsigned[max_runs]{};
+    unsigned timing_min = 9999999, timing_max = 0;
+
+    for (unsigned i = 0; i < max_runs; i++) {
+      /* wait for up to 500ms for data */
+      int pret = orb_poll(&fds[0], (sizeof(fds) / sizeof(fds[0])), 500);
+
+      if (fds[0].revents & POLLIN) {
+        orb_copy(ORB_ID(orb_test), test_multi_sub, &t);
+
+      } else if (fds[1].revents & POLLIN) {
+        orb_copy(ORB_ID(orb_test_medium), test_multi_sub_medium, &t);
+
+      } else if (fds[2].revents & POLLIN) {
+        orb_copy(ORB_ID(orb_test_large), test_multi_sub_large, &t);
+      }
+
+      if (pret < 0) {
+        ORB_ERROR("poll error %d, %d", pret, errno);
+        continue;
+      }
+
+      num_missed += t.val - current_value - 1;
+      current_value = t.val;
+
+      auto elt = (unsigned)orb_elapsed_time(&t.timestamp);
+      latency_integral += elt;
+      timings[i] = elt;
+
+      if (elt > timing_max) {
+        timing_max = elt;
+      }
+
+      if (elt < timing_min) {
+        timing_min = elt;
+      }
+    }
+
+    orb_unsubscribe(&test_multi_sub);
+    orb_unsubscribe(&test_multi_sub_medium);
+    orb_unsubscribe(&test_multi_sub_large);
+
+    float std_dev = 0.f;
+    float mean = latency_integral / max_runs;
+
+    for (unsigned i = 0; i < max_runs; i++) {
+      float diff = (float)timings[i] - mean;
+      std_dev += diff * diff;
+    }
+
+    delete[] timings;
+
+    ORB_INFO("mean:    %8.4f us", static_cast<double>(mean));
+    ORB_INFO("std dev: %8.4f us",
+             static_cast<double>(sqrtf(std_dev / (max_runs - 1))));
+    ORB_INFO("min:     %3i us", timing_min);
+    ORB_INFO("max:     %3i us", timing_max);
+    ORB_INFO("missed topic updates: %i", num_missed);
+
+    pub_sub_test_passed = true;
+
+    ASSERT_LT(static_cast<float>(latency_integral / max_runs), 100.0f);
+  }};
+  /* give the test task some data */
+  while (!pub_sub_test_passed) {
+    ++t.val;
+    t.timestamp = orb_absolute_time();
+
+    ASSERT_TRUE(orb_publish(T, pfd0, &t)) << "mult. pub0 timing fail";
+
+    /* simulate >800 Hz system operation */
+    usleep(1000);
+  }
+
+  orb_unadvertise(&pfd0);
+
+  pub_sub_latency_thread.join();
+}
