@@ -45,11 +45,6 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/msg)
 target_link_libraries(uorb_test uorb_msgs)
 target_include_directories(uorb_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/msg)
 
-# ulog library
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../examples/ulog ${CMAKE_CURRENT_BINARY_DIR}/ulog)
-target_link_libraries(uorb_test ulog)
-target_include_directories(uorb_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../examples/ulog/include)
-
 # pthread
 find_package(Threads REQUIRED)
 target_link_libraries(uorb_test Threads::Threads)

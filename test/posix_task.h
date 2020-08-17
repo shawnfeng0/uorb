@@ -7,7 +7,7 @@
 #include <pthread.h>
 #include <sched.h>
 
-#include "ulog/ulog.h"
+#include "slog.h"
 
 typedef int (*thread_entry_t)(int argc, char *argv[]);
 

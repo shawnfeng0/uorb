@@ -6,8 +6,8 @@
 #include <unistd.h>
 #include <uorb/topics/cpuload.h>
 
-#include "ulog/ulog.h"
 #include "uorb/base/abs_time.h"
+#include "slog.h"
 
 void *adviser_cpuload(void *arg) {
   struct cpuload_s cpuload;
@@ -45,7 +45,7 @@ void *cpuload_update_poll(void *arg) {
     if (0 < orb_poll(pollfds, ARRAY_SIZE(pollfds), timeout)) {
       struct cpuload_s cpu_loader;
       orb_copy(ORB_ID(cpuload), cpu_load_sub_data, &cpu_loader);
-      LOGGER_MULTI_TOKEN(cpu_loader.timestamp, cpu_loader.load,
+      LOGGER_DEBUG("timestamp: %ld, load: %f, ram_usage: %f", cpu_loader.timestamp, cpu_loader.load,
                          cpu_loader.ram_usage);
     } else {
       LOGGER_WARN("Got no data within %d milliseconds", timeout);

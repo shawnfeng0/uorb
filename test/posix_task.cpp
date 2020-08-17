@@ -11,8 +11,6 @@
 #include <cstdlib>
 #include <cstring>
 
-#include "ulog/ulog.h"
-
 typedef struct {
   thread_entry_t entry;
   char name[16];  // pthread_setname_np is restricted to 16 chars

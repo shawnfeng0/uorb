@@ -7,11 +7,6 @@ target_include_directories(uorb_sample PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(uorb_sample uorb)
 target_include_directories(uorb_sample PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
-# ulog library
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ulog)
-target_link_libraries(uorb_sample ulog)
-target_include_directories(uorb_sample PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ulog/include)
-
 # orb message meta data
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/msg)
 target_link_libraries(uorb_sample uorb_msgs)
