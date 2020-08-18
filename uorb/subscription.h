@@ -79,22 +79,22 @@ class Subscription {
    * Check if there is a new update.
    */
   virtual bool updated() {
-    return advertised() ? (node_->published_message_count() != last_generation_)
-                        : false;
+    return advertised() &&
+           (node_->published_message_count() != last_generation_);
   }
 
   /**
    * Update the struct
    * @param data The uORB message struct we are updating.
    */
-  virtual bool update(void *dst) { return updated() ? copy(dst) : false; }
+  virtual bool update(void *dst) { return updated() && copy(dst); }
 
   /**
    * Copy the struct
    * @param data The uORB message struct we are updating.
    */
   virtual bool copy(void *dst) {
-    return advertised() ? node_->Copy(dst, last_generation_) : false;
+    return advertised() && node_->Copy(dst, last_generation_);
   }
 
  protected:
