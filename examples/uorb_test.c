@@ -2,12 +2,13 @@
 // Created by fs on 2020-01-15.
 //
 
+#include <inttypes.h>
 #include <pthread.h>
 #include <unistd.h>
 #include <uorb/topics/cpuload.h>
 
-#include "uorb/base/abs_time.h"
 #include "slog.h"
+#include "uorb/base/abs_time.h"
 
 void *adviser_cpuload(void *arg) {
   struct cpuload_s cpuload;
@@ -45,8 +46,8 @@ void *cpuload_update_poll(void *arg) {
     if (0 < orb_poll(pollfds, ARRAY_SIZE(pollfds), timeout)) {
       struct cpuload_s cpu_loader;
       orb_copy(ORB_ID(cpuload), cpu_load_sub_data, &cpu_loader);
-      LOGGER_DEBUG("timestamp: %ld, load: %f, ram_usage: %f", cpu_loader.timestamp, cpu_loader.load,
-                         cpu_loader.ram_usage);
+      LOGGER_DEBUG("timestamp: %" PRIu64 ", load: %f, ram_usage: %f",
+                   cpu_loader.timestamp, cpu_loader.load, cpu_loader.ram_usage);
     } else {
       LOGGER_WARN("Got no data within %d milliseconds", timeout);
       break;

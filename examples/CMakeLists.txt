@@ -1,3 +1,7 @@
+project(uorb_examples)
+
+cmake_minimum_required(VERSION 3.15)
+
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR} SAMPLE_SOURCE)
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/topic_source SAMPLE_SOURCE)
 add_executable(uorb_sample ${SAMPLE_SOURCE})

@@ -24,6 +24,7 @@ fi
 
 # Build library
 set -x
+rm -rf $SOURCE_DIR/cmake-build-$PLATFORM_NAME
 mkdir -p "$SOURCE_DIR/cmake-build-$PLATFORM_NAME" &&
   cd "$SOURCE_DIR/cmake-build-$PLATFORM_NAME" &&
   cmake \

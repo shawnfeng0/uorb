@@ -34,7 +34,7 @@ project(uorb)
 
 cmake_minimum_required(VERSION 3.15)
 
-option(UORB_BUILD_EXAMPLES "Build examples" OFF)
+option(UORB_BUILD_EXAMPLES "Build examples" ON)
 option(UORB_BUILD_TESTS "Build tests" OFF)
 
 if (CMAKE_TOOLCHAIN_FILE)
@@ -51,12 +51,11 @@ if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 endif ()
 message(STATUS "CMAKE_INSTALL_PREFIX = ${CMAKE_INSTALL_PREFIX}")
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-
 # uorb library
 aux_source_directory(${CMAKE_SOURCE_DIR}/uorb UORB_SOURCE)
 aux_source_directory(${CMAKE_SOURCE_DIR}/uorb/base UORB_SOURCE)
 add_library(uorb ${UORB_SOURCE})
+target_include_directories(uorb PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 # install uorb
 install(TARGETS uorb
