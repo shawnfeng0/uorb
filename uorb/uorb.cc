@@ -48,16 +48,16 @@ using namespace uorb;
 #ifdef ORB_STRICT
 
 #include <cassert>
-#define ORB_ASSERT(condition, false_action) assert(condition)
+#define ORB_CHECK_TRUE(condition, false_action) assert(condition)
 
 #else
 
-#define ORB_ASSERT(expr, false_action, ...) \
-  ({                                        \
-    if (!static_cast<bool>(expr)) {         \
-      false_action;                         \
-      __VA_ARGS__;                          \
-    }                                       \
+#define ORB_CHECK_TRUE(condition, error_code, error_action) \
+  ({                                                        \
+    if (!static_cast<bool>(condition)) {                    \
+      orb_errno = error_code;                               \
+      error_action;                                         \
+    }                                                       \
   })
 
 #endif
@@ -87,12 +87,12 @@ orb_advert_t orb_advertise_multi(const struct orb_metadata *meta,
 orb_advert_t orb_advertise_multi_queue(const struct orb_metadata *meta,
                                        const void *data, unsigned int *instance,
                                        unsigned int queue_size) {
-  ORB_ASSERT(meta, return nullptr);
+  ORB_CHECK_TRUE(meta, EINVAL, return nullptr);
   auto &meta_ = *meta;
   auto &device_master = DeviceMaster::get_instance();
   auto *dev_ = device_master.CreateAdvertiser(meta_, instance, queue_size);
 
-  ORB_ASSERT(dev_, return nullptr);
+  ORB_CHECK_TRUE(dev_, orb_errno, return nullptr);
 
   if (data) dev_->Publish(meta_, data);
 
@@ -100,10 +100,10 @@ orb_advert_t orb_advertise_multi_queue(const struct orb_metadata *meta,
 }
 
 bool orb_unadvertise(orb_advert_t *handle_ptr) {
-  ORB_ASSERT(handle_ptr, return false);
+  ORB_CHECK_TRUE(handle_ptr, EINVAL, return false);
 
   orb_advert_t &handle = *handle_ptr;
-  ORB_ASSERT(handle, return false);
+  ORB_CHECK_TRUE(handle, EINVAL, return false);
 
   auto &dev = *(uorb::DeviceNode *)handle;
   dev.mark_as_unadvertised();
@@ -115,7 +115,7 @@ bool orb_unadvertise(orb_advert_t *handle_ptr) {
 
 bool orb_publish(const struct orb_metadata *meta, orb_advert_t handle,
                  const void *data) {
-  ORB_ASSERT(meta && handle && data, return false);
+  ORB_CHECK_TRUE(meta && handle && data, EINVAL, return false);
 
   auto &dev = *(uorb::DeviceNode *)handle;
   return dev.Publish(*meta, data);
@@ -127,19 +127,19 @@ orb_subscriber_t orb_subscribe(const struct orb_metadata *meta) {
 
 orb_subscriber_t orb_subscribe_multi(const struct orb_metadata *meta,
                                      unsigned instance) {
-  ORB_ASSERT(meta, return nullptr);
+  ORB_CHECK_TRUE(meta, EINVAL, return nullptr);
 
   auto *sub = new SubscriberC(*meta, 0, instance);
-  ORB_ASSERT(sub, return nullptr);
+  ORB_CHECK_TRUE(sub, ENOMEM, return nullptr);
 
   return (orb_subscriber_t)sub;
 }
 
 bool orb_unsubscribe(orb_subscriber_t *handle_ptr) {
-  ORB_ASSERT(handle_ptr, return false);
+  ORB_CHECK_TRUE(handle_ptr, EINVAL, return false);
 
   orb_subscriber_t &handle = *handle_ptr;
-  ORB_ASSERT(handle, return false);
+  ORB_CHECK_TRUE(handle, EINVAL, return false);
 
   delete (SubscriberC *)handle;
   handle = nullptr;
@@ -149,20 +149,20 @@ bool orb_unsubscribe(orb_subscriber_t *handle_ptr) {
 
 bool orb_copy(const struct orb_metadata *meta, orb_subscriber_t handle,
               void *buffer) {
-  ORB_ASSERT(meta && handle && buffer, return false);
+  ORB_CHECK_TRUE(meta && handle && buffer, EINVAL, return false);
 
   auto &sub = *(SubscriberC *)handle;
   return sub.copy(buffer);
 }
 
 bool orb_check_updated(orb_subscriber_t handle) {
-  ORB_ASSERT(handle, return false);
+  ORB_CHECK_TRUE(handle, EINVAL, return false);
   auto &sub = *(SubscriberC *)handle;
   return sub.updated();
 }
 
 bool orb_exists(const struct orb_metadata *meta, unsigned int instance) {
-  ORB_ASSERT(meta, return false);
+  ORB_CHECK_TRUE(meta, EINVAL, return false);
 
   auto &master = DeviceMaster::get_instance();
   auto *dev = master.GetDeviceNode(*meta, instance);
@@ -173,7 +173,7 @@ bool orb_exists(const struct orb_metadata *meta, unsigned int instance) {
 }
 
 unsigned int orb_group_count(const struct orb_metadata *meta) {
-  ORB_ASSERT(meta, return false);
+  ORB_CHECK_TRUE(meta, EINVAL, return false);
 
   unsigned int instance = 0;
 
@@ -185,20 +185,20 @@ unsigned int orb_group_count(const struct orb_metadata *meta) {
 }
 
 bool orb_set_interval(orb_subscriber_t handle, unsigned interval_ms) {
-  ORB_ASSERT(handle, return false);
+  ORB_CHECK_TRUE(handle, EINVAL, return false);
   auto &sub = *(SubscriberC *)handle;
   sub.set_interval_ms(interval_ms);
   return true;
 }
 
 unsigned int orb_get_interval(orb_subscriber_t handle) {
-  ORB_ASSERT(handle, return false);
+  ORB_CHECK_TRUE(handle, EINVAL, return false);
   auto &sub = *(SubscriberC *)handle;
   return sub.get_interval_ms();
 }
 
 int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
-  ORB_ASSERT(fds && nfds, orb_errno = EINVAL; return -1);
+  ORB_CHECK_TRUE(fds && nfds, EINVAL, return -1);
 
   uorb::DeviceNode::SemaphoreCallback semaphore_callback(0);
   int updated_num = 0;  // Number of new messages
