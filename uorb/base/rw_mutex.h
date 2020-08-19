@@ -76,13 +76,13 @@ class ReaderLockGuard {
   RwMutex &mutex_;
 };
 
-class WriteLockGuard {
+class WriterLockGuard {
  public:
-  explicit WriteLockGuard(RwMutex &m) : mutex_(m) { mutex_.lock(); }
-  ~WriteLockGuard() { mutex_.unlock(); }
+  explicit WriterLockGuard(RwMutex &m) : mutex_(m) { mutex_.lock(); }
+  ~WriterLockGuard() { mutex_.unlock(); }
 
-  WriteLockGuard(const WriteLockGuard &) = delete;
-  WriteLockGuard &operator=(const WriteLockGuard &) = delete;
+  WriterLockGuard(const WriterLockGuard &) = delete;
+  WriterLockGuard &operator=(const WriterLockGuard &) = delete;
 
  private:
   RwMutex &mutex_;

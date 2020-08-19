@@ -105,7 +105,7 @@ bool uorb::DeviceNode::Publish(const orb_metadata &meta, const void *data) {
     return false;
   }
 
-  base::WriteLockGuard lg(lock_);
+  base::WriterLockGuard lg(lock_);
 
   if (nullptr == data_) {
     data_ = new uint8_t[meta_.o_size * queue_size_];
@@ -138,12 +138,12 @@ bool uorb::DeviceNode::Publish(const orb_metadata &meta, const void *data) {
 }
 
 void uorb::DeviceNode::IncreaseSubscriberCount() {
-  base::WriteLockGuard lg(lock_);
+  base::WriterLockGuard lg(lock_);
   subscriber_count_++;
 }
 
 void uorb::DeviceNode::ReduceSubscriberCount() {
-  base::WriteLockGuard lg(lock_);
+  base::WriterLockGuard lg(lock_);
   subscriber_count_--;
 }
 
@@ -162,7 +162,7 @@ bool uorb::DeviceNode::RegisterCallback(Callback *callback) {
     return false;
   }
 
-  base::WriteLockGuard lg(lock_);
+  base::WriterLockGuard lg(lock_);
 
   // prevent duplicate registrations
   for (auto existing_callback : callbacks_) {
@@ -175,6 +175,6 @@ bool uorb::DeviceNode::RegisterCallback(Callback *callback) {
 }
 
 void uorb::DeviceNode::UnregisterCallback(Callback *callback) {
-  base::WriteLockGuard lg(lock_);
+  base::WriterLockGuard lg(lock_);
   callbacks_.Remove(callback);
 }

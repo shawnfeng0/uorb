@@ -47,7 +47,7 @@ uorb::DeviceNode *uorb::DeviceMaster::CreateAdvertiser(const orb_metadata &meta,
   DeviceNode *device_node;
   unsigned group_tries = 0;
 
-  uorb::base::WriteLockGuard lg(lock_);
+  uorb::base::WriterLockGuard lg(lock_);
 
   // Find the following devices that can advertise:
   // - Unadvertised device
@@ -108,7 +108,7 @@ uorb::DeviceNode *uorb::DeviceMaster::OpenDeviceNode(const orb_metadata &meta,
     return nullptr;
   }
 
-  uorb::base::WriteLockGuard lg(lock_);
+  uorb::base::WriterLockGuard lg(lock_);
 
   DeviceNode *device_node = GetDeviceNodeLocked(meta, instance);
   if (device_node) {

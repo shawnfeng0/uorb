@@ -126,6 +126,8 @@ class DeviceNode : public ListNode<DeviceNode *> {
 
   uint16_t get_queue_size() const { return queue_size_; }
   bool set_queue_size(uint16_t queue_size) {
+    base::WriterLockGuard lg(lock_);
+
     if (data_ || queue_size_ > queue_size) {
       return false;
     }
