@@ -35,7 +35,7 @@
 
 /**
  * @file uorb.h
- * API for the uORB lightweight object broker.
+ * API for the uORB lightweight object request broker.
  */
 
 #include <stdbool.h>
@@ -92,7 +92,6 @@ struct orb_metadata {
  *
  * @param _name		The name of the topic.
  * @param _struct	The structure the topic provides.
- * @param _orb_id_enum	ORB ID enum e.g.: ORB_ID::vehicle_status
  */
 #define ORB_DEFINE(_name, _struct)                                     \
   const struct orb_metadata __orb_##_name = {#_name, sizeof(_struct)}; \
@@ -101,27 +100,21 @@ struct orb_metadata {
 __BEGIN_DECLS
 
 /**
- * ORB topic advertiser handle, and hide implementation details.
+ * ORB topic advertiser handle
  *
- * Advertiser handles are global; once obtained they can be shared freely
- * and do not need to be closed or released.
+ * "struct orb_advert" does not exist, it is only defined to hide the
+ * implementation and avoid the implicit conversion of "void*" types.
  *
- * This permits publication from interrupt context and other contexts where
- * a file-descriptor-based handle would not otherwise be in scope for the
- * publisher.
- *
- * Why not use void* but named struct* ?
- * void * will be implicitly converted with other void* types, and no warning
- * can be given when using the wrong API. And struct* can give warnings.
+ * Advertiser handles are global; once obtained they can be shared freely and do
+ * not need to be closed or released.
  */
 typedef struct orb_advert *orb_advert_t;
 
 /**
- * ORB topic subscriber handle, and hide implementation details.
+ * ORB topic subscriber handle
  *
- * Why not use void* but named struct* ?
- * void * will be implicitly converted with other void* types, and no warning
- * can be given when using the wrong API. And struct* can give warnings.
+ * "struct orb_subscriber" does not exist, it is only defined to hide the
+ * implementation and avoid the implicit conversion of "void*" types.
  */
 typedef struct orb_subscriber *orb_subscriber_t;
 
@@ -132,6 +125,8 @@ typedef struct orb_subscriber *orb_subscriber_t;
 /**
  * The auxiliary data structure used to use orb_poll, similar to the poll()
  * function of POSIX.
+ *
+ * Only supports POLLIN function.
  */
 struct orb_pollfd {
   orb_subscriber_t fd;  // A handle returned from orb_subscribe.
@@ -174,29 +169,30 @@ extern orb_advert_t orb_advertise_multi(const struct orb_metadata *meta,
  * but co-ordination between publishers is not provided by the ORB.
  *
  * If instance is nullptr, the device is a single instance, and each call will
- * return the same instance.
- * Otherwise, create an independent instance of the topic (each instance has its
- * own buffer), and each call will generate an independent instance (up to
- * ORB_MULTI_MAX_INSTANCES), which is useful for scenarios where multiple
- * publishers publish the same topic.
+ * return the same instance. Otherwise, create an independent instance of the
+ * topic (each instance has its own buffer), and each call will generate an
+ * independent instance (up to ORB_MULTI_MAX_INSTANCES), which is useful for
+ * scenarios where multiple publishers publish the same topic.
  *
  * @param meta    The uORB metadata (usually from the ORB_ID() macro) for the
  * topic.
- * @param data    A pointer to the initial data to be published. For topics
- * updated by interrupt handlers, the advertisement must be performed from
- * non-interrupt context.
+ *
+ * @param data    A pointer to the initial data to be published. NULL means no
+ * initial data.
+ *
  * @param instance  Pointer to an integer which will yield the instance ID
  * (0-based) of the publication. This is an output parameter and will be set to
  * the newly created instance, ie. 0 for the first advertiser, 1 for the next
  * and so on.
- * NOTE: If it is NULL, only 0 instances will be returned, which means that if
+ * WARN: If it is NULL, only 0 instances will be returned, which means that if
  * there are other 0 instance publishers (by passing in NULL, or the first
- * instance), the data of multiple publishers will be sent to the same 0
- * Instance.
- * @param queue_size  Maximum number of buffered elements. If this is 1, no
- * queuing is used.
+ * instance), the data of multiple publishers will be sent to the same instance.
+ *
+ * @param queue_size  Maximum number of buffered elements. If queue_size < 2, no
+ * queuing is used. Will round up to a power of 2 inside.
+ *
  * @return NULL on error(No memory or too many instances), otherwise returns an
- * object pointer that can be used to publish to the topic.
+ * ORB topic advertiser handle that can be used to publish to the topic.
  */
 extern orb_advert_t orb_advertise_multi_queue(const struct orb_metadata *meta,
                                               const void *data,
@@ -208,7 +204,7 @@ extern orb_advert_t orb_advertise_multi_queue(const struct orb_metadata *meta,
  *
  * @param handle The pointer of the handle returned from orb_advertise_xxx will
  * be destroyed and set to NULL. (In order to prevent wild pointers from
- * appearing, learn from zmq)
+ * appearing, reference zmq project)
  * @return true on success
  */
 extern bool orb_unadvertise(orb_advert_t *handle_ptr) __EXPORT;
@@ -290,7 +286,7 @@ extern orb_subscriber_t orb_subscribe(const struct orb_metadata *meta) __EXPORT;
  * @param instance  The instance of the topic. Instance 0 matches the
  *      topic of the orb_subscribe() call, higher indices
  *      are for topics created with orb_advertise_multi().
- * @return    NULL on error, otherwise returns a handle
+ * @return    NULL on error, otherwise returns a subscriber handle
  *      that can be used to read and update the topic.
  */
 extern orb_subscriber_t orb_subscribe_multi(const struct orb_metadata *meta,
@@ -301,7 +297,7 @@ extern orb_subscriber_t orb_subscribe_multi(const struct orb_metadata *meta,
  *
  * @param handle The pointer of the handle returned from orb_subscribe will be
  * destroyed and set to NULL. (In order to prevent wild pointers from appearing,
- * learn from zmq)
+ * reference zmq project)
  * @return true on success.
  */
 extern bool orb_unsubscribe(orb_subscriber_t *handle_ptr) __EXPORT;
@@ -317,9 +313,7 @@ extern bool orb_unsubscribe(orb_subscriber_t *handle_ptr) __EXPORT;
  * @param meta    The uORB metadata (usually from the ORB_ID() macro)
  *      for the topic.
  * @param handle  A handle returned from orb_subscribe.
- * @param buffer  Pointer to the buffer receiving the data, or NULL
- *      if the caller wants to clear the updated flag without
- *      using the data.
+ * @param buffer  Pointer to the buffer receiving the data.
  * @return    true on success, false otherwise with orb_errno set accordingly.
  */
 extern bool orb_copy(const struct orb_metadata *meta, orb_subscriber_t handle,
@@ -375,7 +369,7 @@ extern unsigned int orb_group_count(const struct orb_metadata *meta) __EXPORT;
  *
  * @param handle  A handle returned from orb_subscribe.
  * @param interval  An interval period in milliseconds.
- * @return    OK on success, PX4_ERROR otherwise with ERRNO set accordingly.
+ * @return    true on success, otherwise with orb_errno set accordingly.
  */
 extern bool orb_set_interval(orb_subscriber_t handle,
                              unsigned interval_ms) __EXPORT;
