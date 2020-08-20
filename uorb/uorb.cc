@@ -200,7 +200,7 @@ unsigned int orb_get_interval(orb_subscriber_t handle) {
 int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
   ORB_CHECK_TRUE(fds && nfds, EINVAL, return -1);
 
-  uorb::DeviceNode::SemaphoreCallback semaphore_callback(0);
+  uorb::DeviceNode::SemaphoreCallback semaphore_callback;
   int updated_num = 0;  // Number of new messages
 
   for (unsigned i = 0; i < nfds; i++) {

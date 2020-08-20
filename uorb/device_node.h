@@ -57,7 +57,7 @@ class DeviceNode : public ListNode<DeviceNode *> {
   class SemaphoreCallback : public base::SimpleSemaphore<CLOCK_MONOTONIC>,
                             public Callback {
    public:
-    explicit SemaphoreCallback(unsigned count) : SimpleSemaphore(count) {}
+    explicit SemaphoreCallback() : SimpleSemaphore(0) {}
     void call() override { release(); }
   };
 
