@@ -47,4 +47,7 @@ The main difference lies in the implementation of the bottom layer, and the appl
 ### Difference in implementation
 
 * Use read-write locks instead of regular locks to reduce latency in multi-subscription situations
-* The queue size is set to a power of 2, and this implementation avoids the problem of limiting the number of messages published to INT_MAX
+* The queue size is set to a power of 2, and this implementation avoids the problem of limiting the number of messages published to ``UINTMAX_MAX``
+* Delete the ``o_id ``(``ORB_ID enum``) field in ``orb_metadata``. This field has no meaning and is very redundant. It is newly added in PX4-v1.11. 
+* Delete the ``o_size_no_padding`` and ``o_fields`` fields, keep it simple, and do not plan to use logger.
+* In C++, ``orb_metadata`` can be obtained directly through the orb message type, which can simplify the constructors of ``PublicationData`` and ``SubscriptionData``, and there is no need to pass in parameters such as ``ORB_ID(msg_name)`` to simplify the code and avoid errors.
