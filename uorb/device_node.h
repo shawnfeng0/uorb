@@ -51,7 +51,11 @@ class DeviceNode : public ListNode<DeviceNode *> {
  public:
   class Callback : public ListNode<Callback *> {
    public:
+    void operator()() { call(); }
+
+   protected:
     virtual void call() = 0;
+    virtual ~Callback() = default;
   };
 
   class SemaphoreCallback : public base::SimpleSemaphore<CLOCK_MONOTONIC>,

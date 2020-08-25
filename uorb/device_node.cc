@@ -131,7 +131,7 @@ bool uorb::DeviceNode::Publish(const orb_metadata &meta, const void *data) {
   if (!advertised_) advertised_ = true;
 
   for (auto callback : callbacks_) {
-    callback->call();
+    (*callback)();
   }
 
   return true;
