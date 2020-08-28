@@ -77,7 +77,11 @@
 #endif
 
 /* The error code set by various library functions.  */
+#if defined(__cplusplus)
+extern "C" int *__orb_errno_location();
+#else
 extern int *__orb_errno_location();
+#endif
 
 #define orb_errno (*__orb_errno_location())
 
