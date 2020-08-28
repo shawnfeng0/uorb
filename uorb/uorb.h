@@ -110,21 +110,19 @@ __BEGIN_DECLS
 /**
  * ORB topic advertiser handle
  *
- * "struct orb_advert" does not exist, it is only defined to hide the
- * implementation and avoid the implicit conversion of "void*" types.
- *
  * Advertiser handles are global; once obtained they can be shared freely and do
  * not need to be closed or released.
  */
-typedef struct orb_advert *orb_advert_t;
+typedef struct orb_advert {
+  void *ptr;
+} orb_advert_t;
 
 /**
  * ORB topic subscriber handle
- *
- * "struct orb_subscriber" does not exist, it is only defined to hide the
- * implementation and avoid the implicit conversion of "void*" types.
  */
-typedef struct orb_subscriber *orb_subscriber_t;
+typedef struct orb_subscriber {
+  void *ptr;
+} orb_subscriber_t;
 
 #ifndef POLLIN
 #define POLLIN (0x01u)
@@ -249,9 +247,9 @@ static inline bool orb_publish_auto(const struct orb_metadata *meta,
     return false;
   }
 
-  if (!*handle) {
+  if (!(*handle).ptr) {
     *handle = orb_advertise_multi(meta, data, instance);
-    return *handle;
+    return (*handle).ptr;
 
   } else {
     return orb_publish(meta, *handle, data);

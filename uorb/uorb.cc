@@ -87,37 +87,37 @@ orb_advert_t orb_advertise_multi(const struct orb_metadata *meta,
 orb_advert_t orb_advertise_multi_queue(const struct orb_metadata *meta,
                                        const void *data, unsigned int *instance,
                                        unsigned int queue_size) {
-  ORB_CHECK_TRUE(meta, EINVAL, return nullptr);
+  ORB_CHECK_TRUE(meta, EINVAL, return orb_advert_t{});
   auto &meta_ = *meta;
   auto &device_master = DeviceMaster::get_instance();
   auto *dev_ = device_master.CreateAdvertiser(meta_, instance, queue_size);
 
-  ORB_CHECK_TRUE(dev_, orb_errno, return nullptr);
+  ORB_CHECK_TRUE(dev_, orb_errno, return orb_advert_t{});
 
   if (data) dev_->Publish(meta_, data);
 
-  return (orb_advert_t)dev_;
+  return orb_advert_t{dev_};
 }
 
 bool orb_unadvertise(orb_advert_t *handle_ptr) {
   ORB_CHECK_TRUE(handle_ptr, EINVAL, return false);
 
   orb_advert_t &handle = *handle_ptr;
-  ORB_CHECK_TRUE(handle, EINVAL, return false);
+  ORB_CHECK_TRUE(handle.ptr, EINVAL, return false);
 
-  auto &dev = *(uorb::DeviceNode *)handle;
+  auto &dev = *(uorb::DeviceNode *)handle.ptr;
   dev.mark_as_unadvertised();
 
-  handle = nullptr;
+  handle.ptr = nullptr;
 
   return true;
 }
 
 bool orb_publish(const struct orb_metadata *meta, orb_advert_t handle,
                  const void *data) {
-  ORB_CHECK_TRUE(meta && handle && data, EINVAL, return false);
+  ORB_CHECK_TRUE(meta && handle.ptr && data, EINVAL, return false);
 
-  auto &dev = *(uorb::DeviceNode *)handle;
+  auto &dev = *(uorb::DeviceNode *)handle.ptr;
   return dev.Publish(*meta, data);
 }
 
@@ -127,37 +127,37 @@ orb_subscriber_t orb_subscribe(const struct orb_metadata *meta) {
 
 orb_subscriber_t orb_subscribe_multi(const struct orb_metadata *meta,
                                      unsigned instance) {
-  ORB_CHECK_TRUE(meta, EINVAL, return nullptr);
+  ORB_CHECK_TRUE(meta, EINVAL, return orb_subscriber_t{});
 
   auto *sub = new SubscriberC(*meta, 0, instance);
-  ORB_CHECK_TRUE(sub, ENOMEM, return nullptr);
+  ORB_CHECK_TRUE(sub, ENOMEM, return orb_subscriber_t{});
 
-  return (orb_subscriber_t)sub;
+  return orb_subscriber_t{sub};
 }
 
 bool orb_unsubscribe(orb_subscriber_t *handle_ptr) {
   ORB_CHECK_TRUE(handle_ptr, EINVAL, return false);
 
   orb_subscriber_t &handle = *handle_ptr;
-  ORB_CHECK_TRUE(handle, EINVAL, return false);
+  ORB_CHECK_TRUE(handle.ptr, EINVAL, return false);
 
-  delete (SubscriberC *)handle;
-  handle = nullptr;
+  delete (SubscriberC *)handle.ptr;
+  handle.ptr = nullptr;
 
   return true;
 }
 
 bool orb_copy(const struct orb_metadata *meta, orb_subscriber_t handle,
               void *buffer) {
-  ORB_CHECK_TRUE(meta && handle && buffer, EINVAL, return false);
+  ORB_CHECK_TRUE(meta && handle.ptr && buffer, EINVAL, return false);
 
-  auto &sub = *(SubscriberC *)handle;
+  auto &sub = *(SubscriberC *)handle.ptr;
   return sub.copy(buffer);
 }
 
 bool orb_check_updated(orb_subscriber_t handle) {
-  ORB_CHECK_TRUE(handle, EINVAL, return false);
-  auto &sub = *(SubscriberC *)handle;
+  ORB_CHECK_TRUE(handle.ptr, EINVAL, return false);
+  auto &sub = *(SubscriberC *)handle.ptr;
   return sub.updated();
 }
 
@@ -185,15 +185,15 @@ unsigned int orb_group_count(const struct orb_metadata *meta) {
 }
 
 bool orb_set_interval(orb_subscriber_t handle, unsigned interval_ms) {
-  ORB_CHECK_TRUE(handle, EINVAL, return false);
-  auto &sub = *(SubscriberC *)handle;
+  ORB_CHECK_TRUE(handle.ptr, EINVAL, return false);
+  auto &sub = *(SubscriberC *)handle.ptr;
   sub.set_interval_ms(interval_ms);
   return true;
 }
 
 unsigned int orb_get_interval(orb_subscriber_t handle) {
-  ORB_CHECK_TRUE(handle, EINVAL, return false);
-  auto &sub = *(SubscriberC *)handle;
+  ORB_CHECK_TRUE(handle.ptr, EINVAL, return false);
+  auto &sub = *(SubscriberC *)handle.ptr;
   return sub.get_interval_ms();
 }
 
@@ -205,9 +205,9 @@ int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
 
   for (unsigned i = 0; i < nfds; i++) {
     orb_subscriber_t &subscriber = fds[i].fd;
-    if (!subscriber) continue;
+    if (!subscriber.ptr) continue;
 
-    auto &sub = *((SubscriberC *)subscriber);
+    auto &sub = *((SubscriberC *)subscriber.ptr);
     if (!sub.get_node()) sub.subscribe();
     if (!sub.get_node()) continue;
 
@@ -231,9 +231,9 @@ int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
   updated_num = 0;
   for (unsigned i = 0; i < nfds; i++) {
     orb_subscriber_t &subscriber = fds[i].fd;
-    if (!subscriber) continue;
+    if (!subscriber.ptr) continue;
 
-    auto &sub = *((SubscriberC *)subscriber);
+    auto &sub = *((SubscriberC *)subscriber.ptr);
     if (!sub.get_node()) sub.subscribe();
     if (!sub.get_node()) continue;
 
