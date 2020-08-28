@@ -42,6 +42,7 @@
 #include "uorb/device_master.h"
 #include "uorb/device_node.h"
 #include "uorb/uorb.h"
+#include "uorb/uorb_topics.h"
 
 namespace uorb {
 
@@ -60,16 +61,18 @@ class PublicationBase {
 /**
  * uORB publication wrapper class
  */
-template <typename T, uint8_t ORB_QSIZE = 1>
+template <const orb_metadata &T, uint8_t ORB_QSIZE = 1>
 class Publication : public PublicationBase {
+  using Type = typename ORBTypeMap<T>::type;
  public:
-  Publication() : PublicationBase(T::get_metadata()) {}
+
+  Publication() : PublicationBase(T) {}
 
   /**
    * Publish the struct
    * @param data The uORB message struct we are updating.
    */
-  bool publish(const T &data) {
+  bool publish(const Type &data) {
     if (!dev_) advertise();
 
     if (dev_) {
@@ -91,13 +94,14 @@ class Publication : public PublicationBase {
 /**
  * The publication class with data embedded.
  */
-template <typename T, uint8_t queue_size = 1>
+template <const orb_metadata &T, uint8_t queue_size = 1>
 class PublicationData : public Publication<T, queue_size> {
+  using Type = typename ORBTypeMap<T>::type;
  public:
   PublicationData() = default;
 
-  T &get() { return data_; }
-  auto set(const T &data) -> decltype(*this) {
+  Type &get() { return data_; }
+  auto set(const Type &data) -> decltype(*this) {
     data_ = data;
     return *this;
   }
@@ -106,10 +110,7 @@ class PublicationData : public Publication<T, queue_size> {
   bool publish() { return Publication<T, queue_size>::publish(data_); }
 
  private:
-  T data_{};
+  Type data_{};
 };
-
-template <class T>
-using PublicationQueued = Publication<T, T::ORB_QUEUE_LENGTH>;
 
 }  // namespace uorb

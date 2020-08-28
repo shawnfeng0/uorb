@@ -40,6 +40,7 @@
 
 #include "uorb/device_node.h"
 #include "uorb/uorb.h"
+#include "uorb/uorb_topics.h"
 
 namespace uorb {
 
@@ -106,16 +107,17 @@ class Subscription {
 };
 
 // Subscription wrapper class with data
-template <class T>
+template <const orb_metadata &T>
 class SubscriptionData : public Subscription {
+  using Type = typename ORBTypeMap<T>::type;
+
  public:
   /**
    * Constructor
    *
    * @param instance The instance for multi sub.
    */
-  explicit SubscriptionData(uint8_t instance = 0)
-      : Subscription(T::get_metadata(), instance) {}
+  explicit SubscriptionData(uint8_t instance = 0) : Subscription(T, instance) {}
 
   ~SubscriptionData() = default;
 
@@ -128,10 +130,10 @@ class SubscriptionData : public Subscription {
   // update the embedded struct.
   bool update() { return Subscription::update(&data_); }
 
-  const T &get() const { return data_; }
+  const Type &get() const { return data_; }
 
  private:
-  T data_{};
+  Type data_{};
 };
 
 }  // namespace uorb

@@ -69,7 +69,7 @@ struct orb_metadata {
  *
  * @param _name		The name of the topic.
  */
-#define ORB_ID(_name) &__orb_##_name
+#define ORB_ID(_name) __orb_##_name()
 
 /**
  * Declare (prototype) the uORB metadata for a topic (used by code generators).
@@ -77,11 +77,14 @@ struct orb_metadata {
  * @param _name		The name of the topic.
  */
 #if defined(__cplusplus)
-#define ORB_DECLARE(_name) \
-  extern "C" const struct orb_metadata __orb_##_name __EXPORT
+#define ORB_DECLARE(_name)                \
+  namespace ORB {                         \
+  extern const struct orb_metadata _name; \
+  }                                       \
+  extern "C" const struct orb_metadata *__orb_##_name() __EXPORT
 #else
 #define ORB_DECLARE(_name) \
-  extern const struct orb_metadata __orb_##_name __EXPORT
+  extern const struct orb_metadata *__orb_##_name() __EXPORT
 #endif
 
 /**
@@ -96,13 +99,15 @@ struct orb_metadata {
  * @param _name		The name of the topic.
  * @param _struct	The structure the topic provides.
  * @param _size_no_padding	Struct size w/o padding at the end
- * @param _fields	All fields in a semicolon separated list e.g: "float[3]
- * position;bool armed"
- * @param _orb_id_enum	ORB ID enum e.g.: ORB_ID::vehicle_status
+ * @param _fields	All fields in a semicolon separated list
+ *                      e.g: "float[3] position;bool armed"
  */
-#define ORB_DEFINE(_name, _struct, _size_no_padding, _fields)            \
-  const struct orb_metadata __orb_##_name = {#_name, sizeof(_struct),    \
-                                             _size_no_padding, _fields}; \
+#define ORB_DEFINE(_name, _struct, _size_no_padding, _fields)        \
+  namespace ORB {                                                    \
+  const struct orb_metadata _name = {#_name, sizeof(_struct),        \
+                                     _size_no_padding, _fields};     \
+  }                                                                  \
+  const struct orb_metadata *__orb_##_name() { return &ORB::_name; } \
   struct hack
 
 __BEGIN_DECLS

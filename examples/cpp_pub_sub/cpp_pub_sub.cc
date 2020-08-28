@@ -11,7 +11,7 @@
 #include "slog.h"
 
 void *thread_publisher(void *arg) {
-  uorb::PublicationData<example_string_s, 3> pub_example_string;
+  uorb::PublicationData<ORB::example_string, 3> pub_example_string;
 
   for (int i = 0; i < 10; i++) {
     snprintf((char *)pub_example_string.get().string,
@@ -30,7 +30,7 @@ void *thread_publisher(void *arg) {
 }
 
 void *thread_subscriber(void *unused) {
-  uorb::SubscriptionData<example_string_s> sub_example_string;
+  uorb::SubscriptionData<ORB::example_string> sub_example_string;
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))

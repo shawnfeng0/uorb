@@ -130,10 +130,14 @@ for constant in spec.constants:
 
     print('\tstatic constexpr %s %s = %s;'%(type_px4, constant.name, int(constant.val)))
 }
-@{
-print('\tstatic inline const constexpr orb_metadata &get_metadata() {')
-print('\t\treturn *ORB_ID(%s);'%(topic_name))
-print('\t}')
-}
 #endif
 };
+
+#ifdef __cplusplus
+template<const orb_metadata &> struct ORBTypeMap;
+@[for multi_topic in topics]@
+template<> struct ORBTypeMap<ORB::@multi_topic> {
+    using type = @(uorb_struct);
+};
+@[end for]
+#endif

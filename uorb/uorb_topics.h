@@ -37,6 +37,10 @@
 
 #include "uorb/uorb.h"
 
+#ifdef __cplusplus
+template<const orb_metadata &> struct ORBTypeMap;
+#endif
+
 /*
  * Returns array of topics metadata
  */
