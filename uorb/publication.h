@@ -38,7 +38,7 @@
 
 #pragma once
 
-#include "uorb/base/errno.h"
+#include "uorb/base/orb_errno.h"
 #include "uorb/device_master.h"
 #include "uorb/device_node.h"
 #include "uorb/uorb.h"

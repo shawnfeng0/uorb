@@ -35,7 +35,7 @@
 
 #include <cstring>
 
-#include "uorb/base/errno.h"
+#include "uorb/base/orb_errno.h"
 
 uorb::DeviceNode::DeviceNode(const struct orb_metadata &meta, uint8_t instance,
                              uint16_t queue_size)

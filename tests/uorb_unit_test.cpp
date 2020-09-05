@@ -48,31 +48,34 @@ namespace uORBTest {
 
 TEST_F(UnitTest, unadvertise) {
   // try to advertise and see whether we get the right instance
-  orb_advert_t pfd[4]{};  ///< used for test_multi and test_multi_reversed
+  orb_publication_t *pfd[4]{};  ///< used for test_multi and test_multi_reversed
   unsigned instance_test[4]{};
   orb_test_s t{};
 
   for (int i = 0; i < 4; ++i) {
-    pfd[i] = orb_advertise_multi(ORB_ID(orb_multitest), &t, &instance_test[i]);
+    pfd[i] = orb_create_publication_multi(ORB_ID(orb_multitest), &instance_test[i], 1);
     EXPECT_EQ(instance_test[i], i) << "got wrong instance";
+    orb_publish(ORB_ID(orb_multitest), pfd[i], &t);
   }
 
   for (auto &i : pfd) {
-    EXPECT_TRUE(orb_unadvertise(&i));
+    EXPECT_TRUE(orb_destroy_publication(&i));
   }
 }
 
 TEST_F(UnitTest, single_topic) {
   orb_test_s t{};
   orb_test_s u{};
-  orb_advert_t ptopic{};
+  orb_publication_t *ptopic{};
 
   t.val = 0;
-  ptopic = orb_advertise(ORB_ID(orb_test), &t);
+  ptopic = orb_create_publication_multi(ORB_ID(orb_test), nullptr, 1);
 
   ASSERT_NE(ptopic, nullptr) << "advertise failed:" << errno;
 
-  auto sfd = orb_subscribe(ORB_ID(orb_test));
+  orb_publish(ORB_ID(orb_test), ptopic, &t);
+
+  auto sfd = orb_create_subscription_multi(ORB_ID(orb_test), 0);
 
   ASSERT_NE(sfd, nullptr) << "subscribe failed: " << errno;
 
@@ -96,13 +99,13 @@ TEST_F(UnitTest, single_topic) {
 
   ASSERT_EQ(u.val, t.val) << "copy(2) mismatch";
 
-  ASSERT_TRUE(orb_unsubscribe(&sfd));
+  ASSERT_TRUE(orb_destroy_subscription(&sfd));
 
-  ASSERT_TRUE(orb_unadvertise(&ptopic)) << "orb_unadvertise failed";
+  ASSERT_TRUE(orb_destroy_publication(&ptopic)) << "orb_destroy_publication failed";
 }
 
 TEST_F(UnitTest, multi_topic) {
-  orb_advert_t pfd[4]{};  ///< used for test_multi and test_multi_reversed
+  orb_publication_t *pfd[4]{};  ///< used for test_multi and test_multi_reversed
 
   /* this routine tests the multi-topic support */
   {
@@ -110,10 +113,10 @@ TEST_F(UnitTest, multi_topic) {
     orb_test_s u{};
 
     unsigned instance0;
-    pfd[0] = orb_advertise_multi(ORB_ID(orb_multitest), &t, &instance0);
+    pfd[0] = orb_create_publication_multi(ORB_ID(orb_multitest), &instance0, 1);
 
     unsigned instance1;
-    pfd[1] = orb_advertise_multi(ORB_ID(orb_multitest), &t, &instance1);
+    pfd[1] = orb_create_publication_multi(ORB_ID(orb_multitest), &instance1, 1);
 
     ASSERT_EQ(instance0, 0) << "mult. id0: " << instance0;
 
@@ -130,14 +133,14 @@ TEST_F(UnitTest, multi_topic) {
         << "mult. pub1 fail";
 
     /* subscribe to both topics and ensure valid data is received */
-    auto sfd0 = orb_subscribe_multi(ORB_ID(orb_multitest), 0);
+    auto sfd0 = orb_create_subscription_multi(ORB_ID(orb_multitest), 0);
 
     ASSERT_TRUE(orb_copy(ORB_ID(orb_multitest), sfd0, &u))
         << "sub #0 copy failed: " << errno;
 
     ASSERT_EQ(u.val, 103) << "sub #0 val. mismatch: " << u.val;
 
-    auto sfd1 = orb_subscribe_multi(ORB_ID(orb_multitest), 1);
+    auto sfd1 = orb_create_subscription_multi(ORB_ID(orb_multitest), 1);
 
     ASSERT_TRUE(orb_copy(ORB_ID(orb_multitest), sfd1, &u))
         << "sub #1 copy failed: " << errno;
@@ -146,8 +149,8 @@ TEST_F(UnitTest, multi_topic) {
 
     latency_test<orb_test_s>(ORB_ID(orb_test));
 
-    orb_unsubscribe(&sfd0);
-    orb_unsubscribe(&sfd1);
+    orb_destroy_subscription(&sfd0);
+    orb_destroy_subscription(&sfd1);
   }
   {
     /* For these tests 0 and 1 instances are taken from before, therefore
@@ -156,7 +159,7 @@ TEST_F(UnitTest, multi_topic) {
     // try multi-topic support subscribing before publishing
 
     /* Subscribe first and advertise afterwards. */
-    auto sfd2 = orb_subscribe_multi(ORB_ID(orb_multitest), 2);
+    auto sfd2 = orb_create_subscription_multi(ORB_ID(orb_multitest), 2);
 
     ASSERT_NE(sfd2, nullptr) << "errno: " << orb_errno;
 
@@ -166,11 +169,11 @@ TEST_F(UnitTest, multi_topic) {
     t.val = 0;
 
     unsigned int instance2;
-    pfd[2] = orb_advertise_multi(ORB_ID(orb_multitest), &t, &instance2);
+    pfd[2] = orb_create_publication_multi(ORB_ID(orb_multitest), &instance2, 1);
     ASSERT_EQ(instance2, 2) << "mult. id2: " << instance2;
 
     unsigned int instance3;
-    pfd[3] = orb_advertise_multi(ORB_ID(orb_multitest), &t, &instance3);
+    pfd[3] = orb_create_publication_multi(ORB_ID(orb_multitest), &instance3, 1);
     ASSERT_EQ(instance3, 3) << "mult. id3: " << instance3;
 
     t.val = 204;
@@ -186,7 +189,7 @@ TEST_F(UnitTest, multi_topic) {
 
     ASSERT_EQ(u.val, 204) << "sub #3 val. mismatch: " << u.val;
 
-    auto sfd3 = orb_subscribe_multi(ORB_ID(orb_multitest), 3);
+    auto sfd3 = orb_create_subscription_multi(ORB_ID(orb_multitest), 3);
 
     ASSERT_TRUE(orb_copy(ORB_ID(orb_multitest), sfd3, &u))
         << "sub #3 copy failed: " << errno;
@@ -196,7 +199,7 @@ TEST_F(UnitTest, multi_topic) {
 
   // we still have the advertisements from the previous test_multi calls.
   for (auto &i : pfd) {
-    ASSERT_TRUE(orb_unadvertise(&i)) << "orb_unadvertise failed";
+    ASSERT_TRUE(orb_destroy_publication(&i)) << "orb_destroy_publication failed";
   }
 }
 
@@ -205,26 +208,25 @@ TEST_F(UnitTest, multi_topic2_queue_simulation) {
 
   volatile bool thread_should_exit = false;
   const int num_instances = 3;
-  orb_subscriber_t orb_data_fd[num_instances]{};
+  orb_subscription_t *orb_data_fd[num_instances]{};
   int orb_data_next = 0;
 
   for (unsigned i = 0; i < num_instances; ++i) {
-    orb_data_fd[i] = orb_subscribe_multi(ORB_ID(orb_test_medium_multi), i);
+    orb_data_fd[i] = orb_create_subscription_multi(ORB_ID(orb_test_medium_multi), i);
   }
 
   std::thread pub_test_multi2_main([&]() {
     int data_next_idx = 0;
     const int num_instances = 3;
-    orb_advert_t orb_pub[num_instances]{};
+    orb_publication_t *orb_pub[num_instances]{};
     orb_test_medium_s data_topic{};
 
     for (int i = 0; i < num_instances; ++i) {
-      orb_advert_t &pub = orb_pub[i];
+      orb_publication_t *&pub = orb_pub[i];
       unsigned idx = i;
       //		PX4_WARN("advertise %i, t=%" PRIu64, i,
       // orb_absolute_time());
-      pub =
-          orb_advertise_multi(ORB_ID(orb_test_medium_multi), &data_topic, &idx);
+      pub = orb_create_publication_multi(ORB_ID(orb_test_medium_multi), &idx, 1);
 
       if (idx != i) {
         thread_should_exit = true;
@@ -240,7 +242,7 @@ TEST_F(UnitTest, multi_topic2_queue_simulation) {
 
     while (message_counter++ < num_messages) {
       usleep(2);  // make sure the timestamps are different
-      orb_advert_t &pub = orb_pub[data_next_idx];
+      orb_publication_t *&pub = orb_pub[data_next_idx];
 
       data_topic.timestamp = orb_absolute_time();
       data_topic.val = data_next_idx;
@@ -260,7 +262,7 @@ TEST_F(UnitTest, multi_topic2_queue_simulation) {
     thread_should_exit = true;
 
     for (auto &i : orb_pub) {
-      orb_unadvertise(&i);
+      orb_destroy_publication(&i);
     }
     return 0;
   });
@@ -289,24 +291,26 @@ TEST_F(UnitTest, multi_topic2_queue_simulation) {
   }
 
   for (auto &i : orb_data_fd) {
-    orb_unsubscribe(&i);
+    orb_destroy_subscription(&i);
   }
 }  // namespace uORBTest
 
 TEST_F(UnitTest, queue) {
   orb_test_medium_s t{};
   orb_test_medium_s u{};
-  orb_advert_t ptopic{nullptr};
+  orb_publication_t *ptopic{nullptr};
 
-  auto sfd = orb_subscribe(ORB_ID(orb_test_medium_queue));
+  auto sfd = orb_create_subscription_multi(ORB_ID(orb_test_medium_queue), 0);
 
   ASSERT_NE(sfd, nullptr) << "subscribe failed: " << errno;
 
   const int queue_size = 8;
   t.val = 0;
-  ptopic = orb_advertise_queue(ORB_ID(orb_test_medium_queue), &t, queue_size);
-
+  ptopic =
+      orb_create_publication_multi(ORB_ID(orb_test_medium_queue), nullptr, queue_size);
   ASSERT_NE(ptopic, nullptr) << "advertise failed: " << errno;
+
+  orb_publish(ORB_ID(orb_test_medium_queue), ptopic, &t);
 
   ASSERT_TRUE(orb_check_updated(sfd)) << "update flag not set";
 
@@ -373,25 +377,25 @@ TEST_F(UnitTest, queue) {
   ASSERT_EQ(u.val, t.val) << "got wrong element from the queue (got " << u.val
                           << ", should be " << t.val << ")";
 
-  ASSERT_TRUE(orb_unadvertise(&ptopic));
+  ASSERT_TRUE(orb_destroy_publication(&ptopic));
 }
 
 TEST_F(UnitTest, queue_poll_notify) {
   orb_test_medium_s t{};
-  orb_subscriber_t sfd;
+  orb_subscription_t *sfd;
   volatile int num_messages_sent = 0;
   volatile bool thread_should_exit = false;
 
-  ASSERT_NE(sfd = orb_subscribe(ORB_ID(orb_test_medium_queue_poll)), nullptr)
+  ASSERT_NE(sfd = orb_create_subscription_multi(ORB_ID(orb_test_medium_queue_poll), 0),
+            nullptr)
       << "subscribe failed: " << errno;
 
   std::thread test_queue_thread{[&]() {
     orb_test_medium_s t{};
-    orb_advert_t ptopic{nullptr};
+    orb_publication_t *ptopic{nullptr};
     const int queue_size = 50;
-    ptopic =
-        orb_advertise_queue(ORB_ID(orb_test_medium_queue_poll), &t, queue_size);
-
+    ptopic = orb_create_publication_multi(ORB_ID(orb_test_medium_queue_poll), nullptr,
+                                  queue_size);
     if (ptopic == nullptr) {
       thread_should_exit = true;
     }
@@ -399,8 +403,6 @@ TEST_F(UnitTest, queue_poll_notify) {
 
     int message_counter = 0;
     int num_messages = 20 * queue_size;
-
-    ++t.val;
 
     while (message_counter < num_messages) {
       // simulate burst
@@ -419,12 +421,12 @@ TEST_F(UnitTest, queue_poll_notify) {
     num_messages_sent = t.val;
     usleep(100 * 1000);
     thread_should_exit = true;
-    orb_unadvertise(&ptopic);
+    orb_destroy_publication(&ptopic);
   }};
   test_queue_thread.detach();
 
   int next_expected_val = 0;
-  orb_pollfd_struct_t fds[1]{};
+  orb_pollfd_t fds[1]{};
   fds[0].fd = sfd;
   fds[0].events = POLLIN;
 

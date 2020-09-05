@@ -7,8 +7,8 @@
 
 #if defined(__unix__)
 #include <errno.h>
-#endif
-
+#define orb_errno errno
+#else
 #ifndef ENOENT
 #define ENOENT 2 /* No such file or directory */
 #endif
@@ -84,5 +84,6 @@ extern int *__orb_errno_location();
 #endif
 
 #define orb_errno (*__orb_errno_location())
+#endif
 
 #endif  // UORB_ORB_ERRNO_H

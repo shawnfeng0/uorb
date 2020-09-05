@@ -12,7 +12,8 @@
 
 void *adviser_cpuload(void *arg) {
   struct cpuload_s cpuload;
-  orb_advert_t cpu_load_pub = orb_advertise_queue(ORB_ID(cpuload), NULL, 3);
+  orb_publication_t *cpu_load_pub =
+      orb_create_publication(ORB_ID(cpuload), 3);
 
   for (int i = 0; i < 10; i++) {
     cpuload.timestamp = orb_absolute_time();
@@ -24,7 +25,7 @@ void *adviser_cpuload(void *arg) {
     usleep(1 * 1000 * 1000);
   }
 
-  orb_unadvertise(&cpu_load_pub);
+  orb_destroy_publication(&cpu_load_pub);
 
   LOGGER_WARN("Publication over.");
   return NULL;
@@ -34,7 +35,8 @@ void *cpuload_update_poll(void *arg) {
   int sleep_time = *(int *)arg;
   sleep(sleep_time);
 
-  orb_subscriber_t cpu_load_sub_data = orb_subscribe(ORB_ID(cpuload));
+  orb_subscription_t *cpu_load_sub_data =
+      orb_create_subscription(ORB_ID(cpuload));
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
@@ -54,7 +56,7 @@ void *cpuload_update_poll(void *arg) {
     }
   }
 
-  orb_unsubscribe(&cpu_load_sub_data);
+  orb_destroy_subscription(&cpu_load_sub_data);
 
   LOGGER_WARN("subscription over");
   return NULL;

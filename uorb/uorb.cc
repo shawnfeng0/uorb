@@ -38,19 +38,12 @@
 
 #include "uorb/uorb.h"
 
-#include "uorb/base/errno.h"
+#include "uorb/base/orb_errno.h"
 #include "uorb/device_master.h"
 #include "uorb/device_node.h"
 #include "uorb/subscription_interval.h"
 
 using namespace uorb;
-
-#ifdef ORB_STRICT
-
-#include <cassert>
-#define ORB_CHECK_TRUE(condition, false_action) assert(condition)
-
-#else
 
 #define ORB_CHECK_TRUE(condition, error_code, error_action) \
   ({                                                        \
@@ -60,8 +53,6 @@ using namespace uorb;
     }                                                       \
   })
 
-#endif
-
 class SubscriberC : public SubscriptionInterval {
  public:
   explicit SubscriberC(const orb_metadata &meta, uint32_t interval_us = 0,
@@ -70,23 +61,14 @@ class SubscriberC : public SubscriptionInterval {
   auto get_node() -> decltype(node_) { return node_; }
 };
 
-orb_advert_t orb_advertise(const struct orb_metadata *meta, const void *data) {
-  return orb_advertise_multi_queue(meta, data, nullptr, 1);
+orb_publication_t *orb_create_publication(const struct orb_metadata *meta,
+                                          unsigned int queue_size) {
+  return orb_create_publication_multi(meta, nullptr, queue_size);
 }
 
-orb_advert_t orb_advertise_queue(const struct orb_metadata *meta,
-                                 const void *data, unsigned int queue_size) {
-  return orb_advertise_multi_queue(meta, data, nullptr, queue_size);
-}
-
-orb_advert_t orb_advertise_multi(const struct orb_metadata *meta,
-                                 const void *data, unsigned int *instance) {
-  return orb_advertise_multi_queue(meta, data, instance, 1);
-}
-
-orb_advert_t orb_advertise_multi_queue(const struct orb_metadata *meta,
-                                       const void *data, unsigned int *instance,
-                                       unsigned int queue_size) {
+orb_publication_t *orb_create_publication_multi(const struct orb_metadata *meta,
+                                          unsigned int *instance,
+                                          unsigned int queue_size) {
   ORB_CHECK_TRUE(meta, EINVAL, return nullptr);
   auto &meta_ = *meta;
   auto &device_master = DeviceMaster::get_instance();
@@ -94,15 +76,13 @@ orb_advert_t orb_advertise_multi_queue(const struct orb_metadata *meta,
 
   ORB_CHECK_TRUE(dev_, orb_errno, return nullptr);
 
-  if (data) dev_->Publish(meta_, data);
-
-  return (orb_advert_t)dev_;
+  return (orb_publication_t *)dev_;
 }
 
-bool orb_unadvertise(orb_advert_t *handle_ptr) {
+bool orb_destroy_publication(orb_publication_t **handle_ptr) {
   ORB_CHECK_TRUE(handle_ptr, EINVAL, return false);
 
-  orb_advert_t &handle = *handle_ptr;
+  orb_publication_t *&handle = *handle_ptr;
   ORB_CHECK_TRUE(handle, EINVAL, return false);
 
   auto &dev = *(uorb::DeviceNode *)handle;
@@ -113,7 +93,7 @@ bool orb_unadvertise(orb_advert_t *handle_ptr) {
   return true;
 }
 
-bool orb_publish(const struct orb_metadata *meta, orb_advert_t handle,
+bool orb_publish(const struct orb_metadata *meta, orb_publication_t *handle,
                  const void *data) {
   ORB_CHECK_TRUE(meta && handle && data, EINVAL, return false);
 
@@ -121,24 +101,24 @@ bool orb_publish(const struct orb_metadata *meta, orb_advert_t handle,
   return dev.Publish(*meta, data);
 }
 
-orb_subscriber_t orb_subscribe(const struct orb_metadata *meta) {
-  return orb_subscribe_multi(meta, 0);
+orb_subscription_t *orb_create_subscription(const struct orb_metadata *meta) {
+  return orb_create_subscription_multi(meta, 0);
 }
 
-orb_subscriber_t orb_subscribe_multi(const struct orb_metadata *meta,
-                                     unsigned instance) {
+orb_subscription_t *orb_create_subscription_multi(const struct orb_metadata *meta,
+                                            unsigned instance) {
   ORB_CHECK_TRUE(meta, EINVAL, return nullptr);
 
   auto *sub = new SubscriberC(*meta, 0, instance);
   ORB_CHECK_TRUE(sub, ENOMEM, return nullptr);
 
-  return (orb_subscriber_t)sub;
+  return (orb_subscription_t *)sub;
 }
 
-bool orb_unsubscribe(orb_subscriber_t *handle_ptr) {
+bool orb_destroy_subscription(orb_subscription_t **handle_ptr) {
   ORB_CHECK_TRUE(handle_ptr, EINVAL, return false);
 
-  orb_subscriber_t &handle = *handle_ptr;
+  orb_subscription_t *&handle = *handle_ptr;
   ORB_CHECK_TRUE(handle, EINVAL, return false);
 
   delete (SubscriberC *)handle;
@@ -147,7 +127,7 @@ bool orb_unsubscribe(orb_subscriber_t *handle_ptr) {
   return true;
 }
 
-bool orb_copy(const struct orb_metadata *meta, orb_subscriber_t handle,
+bool orb_copy(const struct orb_metadata *meta, orb_subscription_t *handle,
               void *buffer) {
   ORB_CHECK_TRUE(meta && handle && buffer, EINVAL, return false);
 
@@ -155,7 +135,7 @@ bool orb_copy(const struct orb_metadata *meta, orb_subscriber_t handle,
   return sub.copy(buffer);
 }
 
-bool orb_check_updated(orb_subscriber_t handle) {
+bool orb_check_updated(orb_subscription_t *handle) {
   ORB_CHECK_TRUE(handle, EINVAL, return false);
   auto &sub = *(SubscriberC *)handle;
   return sub.updated();
@@ -184,19 +164,6 @@ unsigned int orb_group_count(const struct orb_metadata *meta) {
   return instance;
 }
 
-bool orb_set_interval(orb_subscriber_t handle, unsigned interval_ms) {
-  ORB_CHECK_TRUE(handle, EINVAL, return false);
-  auto &sub = *(SubscriberC *)handle;
-  sub.set_interval_ms(interval_ms);
-  return true;
-}
-
-unsigned int orb_get_interval(orb_subscriber_t handle) {
-  ORB_CHECK_TRUE(handle, EINVAL, return false);
-  auto &sub = *(SubscriberC *)handle;
-  return sub.get_interval_ms();
-}
-
 int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
   ORB_CHECK_TRUE(fds && nfds, EINVAL, return -1);
 
@@ -204,7 +171,7 @@ int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
   int updated_num = 0;  // Number of new messages
 
   for (unsigned i = 0; i < nfds; i++) {
-    orb_subscriber_t &subscriber = fds[i].fd;
+    orb_subscription_t *&subscriber = fds[i].fd;
     if (!subscriber) continue;
 
     auto &sub = *((SubscriberC *)subscriber);
@@ -230,7 +197,7 @@ int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
   // Cancel registration callback, re-count the number of new messages
   updated_num = 0;
   for (unsigned i = 0; i < nfds; i++) {
-    orb_subscriber_t &subscriber = fds[i].fd;
+    orb_subscription_t *&subscriber = fds[i].fd;
     if (!subscriber) continue;
 
     auto &sub = *((SubscriberC *)subscriber);
