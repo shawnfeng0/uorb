@@ -21,7 +21,7 @@ The main difference lies in the implementation of the bottom layer, and the appl
 
 ### API interface difference
 
-* The handle returned by the orb_subscribe() function uses ``orb_subscriber_t`` instead of ``int``.
+* The handle returned by the orb_subscribe() function uses ``orb_subscription_t`` instead of ``int``.
 * Pass pointers when unpublishing and unsubscribing to avoid wild pointers(Reference from zmq)
 * Use ``bool`` type (include in ``<stdbool.h>``) to indicate whether the operation is successful
 * Remove the concept of uORB priority(``ORB_PRIO``) completely
@@ -35,14 +35,14 @@ The main difference lies in the implementation of the bottom layer, and the appl
 | orb_advert_t orb_advertise_multi_queue(const struct orb_metadata \*meta, const void \*data, int \*instance, ~~enum ORB_PRIO priority,~~ unsigned queue_size) | orb_advert_t orb_advertise_multi_queue(const struct orb_metadata \*meta, const void \*data, unsigned int \*instance, unsigned queue_size) |
 | **int** orb_publish(const struct orb_metadata \*meta, orb_advert_t handle, const void \*data)                                                                | **bool** orb_publish(const struct orb_metadata \*meta, orb_advert_t handle, const void \*data)                                            |
 | **int** orb_unadvertise(orb_advert_t **handle**)                                                                                                             | **bool** orb_unadvertise(orb_advert_t **\*handle_ptr**)                                                                                   |
-| **int** orb_subscribe(const struct orb_metadata \*meta)                                                                                                      | **orb_subscriber_t** orb_subscribe(const struct orb_metadata \*meta)                                                                      |
-| **int** orb_subscribe_multi(const struct orb_metadata \*meta, unsigned instance)                                                                             | **orb_subscriber_t** orb_subscribe_multi(const struct orb_metadata *meta, unsigned instance)                                              |
-| **int** orb_unsubscribe(**int handle**)                                                                                                                      | **bool** orb_unsubscribe(**orb_subscriber_t \*handle_ptr**)                                                                               |
-| **int** orb_copy(const struct orb_metadata \*meta, **int handle**, void \*buffer)                                                                            | **bool** orb_copy(const struct orb_metadata \*meta, **orb_subscriber_t handle**, void \*buffer)                                           |
-| **int** orb_check(**int handle** ~~, bool \*updated~~)                                                                                                       | **bool** orb_check **_updated**(**orb_subscriber_t handle**)                                                                              |
+| **int** orb_subscribe(const struct orb_metadata \*meta)                                                                                                      | **orb_subscription_t** orb_subscribe(const struct orb_metadata \*meta)                                                                      |
+| **int** orb_subscribe_multi(const struct orb_metadata \*meta, unsigned instance)                                                                             | **orb_subscription_t** orb_subscribe_multi(const struct orb_metadata *meta, unsigned instance)                                              |
+| **int** orb_unsubscribe(**int handle**)                                                                                                                      | **bool** orb_unsubscribe(**orb_subscription_t \*handle_ptr**)                                                                               |
+| **int** orb_copy(const struct orb_metadata \*meta, **int handle**, void \*buffer)                                                                            | **bool** orb_copy(const struct orb_metadata \*meta, **orb_subscription_t handle**, void \*buffer)                                           |
+| **int** orb_check(**int handle** ~~, bool \*updated~~)                                                                                                       | **bool** orb_check **_updated**(**orb_subscription_t handle**)                                                                              |
 | ~~int orb_priority(int handle, enum ORB_PRIO \*priority)~~                                                                                                   |                                                                                                                                           |
-| **int** orb_set_interval(**int handle**, unsigned interval)                                                                                                  | **bool** orb_set_interval(**orb_subscriber_t handle**, unsigned interval_ms)                                                              |
-| **int** orb_get_interval(**int handle**, unsigned \*interval)                                                                                                | **unsigned** int orb_get_interval(**orb_subscriber_t handle**)                                                                            |
+| **int** orb_set_interval(**int handle**, unsigned interval)                                                                                                  | **bool** orb_set_interval(**orb_subscription_t handle**, unsigned interval_ms)                                                              |
+| **int** orb_get_interval(**int handle**, unsigned \*interval)                                                                                                | **unsigned** int orb_get_interval(**orb_subscription_t handle**)                                                                            |
 
 ### Difference in implementation
 

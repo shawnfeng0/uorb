@@ -41,7 +41,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "uorb/base/errno.h"
+#include "uorb/base/orb_errno.h"
 #include "uorb/base/visibility.h"
 
 /**
@@ -110,13 +110,13 @@ __BEGIN_DECLS
 /**
  * ORB topic advertiser handle
  *
- * "struct orb_advert" does not exist, it is only defined to hide the
+ * "struct orb_publication" does not exist, it is only defined to hide the
  * implementation and avoid the implicit conversion of "void*" types.
  *
  * Advertiser handles are global; once obtained they can be shared freely and do
  * not need to be closed or released.
  */
-typedef struct orb_advert *orb_advert_t;
+typedef struct hack_orb_publication orb_publication_t;
 
 /**
  * ORB topic subscriber handle
@@ -124,7 +124,7 @@ typedef struct orb_advert *orb_advert_t;
  * "struct orb_subscriber" does not exist, it is only defined to hide the
  * implementation and avoid the implicit conversion of "void*" types.
  */
-typedef struct orb_subscriber *orb_subscriber_t;
+typedef struct hack_orb_subscription orb_subscription_t;
 
 #ifndef POLLIN
 #define POLLIN (0x01u)
@@ -137,35 +137,19 @@ typedef struct orb_subscriber *orb_subscriber_t;
  * Only supports POLLIN function.
  */
 struct orb_pollfd {
-  orb_subscriber_t fd;  // A handle returned from orb_subscribe.
-  unsigned events;      // The input event flags
-  unsigned revents;     // The output event flags
+  orb_subscription_t *fd;  // A handle returned from orb_create_subscription.
+  unsigned events;         // The input event flags
+  unsigned revents;        // The output event flags
 };
 
-typedef struct orb_pollfd orb_pollfd_struct_t;
+typedef struct orb_pollfd orb_pollfd_t;
 
 /**
- * return orb_advertise_multi_queue(meta, data, nullptr, 1);
- * @see orb_advertise_multi_queue()
+ * return orb_create_publication_multi(meta, nullptr, queue_size);
+ * @see orb_create_publication_multi()
  */
-extern orb_advert_t orb_advertise(const struct orb_metadata *meta,
-                                  const void *data) __EXPORT;
-
-/**
- * return orb_advertise_multi_queue(meta, data, nullptr, queue_size);
- * @see orb_advertise_multi_queue()
- */
-extern orb_advert_t orb_advertise_queue(const struct orb_metadata *meta,
-                                        const void *data,
-                                        unsigned int queue_size) __EXPORT;
-
-/**
- * return orb_advertise_multi_queue(meta, data, instance);
- * @see orb_advertise_multi_queue()
- */
-extern orb_advert_t orb_advertise_multi(const struct orb_metadata *meta,
-                                        const void *data,
-                                        unsigned int *instance) __EXPORT;
+extern orb_publication_t *orb_create_publication(
+    const struct orb_metadata *meta, unsigned int queue_size) __EXPORT;
 
 /**
  * Advertise as the publisher of a topic.
@@ -185,9 +169,6 @@ extern orb_advert_t orb_advertise_multi(const struct orb_metadata *meta,
  * @param meta    The uORB metadata (usually from the ORB_ID() macro) for the
  * topic.
  *
- * @param data    A pointer to the initial data to be published. NULL means no
- * initial data.
- *
  * @param instance  Pointer to an integer which will yield the instance ID
  * (0-based) of the publication. This is an output parameter and will be set to
  * the newly created instance, ie. 0 for the first advertiser, 1 for the next
@@ -202,10 +183,9 @@ extern orb_advert_t orb_advertise_multi(const struct orb_metadata *meta,
  * @return NULL on error(No memory or too many instances), otherwise returns an
  * ORB topic advertiser handle that can be used to publish to the topic.
  */
-extern orb_advert_t orb_advertise_multi_queue(const struct orb_metadata *meta,
-                                              const void *data,
-                                              unsigned int *instance,
-                                              unsigned int queue_size) __EXPORT;
+extern orb_publication_t *orb_create_publication_multi(
+    const struct orb_metadata *meta, unsigned int *instance,
+    unsigned int queue_size) __EXPORT;
 
 /**
  * Unadvertise a topic.
@@ -215,7 +195,7 @@ extern orb_advert_t orb_advertise_multi_queue(const struct orb_metadata *meta,
  * appearing, reference zmq project)
  * @return true on success
  */
-extern bool orb_unadvertise(orb_advert_t *handle_ptr) __EXPORT;
+extern bool orb_destroy_publication(orb_publication_t **handle_ptr) __EXPORT;
 
 /**
  * Publish new data to a topic.
@@ -224,14 +204,11 @@ extern bool orb_unadvertise(orb_advert_t *handle_ptr) __EXPORT;
  * will be notified.  Subscribers that are not waiting can check the topic
  * for updates using orb_check.
  *
- * @param meta    The uORB metadata (usually from the ORB_ID() macro) for the
- * topic.
  * @param handle  The handle returned from orb_advertise.
  * @param data    A pointer to the data to be published.
  * @return    true on success, false with orb_errno set accordingly.
  */
-extern bool orb_publish(const struct orb_metadata *meta, orb_advert_t handle,
-                        const void *data) __EXPORT;
+extern bool orb_publish(orb_publication_t *handle, const void *data) __EXPORT;
 
 /**
  * Advertise as the publisher of a topic.
@@ -242,27 +219,28 @@ extern bool orb_publish(const struct orb_metadata *meta, orb_advert_t handle,
  * @see orb_advertise_multi() for meaning of the individual parameters
  */
 static inline bool orb_publish_auto(const struct orb_metadata *meta,
-                                    orb_advert_t *handle, const void *data,
-                                    unsigned int *instance) {
+                                    orb_publication_t **handle,
+                                    const void *data, unsigned int *instance) {
   if (!meta || !handle) {
     orb_errno = EINVAL;
     return false;
   }
 
   if (!*handle) {
-    *handle = orb_advertise_multi(meta, data, instance);
-    return *handle;
-
-  } else {
-    return orb_publish(meta, *handle, data);
+    *handle = orb_create_publication_multi(meta, instance, 1);
+    if (!*handle) {
+      return false;
+    }
   }
+  return orb_publish(*handle, data);
 }
 
 /**
- * return orb_subscribe_multi(meta, 0);
- * @see orb_subscribe_multi()
+ * return orb_create_subscription_multi(meta, 0);
+ * @see orb_create_subscription_multi()
  */
-extern orb_subscriber_t orb_subscribe(const struct orb_metadata *meta) __EXPORT;
+extern orb_subscription_t *orb_create_subscription(
+    const struct orb_metadata *meta) __EXPORT;
 
 /**
  * Subscribe to a multi-instance of a topic.
@@ -272,7 +250,7 @@ extern orb_subscriber_t orb_subscribe(const struct orb_metadata *meta) __EXPORT;
  * orb_check().
  *
  * If there were any publications of the topic prior to the subscription,
- * an orb_check right after orb_subscribe_multi will return true.
+ * an orb_check right after orb_create_subscription will return true.
  *
  * Subscription will succeed even if the topic has not been advertised;
  * in this case the topic will have a timestamp of zero, it will never
@@ -286,29 +264,29 @@ extern orb_subscriber_t orb_subscribe(const struct orb_metadata *meta) __EXPORT;
  * can never be published.
  *
  * If a publisher publishes multiple instances the subscriber should
- * subscribe to each instance with orb_subscribe_multi
+ * subscribe to each instance with orb_create_subscription
  * (@see orb_advertise_multi()).
  *
  * @param meta    The uORB metadata (usually from the ORB_ID() macro)
  *      for the topic.
  * @param instance  The instance of the topic. Instance 0 matches the
- *      topic of the orb_subscribe() call, higher indices
+ *      topic of the orb_create_subscription() call, higher indices
  *      are for topics created with orb_advertise_multi().
  * @return    NULL on error, otherwise returns a subscriber handle
  *      that can be used to read and update the topic.
  */
-extern orb_subscriber_t orb_subscribe_multi(const struct orb_metadata *meta,
-                                            unsigned instance) __EXPORT;
+extern orb_subscription_t *orb_create_subscription_multi(
+    const struct orb_metadata *meta, unsigned instance) __EXPORT;
 
 /**
  * Unsubscribe from a topic.
  *
- * @param handle The pointer of the handle returned from orb_subscribe will be
- * destroyed and set to NULL. (In order to prevent wild pointers from appearing,
- * reference zmq project)
+ * @param handle The pointer of the handle returned from orb_create_subscription
+ * will be destroyed and set to NULL. (In order to prevent wild pointers from
+ * appearing, reference zmq project)
  * @return true on success.
  */
-extern bool orb_unsubscribe(orb_subscriber_t *handle_ptr) __EXPORT;
+extern bool orb_destroy_subscription(orb_subscription_t **handle_ptr) __EXPORT;
 
 /**
  * Fetch data from a topic.
@@ -318,14 +296,11 @@ extern bool orb_unsubscribe(orb_subscriber_t *handle_ptr) __EXPORT;
  * or check return indicating that an update is available, this call
  * must be used to update the subscription.
  *
- * @param meta    The uORB metadata (usually from the ORB_ID() macro)
- *      for the topic.
- * @param handle  A handle returned from orb_subscribe.
+ * @param handle  A handle returned from orb_create_subscription.
  * @param buffer  Pointer to the buffer receiving the data.
  * @return    true on success, false otherwise with orb_errno set accordingly.
  */
-extern bool orb_copy(const struct orb_metadata *meta, orb_subscriber_t handle,
-                     void *buffer) __EXPORT;
+extern bool orb_copy(orb_subscription_t *handle, void *buffer) __EXPORT;
 
 /**
  * Check whether a topic has been published to since the last orb_copy.
@@ -337,11 +312,11 @@ extern bool orb_copy(const struct orb_metadata *meta, orb_subscriber_t handle,
  * Updates are tracked on a per-handle basis; this call will continue to
  * return true until orb_copy is called using the same handle.
  *
- * @param handle  A handle returned from orb_subscribe.
+ * @param handle  A handle returned from orb_create_subscription.
  * @return true if the topic has been updated since the last time it was copied
  * using this handle.
  */
-extern bool orb_check_updated(orb_subscriber_t handle) __EXPORT;
+extern bool orb_check_updated(orb_subscription_t *handle) __EXPORT;
 
 /**
  * Check if a topic has already been created and published (advertised)
@@ -360,37 +335,6 @@ extern bool orb_exists(const struct orb_metadata *meta,
  * @return    The number of published instances of this topic
  */
 extern unsigned int orb_group_count(const struct orb_metadata *meta) __EXPORT;
-
-/**
- * Set the minimum interval between which updates are seen for a subscription.
- *
- * If this interval is set, the subscriber will not see more than one update
- * within the period.
- *
- * Specifically, the first time an update is reported to the subscriber a timer
- * is started. The update will continue to be reported via poll and orb_check,
- * but once fetched via orb_copy another update will not be reported until the
- * timer expires.
- *
- * This feature can be used to pace a subscriber that is watching a topic that
- * would otherwise update too quickly.
- *
- * @param handle  A handle returned from orb_subscribe.
- * @param interval  An interval period in milliseconds.
- * @return    true on success, otherwise with orb_errno set accordingly.
- */
-extern bool orb_set_interval(orb_subscriber_t handle,
-                             unsigned interval_ms) __EXPORT;
-
-/**
- * Get the minimum interval between which updates are seen for a subscription.
- *
- * @see orb_set_interval()
- *
- * @param handle  A handle returned from orb_subscribe.
- * @return  The interval period in milliseconds.
- */
-extern unsigned int orb_get_interval(orb_subscriber_t handle) __EXPORT;
 
 /**
  * Similar to the poll() function of POSIX.

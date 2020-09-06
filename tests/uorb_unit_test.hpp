@@ -79,9 +79,10 @@ void uORBTest::UnitTest::latency_test(orb_id_t T) {
   t.val = 308;
   t.timestamp = orb_absolute_time();
 
-  orb_advert_t pfd0 = orb_advertise(T, &t);
-
+  orb_publication_t *pfd0 = orb_create_publication(T, 1);
   ASSERT_NE(pfd0, nullptr) << "orb_advertise failed: " << errno;
+
+  orb_publish(pfd0, &t);
 
   bool pub_sub_test_passed = false;
 
@@ -95,19 +96,20 @@ void uORBTest::UnitTest::latency_test(orb_id_t T) {
     float latency_integral = 0.0f;
 
     /* wakeup source(s) */
-    orb_pollfd_struct_t fds[3];
+    orb_pollfd_t fds[3];
 
-    auto test_multi_sub = orb_subscribe_multi(ORB_ID(orb_test), 0);
+    auto test_multi_sub = orb_create_subscription(ORB_ID(orb_test));
     auto test_multi_sub_medium =
-        orb_subscribe_multi(ORB_ID(orb_test_medium), 0);
-    auto test_multi_sub_large = orb_subscribe_multi(ORB_ID(orb_test_large), 0);
+        orb_create_subscription(ORB_ID(orb_test_medium));
+    auto test_multi_sub_large =
+        orb_create_subscription(ORB_ID(orb_test_large));
 
     orb_test_large_s t{};
 
     /* clear all ready flags */
-    orb_copy(ORB_ID(orb_test), test_multi_sub, &t);
-    orb_copy(ORB_ID(orb_test_medium), test_multi_sub_medium, &t);
-    orb_copy(ORB_ID(orb_test_large), test_multi_sub_large, &t);
+    orb_copy(test_multi_sub, &t);
+    orb_copy(test_multi_sub_medium, &t);
+    orb_copy(test_multi_sub_large, &t);
 
     fds[0].fd = test_multi_sub;
     fds[0].events = POLLIN;
@@ -129,13 +131,13 @@ void uORBTest::UnitTest::latency_test(orb_id_t T) {
       int pret = orb_poll(&fds[0], (sizeof(fds) / sizeof(fds[0])), 500);
 
       if (fds[0].revents & POLLIN) {
-        orb_copy(ORB_ID(orb_test), test_multi_sub, &t);
+        orb_copy(test_multi_sub, &t);
 
       } else if (fds[1].revents & POLLIN) {
-        orb_copy(ORB_ID(orb_test_medium), test_multi_sub_medium, &t);
+        orb_copy(test_multi_sub_medium, &t);
 
       } else if (fds[2].revents & POLLIN) {
-        orb_copy(ORB_ID(orb_test_large), test_multi_sub_large, &t);
+        orb_copy(test_multi_sub_large, &t);
       }
 
       if (pret < 0) {
@@ -159,9 +161,9 @@ void uORBTest::UnitTest::latency_test(orb_id_t T) {
       }
     }
 
-    orb_unsubscribe(&test_multi_sub);
-    orb_unsubscribe(&test_multi_sub_medium);
-    orb_unsubscribe(&test_multi_sub_large);
+    orb_destroy_subscription(&test_multi_sub);
+    orb_destroy_subscription(&test_multi_sub_medium);
+    orb_destroy_subscription(&test_multi_sub_large);
 
     float std_dev = 0.f;
     float mean = latency_integral / max_runs;
@@ -189,13 +191,13 @@ void uORBTest::UnitTest::latency_test(orb_id_t T) {
     ++t.val;
     t.timestamp = orb_absolute_time();
 
-    ASSERT_TRUE(orb_publish(T, pfd0, &t)) << "mult. pub0 timing fail";
+    ASSERT_TRUE(orb_publish(pfd0, &t)) << "mult. pub0 timing fail";
 
     /* simulate >800 Hz system operation */
     usleep(1000);
   }
 
-  orb_unadvertise(&pfd0);
+  orb_destroy_publication(&pfd0);
 
   pub_sub_latency_thread.join();
 }

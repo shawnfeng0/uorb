@@ -35,7 +35,7 @@
 
 #include <cstring>
 
-#include "uorb/base/errno.h"
+#include "uorb/base/orb_errno.h"
 
 uorb::DeviceNode::DeviceNode(const struct orb_metadata &meta, uint8_t instance,
                              uint16_t queue_size)
@@ -93,15 +93,9 @@ bool uorb::DeviceNode::Copy(void *dst, unsigned &sub_generation) {
   return true;
 }
 
-bool uorb::DeviceNode::Publish(const orb_metadata &meta, const void *data) {
+bool uorb::DeviceNode::Publish(const void *data) {
   if (data == nullptr) {
     orb_errno = EFAULT;
-    return false;
-  }
-
-  /* check if the orb meta data matches the publication */
-  if (!IsSameWith(meta)) {
-    orb_errno = EINVAL;
     return false;
   }
 

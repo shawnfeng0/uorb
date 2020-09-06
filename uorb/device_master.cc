@@ -33,7 +33,7 @@
 
 #include "uorb/device_master.h"
 
-#include "uorb/base/errno.h"
+#include "uorb/base/orb_errno.h"
 #include "uorb/device_node.h"
 
 uorb::DeviceMaster uorb::DeviceMaster::instance_;
@@ -42,7 +42,8 @@ uorb::DeviceNode *uorb::DeviceMaster::CreateAdvertiser(const orb_metadata &meta,
                                                        unsigned int *instance,
                                                        uint16_t queue_size) {
   const bool is_single_instance = !instance;
-  const unsigned max_group_tries = is_single_instance ? 1 : ORB_MULTI_MAX_INSTANCES;
+  const unsigned max_group_tries =
+      is_single_instance ? 1 : ORB_MULTI_MAX_INSTANCES;
 
   DeviceNode *device_node;
   unsigned group_tries = 0;
@@ -55,8 +56,7 @@ uorb::DeviceNode *uorb::DeviceMaster::CreateAdvertiser(const orb_metadata &meta,
   // - Unregistered device
   do {
     device_node = GetDeviceNodeLocked(meta, group_tries);
-    if (device_node &&
-        (!device_node->is_advertised() || is_single_instance)) {
+    if (device_node && (!device_node->is_advertised() || is_single_instance)) {
       device_node->set_queue_size(queue_size);
       device_node->mark_as_advertised();
       break;  // Find a unadvertised device or single instance device
