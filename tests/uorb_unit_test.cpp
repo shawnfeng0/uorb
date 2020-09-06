@@ -86,13 +86,13 @@ TEST_F(UnitTest, single_topic) {
 
   ASSERT_EQ(u.val, t.val) << "copy(1) mismatch";
 
-  ASSERT_FALSE(orb_check_updated(sfd)) << "spurious updated flag";
+  ASSERT_FALSE(orb_check_update(sfd)) << "spurious updated flag";
 
   t.val = 2;
 
   ASSERT_TRUE(orb_publish(ptopic, &t)) << "publish failed";
 
-  ASSERT_TRUE(orb_check_updated(sfd)) << "missing updated flag";
+  ASSERT_TRUE(orb_check_update(sfd)) << "missing updated flag";
 
   ASSERT_TRUE(orb_copy(sfd, &u))
       << "copy(2) failed: " << errno;
@@ -275,7 +275,7 @@ TEST_F(UnitTest, multi_topic2_queue_simulation) {
 
     auto orb_data_cur_fd = orb_data_fd[orb_data_next];
 
-    if (orb_check_updated(orb_data_cur_fd)) {
+    if (orb_check_update(orb_data_cur_fd)) {
       orb_test_medium_s msg{};
       orb_copy(orb_data_cur_fd, &msg);
 
@@ -312,14 +312,14 @@ TEST_F(UnitTest, queue) {
 
   orb_publish(ptopic, &t);
 
-  ASSERT_TRUE(orb_check_updated(sfd)) << "update flag not set";
+  ASSERT_TRUE(orb_check_update(sfd)) << "update flag not set";
 
   ASSERT_TRUE(orb_copy(sfd, &u))
       << "copy(1) failed: " << errno;
 
   ASSERT_EQ(u.val, t.val) << "copy(1) mismatch";
 
-  ASSERT_FALSE(orb_check_updated(sfd)) << "spurious updated flag";
+  ASSERT_FALSE(orb_check_update(sfd)) << "spurious updated flag";
 
   // no messages in the queue anymore
 
@@ -331,13 +331,13 @@ TEST_F(UnitTest, queue) {
   }
 
   for (int i = 0; i < queue_size - 2; ++i) {
-    ASSERT_TRUE(orb_check_updated(sfd)) << "update flag not set, element " << i;
+    ASSERT_TRUE(orb_check_update(sfd)) << "update flag not set, element " << i;
     orb_copy(sfd, &u);
     ASSERT_EQ(u.val, i) << "got wrong element from the queue (got" << u.val
                         << "should be" << i << ")";
   }
 
-  ASSERT_FALSE(orb_check_updated(sfd))
+  ASSERT_FALSE(orb_check_update(sfd))
       << "update flag set, element " << queue_size;
 
   //  Testing overflow...
@@ -349,20 +349,20 @@ TEST_F(UnitTest, queue) {
   }
 
   for (int i = 0; i < queue_size; ++i) {
-    ASSERT_TRUE(orb_check_updated(sfd)) << "update flag not set, element " << i;
+    ASSERT_TRUE(orb_check_update(sfd)) << "update flag not set, element " << i;
     orb_copy(sfd, &u);
     ASSERT_EQ(u.val, i + overflow_by)
         << "got wrong element from the queue (got " << u.val << "should be"
         << i + overflow_by << ")";
   }
 
-  ASSERT_FALSE(orb_check_updated(sfd))
+  ASSERT_FALSE(orb_check_update(sfd))
       << "update flag set, element " << queue_size;
 
   //  Testing underflow...
 
   for (int i = 0; i < queue_size; ++i) {
-    ASSERT_FALSE(orb_check_updated(sfd)) << "update flag set, element " << i;
+    ASSERT_FALSE(orb_check_update(sfd)) << "update flag set, element " << i;
     orb_copy(sfd, &u);
     ASSERT_EQ(u.val, queue_size + overflow_by - 1)
         << "got wrong element from the queue (got " << u.val << ", should be "
@@ -371,7 +371,7 @@ TEST_F(UnitTest, queue) {
 
   t.val = 943;
   orb_publish(ptopic, &t);
-  ASSERT_TRUE(orb_check_updated(sfd)) << "update flag not set, element " << -1;
+  ASSERT_TRUE(orb_check_update(sfd)) << "update flag not set, element " << -1;
 
   orb_copy(sfd, &u);
   ASSERT_EQ(u.val, t.val) << "got wrong element from the queue (got " << u.val

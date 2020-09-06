@@ -133,7 +133,7 @@ bool orb_copy(orb_subscription_t *handle, void *buffer) {
   return sub.copy(buffer);
 }
 
-bool orb_check_updated(orb_subscription_t *handle) {
+bool orb_check_update(orb_subscription_t *handle) {
   ORB_CHECK_TRUE(handle, EINVAL, return false);
   auto &sub = *(SubscriberC *)handle;
   return sub.updated();

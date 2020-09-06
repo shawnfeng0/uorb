@@ -316,7 +316,7 @@ bool orb_copy(orb_subscription_t *handle, void *buffer) __EXPORT;
  * @return true if the topic has been updated since the last time it was copied
  * using this handle.
  */
-bool orb_check_updated(orb_subscription_t *handle) __EXPORT;
+bool orb_check_update(orb_subscription_t *handle) __EXPORT;
 
 /**
  * Check if a topic has already been created and published (advertised)
