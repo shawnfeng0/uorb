@@ -1,0 +1,1 @@
+add_executable(uorb_example_c_pub_sub uorb_test.c)

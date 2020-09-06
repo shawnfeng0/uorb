@@ -95,3 +95,7 @@ add_custom_command(OUTPUT ${uorb_sources}
         VERBATIM
         )
 add_custom_target(uorb_examples_target_msg_sources DEPENDS ${uorb_sources})
+
+add_library(uorb_examples_msgs ${uorb_sources})
+target_include_directories(uorb_examples_msgs PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+add_dependencies(uorb_examples_msgs uorb_examples_target_msg_headers)
