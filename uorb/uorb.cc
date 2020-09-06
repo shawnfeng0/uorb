@@ -184,6 +184,7 @@ int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
       revent = event & POLLIN;
       ++updated_num;
     } else {
+      // TODO: There may also be updates before execution
       sub.get_node()->RegisterCallback(&semaphore_callback);
       revent = 0;
     }

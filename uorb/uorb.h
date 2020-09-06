@@ -319,6 +319,15 @@ bool orb_copy(orb_subscription_t *handle, void *buffer) __EXPORT;
 bool orb_check_update(orb_subscription_t *handle) __EXPORT;
 
 /**
+ * If the message is updated, copy the message.
+ * See orb_check_update() and orb_copy().
+ */
+static inline bool orb_check_and_copy(orb_subscription_t *handle,
+                                      void *buffer) {
+  return orb_check_update(handle) && orb_copy(handle, buffer);
+}
+
+/**
  * Check if a topic has already been created and published (advertised)
  *
  * @param meta    ORB topic metadata.
