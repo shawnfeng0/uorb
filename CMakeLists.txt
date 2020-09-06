@@ -32,7 +32,7 @@
 ############################################################################
 project(uorb)
 
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.5)
 
 option(UORB_BUILD_EXAMPLES "Build examples" ON)
 option(UORB_BUILD_TESTS "Build tests" ON)

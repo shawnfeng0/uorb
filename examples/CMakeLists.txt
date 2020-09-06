@@ -1,6 +1,6 @@
 project(uorb_examples)
 
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.5)
 
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR} SAMPLE_SOURCE)
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/msg/uorb/topics_sources SAMPLE_SOURCE)
