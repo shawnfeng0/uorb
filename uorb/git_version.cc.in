@@ -1,0 +1,9 @@
+//
+// Created by fs on 9/7/20.
+//
+
+#include "uorb/uorb.h"
+
+const char *orb_version() {
+  return "@UORB_GIT_TAG@";
+}

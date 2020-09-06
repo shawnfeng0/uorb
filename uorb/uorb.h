@@ -148,8 +148,8 @@ typedef struct orb_pollfd orb_pollfd_t;
  * return orb_create_publication_multi(meta, nullptr, queue_size);
  * @see orb_create_publication_multi()
  */
-extern orb_publication_t *orb_create_publication(
-    const struct orb_metadata *meta, unsigned int queue_size) __EXPORT;
+orb_publication_t *orb_create_publication(const struct orb_metadata *meta,
+                                          unsigned int queue_size) __EXPORT;
 
 /**
  * Advertise as the publisher of a topic.
@@ -183,7 +183,7 @@ extern orb_publication_t *orb_create_publication(
  * @return NULL on error(No memory or too many instances), otherwise returns an
  * ORB topic advertiser handle that can be used to publish to the topic.
  */
-extern orb_publication_t *orb_create_publication_multi(
+orb_publication_t *orb_create_publication_multi(
     const struct orb_metadata *meta, unsigned int *instance,
     unsigned int queue_size) __EXPORT;
 
@@ -195,7 +195,7 @@ extern orb_publication_t *orb_create_publication_multi(
  * appearing, reference zmq project)
  * @return true on success
  */
-extern bool orb_destroy_publication(orb_publication_t **handle_ptr) __EXPORT;
+bool orb_destroy_publication(orb_publication_t **handle_ptr) __EXPORT;
 
 /**
  * Publish new data to a topic.
@@ -208,7 +208,7 @@ extern bool orb_destroy_publication(orb_publication_t **handle_ptr) __EXPORT;
  * @param data    A pointer to the data to be published.
  * @return    true on success, false with orb_errno set accordingly.
  */
-extern bool orb_publish(orb_publication_t *handle, const void *data) __EXPORT;
+bool orb_publish(orb_publication_t *handle, const void *data) __EXPORT;
 
 /**
  * Advertise as the publisher of a topic.
@@ -239,7 +239,7 @@ static inline bool orb_publish_auto(const struct orb_metadata *meta,
  * return orb_create_subscription_multi(meta, 0);
  * @see orb_create_subscription_multi()
  */
-extern orb_subscription_t *orb_create_subscription(
+orb_subscription_t *orb_create_subscription(
     const struct orb_metadata *meta) __EXPORT;
 
 /**
@@ -275,7 +275,7 @@ extern orb_subscription_t *orb_create_subscription(
  * @return    NULL on error, otherwise returns a subscriber handle
  *      that can be used to read and update the topic.
  */
-extern orb_subscription_t *orb_create_subscription_multi(
+orb_subscription_t *orb_create_subscription_multi(
     const struct orb_metadata *meta, unsigned instance) __EXPORT;
 
 /**
@@ -286,7 +286,7 @@ extern orb_subscription_t *orb_create_subscription_multi(
  * appearing, reference zmq project)
  * @return true on success.
  */
-extern bool orb_destroy_subscription(orb_subscription_t **handle_ptr) __EXPORT;
+bool orb_destroy_subscription(orb_subscription_t **handle_ptr) __EXPORT;
 
 /**
  * Fetch data from a topic.
@@ -300,7 +300,7 @@ extern bool orb_destroy_subscription(orb_subscription_t **handle_ptr) __EXPORT;
  * @param buffer  Pointer to the buffer receiving the data.
  * @return    true on success, false otherwise with orb_errno set accordingly.
  */
-extern bool orb_copy(orb_subscription_t *handle, void *buffer) __EXPORT;
+bool orb_copy(orb_subscription_t *handle, void *buffer) __EXPORT;
 
 /**
  * Check whether a topic has been published to since the last orb_copy.
@@ -316,7 +316,7 @@ extern bool orb_copy(orb_subscription_t *handle, void *buffer) __EXPORT;
  * @return true if the topic has been updated since the last time it was copied
  * using this handle.
  */
-extern bool orb_check_updated(orb_subscription_t *handle) __EXPORT;
+bool orb_check_updated(orb_subscription_t *handle) __EXPORT;
 
 /**
  * Check if a topic has already been created and published (advertised)
@@ -325,8 +325,8 @@ extern bool orb_check_updated(orb_subscription_t *handle) __EXPORT;
  * @param instance  ORB instance
  * @return true if the topic exists, false otherwise.
  */
-extern bool orb_exists(const struct orb_metadata *meta,
-                       unsigned int instance) __EXPORT;
+bool orb_exists(const struct orb_metadata *meta,
+                unsigned int instance) __EXPORT;
 
 /**
  * Get the number of published instances of a topic group
@@ -334,7 +334,7 @@ extern bool orb_exists(const struct orb_metadata *meta,
  * @param meta    ORB topic metadata.
  * @return    The number of published instances of this topic
  */
-extern unsigned int orb_group_count(const struct orb_metadata *meta) __EXPORT;
+unsigned int orb_group_count(const struct orb_metadata *meta) __EXPORT;
 
 /**
  * Similar to the poll() function of POSIX.
@@ -357,7 +357,13 @@ extern unsigned int orb_group_count(const struct orb_metadata *meta) __EXPORT;
  * and no handle have been selected. Upon failure, poll() shall return
  * −1 and set orb_errno to indicate the error.
  */
-extern int orb_poll(struct orb_pollfd *fds, unsigned int nfds,
-                    int timeout_ms) __EXPORT;
+int orb_poll(struct orb_pollfd *fds, unsigned int nfds,
+             int timeout_ms) __EXPORT;
+
+/**
+ * Get orb version string
+ * @return version string
+ */
+const char *orb_version(void);
 
 __END_DECLS

@@ -75,6 +75,7 @@ void uorb_sample() {
 }
 
 int main(int argc, char *argv[]) {
+  LOGGER_INFO("uORB version: %s", orb_version());
   uorb_sample();
 
   // Wait for all threads to finish

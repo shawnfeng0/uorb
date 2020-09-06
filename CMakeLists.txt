@@ -51,10 +51,28 @@ if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 endif ()
 message(STATUS "CMAKE_INSTALL_PREFIX = ${CMAKE_INSTALL_PREFIX}")
 
+# Generate git version info
+if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
+    execute_process(
+            COMMAND git describe --always --tags --long --dirty=+
+            OUTPUT_VARIABLE UORB_GIT_TAG
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+else ()
+    set(UORB_GIT_TAG "v0.0.0-0-not_git_repo")
+endif ()
+message(STATUS "uORB version: ${UORB_GIT_TAG}")
+
+configure_file(
+        "${CMAKE_SOURCE_DIR}/uorb/git_version.cc.in"
+        "${CMAKE_BINARY_DIR}/uorb/git_version.cc"
+)
+
 # uorb library
 aux_source_directory(${CMAKE_SOURCE_DIR}/uorb UORB_SOURCE)
 aux_source_directory(${CMAKE_SOURCE_DIR}/uorb/base UORB_SOURCE)
-add_library(uorb ${UORB_SOURCE})
+add_library(uorb ${UORB_SOURCE} ${CMAKE_BINARY_DIR}/uorb/git_version.cc)
 target_include_directories(uorb PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 # install uorb
