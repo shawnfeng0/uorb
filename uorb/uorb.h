@@ -204,14 +204,11 @@ extern bool orb_destroy_publication(orb_publication_t **handle_ptr) __EXPORT;
  * will be notified.  Subscribers that are not waiting can check the topic
  * for updates using orb_check.
  *
- * @param meta    The uORB metadata (usually from the ORB_ID() macro) for the
- * topic.
  * @param handle  The handle returned from orb_advertise.
  * @param data    A pointer to the data to be published.
  * @return    true on success, false with orb_errno set accordingly.
  */
-extern bool orb_publish(const struct orb_metadata *meta,
-                        orb_publication_t *handle, const void *data) __EXPORT;
+extern bool orb_publish(orb_publication_t *handle, const void *data) __EXPORT;
 
 /**
  * Advertise as the publisher of a topic.
@@ -235,7 +232,7 @@ static inline bool orb_publish_auto(const struct orb_metadata *meta,
       return false;
     }
   }
-  return orb_publish(meta, *handle, data);
+  return orb_publish(*handle, data);
 }
 
 /**
@@ -299,14 +296,11 @@ extern bool orb_destroy_subscription(orb_subscription_t **handle_ptr) __EXPORT;
  * or check return indicating that an update is available, this call
  * must be used to update the subscription.
  *
- * @param meta    The uORB metadata (usually from the ORB_ID() macro)
- *      for the topic.
  * @param handle  A handle returned from orb_create_subscription.
  * @param buffer  Pointer to the buffer receiving the data.
  * @return    true on success, false otherwise with orb_errno set accordingly.
  */
-extern bool orb_copy(const struct orb_metadata *meta,
-                     orb_subscription_t *handle, void *buffer) __EXPORT;
+extern bool orb_copy(orb_subscription_t *handle, void *buffer) __EXPORT;
 
 /**
  * Check whether a topic has been published to since the last orb_copy.

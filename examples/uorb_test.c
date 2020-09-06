@@ -19,7 +19,7 @@ void *adviser_cpuload(void *arg) {
     cpuload.timestamp = orb_absolute_time();
     cpuload.load++;
     cpuload.ram_usage++;
-    if (!orb_publish(ORB_ID(cpuload), cpu_load_pub, &cpuload)) {
+    if (!orb_publish(cpu_load_pub, &cpuload)) {
       LOGGER_ERROR("Publish error");
     }
     usleep(1 * 1000 * 1000);
@@ -47,7 +47,7 @@ void *cpuload_update_poll(void *arg) {
     int timeout = 2000;
     if (0 < orb_poll(pollfds, ARRAY_SIZE(pollfds), timeout)) {
       struct cpuload_s cpu_loader;
-      orb_copy(ORB_ID(cpuload), cpu_load_sub_data, &cpu_loader);
+      orb_copy(cpu_load_sub_data, &cpu_loader);
       LOGGER_DEBUG("timestamp: %" PRIu64 ", load: %f, ram_usage: %f",
                    cpu_loader.timestamp, cpu_loader.load, cpu_loader.ram_usage);
     } else {

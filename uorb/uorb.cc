@@ -93,12 +93,11 @@ bool orb_destroy_publication(orb_publication_t **handle_ptr) {
   return true;
 }
 
-bool orb_publish(const struct orb_metadata *meta, orb_publication_t *handle,
-                 const void *data) {
-  ORB_CHECK_TRUE(meta && handle && data, EINVAL, return false);
+bool orb_publish(orb_publication_t *handle, const void *data) {
+  ORB_CHECK_TRUE(handle && data, EINVAL, return false);
 
   auto &dev = *(uorb::DeviceNode *)handle;
-  return dev.Publish(*meta, data);
+  return dev.Publish(data);
 }
 
 orb_subscription_t *orb_create_subscription(const struct orb_metadata *meta) {
@@ -127,9 +126,8 @@ bool orb_destroy_subscription(orb_subscription_t **handle_ptr) {
   return true;
 }
 
-bool orb_copy(const struct orb_metadata *meta, orb_subscription_t *handle,
-              void *buffer) {
-  ORB_CHECK_TRUE(meta && handle && buffer, EINVAL, return false);
+bool orb_copy(orb_subscription_t *handle, void *buffer) {
+  ORB_CHECK_TRUE(handle && buffer, EINVAL, return false);
 
   auto &sub = *(SubscriberC *)handle;
   return sub.copy(buffer);

@@ -82,7 +82,7 @@ void uORBTest::UnitTest::latency_test(orb_id_t T) {
   orb_publication_t *pfd0 = orb_create_publication(T, 1);
   ASSERT_NE(pfd0, nullptr) << "orb_advertise failed: " << errno;
 
-  orb_publish(T, pfd0, &t);
+  orb_publish(pfd0, &t);
 
   bool pub_sub_test_passed = false;
 
@@ -107,9 +107,9 @@ void uORBTest::UnitTest::latency_test(orb_id_t T) {
     orb_test_large_s t{};
 
     /* clear all ready flags */
-    orb_copy(ORB_ID(orb_test), test_multi_sub, &t);
-    orb_copy(ORB_ID(orb_test_medium), test_multi_sub_medium, &t);
-    orb_copy(ORB_ID(orb_test_large), test_multi_sub_large, &t);
+    orb_copy(test_multi_sub, &t);
+    orb_copy(test_multi_sub_medium, &t);
+    orb_copy(test_multi_sub_large, &t);
 
     fds[0].fd = test_multi_sub;
     fds[0].events = POLLIN;
@@ -131,13 +131,13 @@ void uORBTest::UnitTest::latency_test(orb_id_t T) {
       int pret = orb_poll(&fds[0], (sizeof(fds) / sizeof(fds[0])), 500);
 
       if (fds[0].revents & POLLIN) {
-        orb_copy(ORB_ID(orb_test), test_multi_sub, &t);
+        orb_copy(test_multi_sub, &t);
 
       } else if (fds[1].revents & POLLIN) {
-        orb_copy(ORB_ID(orb_test_medium), test_multi_sub_medium, &t);
+        orb_copy(test_multi_sub_medium, &t);
 
       } else if (fds[2].revents & POLLIN) {
-        orb_copy(ORB_ID(orb_test_large), test_multi_sub_large, &t);
+        orb_copy(test_multi_sub_large, &t);
       }
 
       if (pret < 0) {
@@ -191,7 +191,7 @@ void uORBTest::UnitTest::latency_test(orb_id_t T) {
     ++t.val;
     t.timestamp = orb_absolute_time();
 
-    ASSERT_TRUE(orb_publish(T, pfd0, &t)) << "mult. pub0 timing fail";
+    ASSERT_TRUE(orb_publish(pfd0, &t)) << "mult. pub0 timing fail";
 
     /* simulate >800 Hz system operation */
     usleep(1000);

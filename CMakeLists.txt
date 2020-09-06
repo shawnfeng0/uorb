@@ -35,7 +35,7 @@ project(uorb)
 cmake_minimum_required(VERSION 3.15)
 
 option(UORB_BUILD_EXAMPLES "Build examples" ON)
-option(UORB_BUILD_TESTS "Build tests" OFF)
+option(UORB_BUILD_TESTS "Build tests" ON)
 
 if (CMAKE_TOOLCHAIN_FILE)
     set(LIBRARY_OUTPUT_PATH_ROOT ${CMAKE_BINARY_DIR} CACHE PATH "root for library output, set this to change where android libs are compiled to")

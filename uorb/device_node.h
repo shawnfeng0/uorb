@@ -75,7 +75,7 @@ class DeviceNode : public ListNode<DeviceNode *> {
   /**
    * Method to publish a data to this node.
    */
-  bool Publish(const orb_metadata &meta, const void *data);
+  bool Publish(const void *data);
 
   /**
    * Add the subscriber to the node's list of subscriber.  If there is
