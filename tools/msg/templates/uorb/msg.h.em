@@ -134,10 +134,14 @@ for constant in spec.constants:
 };
 
 #ifdef __cplusplus
+namespace uorb {
+namespace msg {
 template<const orb_metadata &> struct ORBTypeMap;
 @[for multi_topic in topics]@
-template<> struct ORBTypeMap<ORB::@multi_topic> {
+template<> struct TypeMap<@multi_topic> {
     using type = @(uorb_struct);
 };
 @[end for]
+}
+}
 #endif

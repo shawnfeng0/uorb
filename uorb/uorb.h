@@ -55,6 +55,15 @@ struct orb_metadata {
   const char *o_fields;  /**< semicolon separated list of fields (with type) */
 };
 
+#ifdef __cplusplus
+namespace uorb {
+namespace msg {
+template <const orb_metadata &>
+struct TypeMap;
+}
+}  // namespace uorb
+#endif
+
 /**
  * Maximum number of multi topic instances
  */
@@ -78,8 +87,10 @@ struct orb_metadata {
  */
 #if defined(__cplusplus)
 #define ORB_DECLARE(_name)                \
-  namespace ORB {                         \
+  namespace uorb {                        \
+  namespace msg {                         \
   extern const struct orb_metadata _name; \
+  }                                       \
   }                                       \
   extern "C" const struct orb_metadata *__orb_##_name() __EXPORT
 #else
@@ -102,12 +113,14 @@ struct orb_metadata {
  * @param _fields	All fields in a semicolon separated list
  *                      e.g: "float[3] position;bool armed"
  */
-#define ORB_DEFINE(_name, _struct, _size_no_padding, _fields)        \
-  namespace ORB {                                                    \
-  const struct orb_metadata _name = {#_name, sizeof(_struct),        \
-                                     _size_no_padding, _fields};     \
-  }                                                                  \
-  const struct orb_metadata *__orb_##_name() { return &ORB::_name; } \
+#define ORB_DEFINE(_name, _struct, _size_no_padding, _fields)              \
+  namespace uorb {                                                         \
+  namespace msg {                                                          \
+  const struct orb_metadata _name = {#_name, sizeof(_struct),              \
+                                     _size_no_padding, _fields};           \
+  }                                                                        \
+  }                                                                        \
+  const struct orb_metadata *__orb_##_name() { return &uorb::msg::_name; } \
   struct hack
 
 __BEGIN_DECLS

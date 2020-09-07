@@ -40,7 +40,6 @@
 
 #include "uorb/device_node.h"
 #include "uorb/uorb.h"
-#include "uorb/uorb_topics.h"
 
 namespace uorb {
 
@@ -109,7 +108,7 @@ class Subscription {
 // Subscription wrapper class with data
 template <const orb_metadata &T>
 class SubscriptionData : public Subscription {
-  using Type = typename ORBTypeMap<T>::type;
+  using Type = typename msg::TypeMap<T>::type;
 
  public:
   /**

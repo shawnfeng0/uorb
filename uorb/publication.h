@@ -42,7 +42,6 @@
 #include "uorb/device_master.h"
 #include "uorb/device_node.h"
 #include "uorb/uorb.h"
-#include "uorb/uorb_topics.h"
 
 namespace uorb {
 
@@ -63,9 +62,9 @@ class PublicationBase {
  */
 template <const orb_metadata &T, uint8_t ORB_QSIZE = 1>
 class Publication : public PublicationBase {
-  using Type = typename ORBTypeMap<T>::type;
- public:
+  using Type = typename msg::TypeMap<T>::type;
 
+ public:
   Publication() : PublicationBase(T) {}
 
   /**
@@ -96,7 +95,8 @@ class Publication : public PublicationBase {
  */
 template <const orb_metadata &T, uint8_t queue_size = 1>
 class PublicationData : public Publication<T, queue_size> {
-  using Type = typename ORBTypeMap<T>::type;
+  using Type = typename msg::TypeMap<T>::type;
+
  public:
   PublicationData() = default;
 
