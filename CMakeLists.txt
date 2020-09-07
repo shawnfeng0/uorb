@@ -79,11 +79,8 @@ target_include_directories(uorb PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 install(TARGETS uorb
         ARCHIVE DESTINATION lib)
 
-file(GLOB UORB_HEADERS uorb/*.h)
+file(GLOB UORB_HEADERS uorb/abs_time.h uorb/uorb.h uorb/publication*.h uorb/subscription.h uorb/subscription_interval.h)
 install(FILES ${UORB_HEADERS} DESTINATION include/uorb)
-
-file(GLOB UORB_BASE_HEADERS uorb/base/*.h)
-install(FILES ${UORB_BASE_HEADERS} DESTINATION include/uorb/base)
 
 if (UORB_BUILD_EXAMPLES)
     add_subdirectory(examples)
