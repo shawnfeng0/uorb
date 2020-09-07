@@ -225,7 +225,7 @@ TEST_F(UnitTest, multi_topic2_queue_simulation) {
       orb_publication_t *&pub = orb_pub[i];
       unsigned idx = i;
       //		PX4_WARN("advertise %i, t=%" PRIu64, i,
-      // orb_absolute_time());
+      // orb_absolute_time_us());
       pub = orb_create_publication_multi(ORB_ID(orb_test_medium_multi), &idx, 1);
 
       if (idx != i) {
@@ -244,7 +244,7 @@ TEST_F(UnitTest, multi_topic2_queue_simulation) {
       usleep(2);  // make sure the timestamps are different
       orb_publication_t *&pub = orb_pub[data_next_idx];
 
-      data_topic.timestamp = orb_absolute_time();
+      data_topic.timestamp = orb_absolute_time_us();
       data_topic.val = data_next_idx;
 
       orb_publish(pub, &data_topic);
@@ -268,7 +268,7 @@ TEST_F(UnitTest, multi_topic2_queue_simulation) {
   });
   pub_test_multi2_main.detach();
 
-  orb_abstime last_time = 0;
+  orb_abstime_us last_time = 0;
 
   while (!thread_should_exit) {
     usleep(1000);

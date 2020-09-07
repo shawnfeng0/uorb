@@ -39,14 +39,15 @@
 #pragma once
 
 #include "uorb/base/abs_time.h"
-#include "uorb/device_node.h"
 #include "uorb/subscription.h"
 #include "uorb/uorb.h"
 
 namespace uorb {
 
-// Base subscription wrapper class
-class SubscriptionInterval : public Subscription {
+template <const orb_metadata &T>
+class SubscriptionInterval : public Subscription<T> {
+  using Type = typename msg::TypeMap<T>::type;
+
  private:
   template <typename Tp>
   constexpr Tp constrain(Tp val, Tp min_val, Tp max_val) {
@@ -62,21 +63,17 @@ class SubscriptionInterval : public Subscription {
    * @param interval The requested maximum update interval in microseconds.
    * @param instance The instance for multi sub.
    */
-  explicit SubscriptionInterval(const orb_metadata &meta,
-                                uint32_t interval_us = 0, uint8_t instance = 0)
-      : Subscription(meta, instance), interval_us_(interval_us) {}
+  explicit SubscriptionInterval(uint32_t interval_us = 0, uint8_t instance = 0)
+      : Subscription<T>(instance), interval_us_(interval_us) {}
 
   ~SubscriptionInterval() = default;
 
   /**
    * Check if there is a new update.
    * */
-  bool updated() override {
-    if (advertised() && (orb_elapsed_time(&last_update_) >= interval_us_)) {
-      return Subscription::updated();
-    }
-
-    return false;
+  bool Updated() override {
+    return Subscription<T>::Updated() &&
+           (orb_elapsed_time_us(&last_update_) >= interval_us_);
   }
 
   /**
@@ -84,9 +81,9 @@ class SubscriptionInterval : public Subscription {
    * @param dst The destination pointer where the struct will be copied.
    * @return true only if topic was updated and copied successfully.
    */
-  bool update(void *dst) override {
-    if (updated()) {
-      return copy(dst);
+  bool Update(Type *dst) override {
+    if (Updated()) {
+      return Copy(dst);
     }
 
     return false;
@@ -97,9 +94,9 @@ class SubscriptionInterval : public Subscription {
    * @param dst The destination pointer where the struct will be copied.
    * @return true only if topic was copied successfully.
    */
-  bool copy(void *dst) override {
-    if (Subscription::copy(dst)) {
-      const orb_abstime now = orb_absolute_time();
+  bool Copy(Type *dst) override {
+    if (Subscription<T>::Copy(dst)) {
+      const orb_abstime_us now = orb_absolute_time_us();
       // shift last update time forward, but don't let it get further behind
       // than the interval
       last_update_ =
@@ -110,24 +107,14 @@ class SubscriptionInterval : public Subscription {
     return false;
   }
 
-  uint32_t get_interval_us() const { return interval_us_; }
-  uint32_t get_interval_ms() const { return interval_us_ / 1000; }
-
-  /**
-   * Set the interval in microseconds
-   * @param interval The interval in microseconds.
-   */
+  uint32_t interval_us() const { return interval_us_; }
+  uint32_t interval_ms() const { return interval_us_ / 1000; }
   void set_interval_us(uint32_t interval) { interval_us_ = interval; }
-
-  /**
-   * Set the interval in milliseconds
-   * @param interval The interval in milliseconds.
-   */
   void set_interval_ms(uint32_t interval) { interval_us_ = interval * 1000; }
 
  protected:
-  orb_abstime last_update_{0};  // last update in microseconds
-  uint32_t interval_us_{0};     // maximum update interval in microseconds
+  orb_abstime_us last_update_{0};  // last update in microseconds
+  uint32_t interval_us_{0};        // maximum update interval in microseconds
 };
 
 }  // namespace uorb

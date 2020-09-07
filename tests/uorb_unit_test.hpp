@@ -77,7 +77,7 @@ template <typename S>
 void uORBTest::UnitTest::latency_test(orb_id_t T) {
   S t{};
   t.val = 308;
-  t.timestamp = orb_absolute_time();
+  t.timestamp = orb_absolute_time_us();
 
   orb_publication_t *pfd0 = orb_create_publication(T, 1);
   ASSERT_NE(pfd0, nullptr) << "orb_advertise failed: " << errno;
@@ -148,7 +148,7 @@ void uORBTest::UnitTest::latency_test(orb_id_t T) {
       num_missed += t.val - current_value - 1;
       current_value = t.val;
 
-      auto elt = (unsigned)orb_elapsed_time(&t.timestamp);
+      auto elt = (unsigned)orb_elapsed_time_us(&t.timestamp);
       latency_integral += elt;
       timings[i] = elt;
 
@@ -189,7 +189,7 @@ void uORBTest::UnitTest::latency_test(orb_id_t T) {
   /* give the test task some data */
   while (!pub_sub_test_passed) {
     ++t.val;
-    t.timestamp = orb_absolute_time();
+    t.timestamp = orb_absolute_time_us();
 
     ASSERT_TRUE(orb_publish(pfd0, &t)) << "mult. pub0 timing fail";
 

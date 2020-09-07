@@ -39,7 +39,7 @@ void *thread_subscriber(void *unused) {
   const int period_ms = 20;
   int timeout_ms = 0;
   while (true) {
-    if (sub_example_string.update()) {
+    if (sub_example_string.Update()) {
       timeout_ms = 0;
       LOGGER_INFO("Receive msg: \"%s\"", sub_example_string.get().string);
     } else {

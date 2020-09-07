@@ -52,18 +52,18 @@ __BEGIN_DECLS
  * Absolute time is measured from some arbitrary epoch shortly after
  * system startup.  It should never wrap or go backwards.
  */
-typedef uint64_t orb_abstime;
+typedef uint64_t orb_abstime_us;
 
 /**
  * Get absolute time in [us] (does not wrap).
  */
-static inline orb_abstime orb_absolute_time() {
+static inline orb_abstime_us orb_absolute_time_us() {
   struct timespec ts = {};
-  orb_abstime result;
+  orb_abstime_us result;
 
   clock_gettime(CLOCK_MONOTONIC, &ts);
 
-  result = (orb_abstime)(ts.tv_sec) * 1000000;
+  result = (orb_abstime_us)(ts.tv_sec) * 1000000;
   result += ts.tv_nsec / 1000;
 
   return result;
@@ -73,8 +73,8 @@ static inline orb_abstime orb_absolute_time() {
  * Compute the delta between a timestamp taken in the past
  * and now.
  */
-static inline orb_abstime orb_elapsed_time(const orb_abstime *then) {
-  return then ? orb_absolute_time() - *then : 0;
+static inline orb_abstime_us orb_elapsed_time_us(const orb_abstime_us *then) {
+  return then ? orb_absolute_time_us() - *then : 0;
 }
 
 __END_DECLS
@@ -86,16 +86,16 @@ namespace time_literals {
 // User-defined integer literals for different time units.
 // The base unit is orb_abstime in microseconds
 
-constexpr orb_abstime operator"" _s(unsigned long long seconds) {
-  return orb_abstime(seconds * 1000000ULL);
+constexpr orb_abstime_us operator"" _s(unsigned long long seconds) {
+  return orb_abstime_us(seconds * 1000000ULL);
 }
 
-constexpr orb_abstime operator"" _ms(unsigned long long seconds) {
-  return orb_abstime(seconds * 1000ULL);
+constexpr orb_abstime_us operator"" _ms(unsigned long long seconds) {
+  return orb_abstime_us(seconds * 1000ULL);
 }
 
-constexpr orb_abstime operator"" _us(unsigned long long seconds) {
-  return orb_abstime(seconds);
+constexpr orb_abstime_us operator"" _us(unsigned long long seconds) {
+  return orb_abstime_us(seconds);
 }
 
 } /* namespace time_literals */

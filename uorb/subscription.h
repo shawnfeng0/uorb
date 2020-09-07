@@ -32,19 +32,20 @@
  ****************************************************************************/
 
 /**
- * @file Subscription.hpp
+ * @file subscription.h
  *
  */
 
 #pragma once
 
-#include "uorb/device_node.h"
 #include "uorb/uorb.h"
 
 namespace uorb {
 
-// Base subscription wrapper class
+template <const orb_metadata &meta>
 class Subscription {
+  using Type = typename msg::TypeMap<meta>::type;
+
  public:
   /**
    * Constructor
@@ -53,70 +54,55 @@ class Subscription {
    * topic.
    * @param instance The instance for multi sub.
    */
-  explicit Subscription(const orb_metadata &meta, uint8_t instance = 0)
-      : meta_(meta), instance_(instance) {}
+  explicit Subscription(uint8_t instance = 0) : instance_(instance) {}
 
-  ~Subscription() {
-    if (node_) node_->ReduceSubscriberCount();
-  }
+  // no copy, assignment, move, move assignment
+  Subscription(const Subscription &) = delete;
+  Subscription &operator=(const Subscription &) = delete;
+  Subscription(Subscription &&) = delete;
+  Subscription &operator=(Subscription &&) = delete;
 
-  bool subscribe();
+  ~Subscription() { handle_ &&orb_destroy_subscription(&handle_); }
 
-  bool advertised() {
-    if (!node_) {
-      // try to initialize
-      subscribe();
+  bool Subscribed() {
+    // check if already subscribed
+    if (handle_) {
+      return true;
     }
-
-    if (node_) {
-      return node_->is_advertised();
-    }
-
-    return false;
+    return handle_ = orb_create_subscription_multi(&meta, instance_);
   }
 
   /**
    * Check if there is a new update.
    */
-  virtual bool updated() {
-    return advertised() &&
-           (node_->published_message_count() != last_generation_);
-  }
+  virtual bool Updated() { return Subscribed() && orb_check_update(handle_); }
 
   /**
    * Update the struct
    * @param data The uORB message struct we are updating.
    */
-  virtual bool update(void *dst) { return updated() && copy(dst); }
+  virtual bool Update(Type *dst) { return Updated() && Copy(dst); }
 
   /**
    * Copy the struct
    * @param data The uORB message struct we are updating.
    */
-  virtual bool copy(void *dst) {
-    return advertised() && node_->Copy(dst, last_generation_);
+  virtual bool Copy(Type *dst) {
+    return Subscribed() && orb_copy(handle_, dst);
   }
 
  protected:
-  unsigned last_generation_{0}; /**< last generation the subscriber has seen */
-
-  const orb_metadata &meta_;
   const uint8_t instance_{0};
-  DeviceNode *node_{nullptr};
+  orb_subscription_t *handle_{nullptr};
 };
 
 // Subscription wrapper class with data
 template <const orb_metadata &T>
-class SubscriptionData : public Subscription {
+class SubscriptionData : public Subscription<T> {
   using Type = typename msg::TypeMap<T>::type;
 
  public:
-  /**
-   * Constructor
-   *
-   * @param instance The instance for multi sub.
-   */
-  explicit SubscriptionData(uint8_t instance = 0) : Subscription(T, instance) {}
+  explicit SubscriptionData(uint8_t instance = 0) : Subscription<T>(instance) {}
 
   ~SubscriptionData() = default;
 
@@ -127,7 +113,7 @@ class SubscriptionData : public Subscription {
   SubscriptionData &operator=(SubscriptionData &&) = delete;
 
   // update the embedded struct.
-  bool update() { return Subscription::update(&data_); }
+  bool Update() { return Subscription<T>::Update(&data_); }
 
   const Type &get() const { return data_; }
 

@@ -38,56 +38,40 @@
 
 #pragma once
 
-#include "uorb/base/orb_errno.h"
-#include "uorb/device_master.h"
-#include "uorb/device_node.h"
 #include "uorb/uorb.h"
 
 namespace uorb {
 
-class PublicationBase {
- protected:
-  explicit PublicationBase(const orb_metadata &meta) : meta_(meta) {}
-
-  ~PublicationBase() {
-    if (dev_) dev_->mark_as_unadvertised();
-  }
-
-  uorb::DeviceNode *dev_{nullptr};
-  const orb_metadata &meta_;
-};
-
 /**
  * uORB publication wrapper class
  */
-template <const orb_metadata &T, uint8_t ORB_QSIZE = 1>
-class Publication : public PublicationBase {
-  using Type = typename msg::TypeMap<T>::type;
+template <const orb_metadata &meta, uint8_t queue_size = 1>
+class Publication {
+  using Type = typename msg::TypeMap<meta>::type;
 
  public:
-  Publication() : PublicationBase(T) {}
+  explicit Publication(uint8_t instance = 0) : instance_(instance) {}
+  ~Publication() { handle_ &&orb_destroy_publication(&handle_); }
 
   /**
    * Publish the struct
    * @param data The uORB message struct we are updating.
    */
   bool publish(const Type &data) {
-    if (!dev_) advertise();
-
-    if (dev_) {
-      return dev_->Publish(&data);
+    if (!handle_) {
+      if (instance_ != 0) {
+        handle_ = orb_create_publication_multi(&meta, &instance_, queue_size);
+      } else {
+        handle_ = orb_create_publication(&meta, queue_size);
+      }
     }
 
-    return false;
+    return handle_ && orb_publish(handle_, &data);
   }
 
  private:
-  bool advertise() {
-    auto &device_master = DeviceMaster::get_instance();
-    dev_ = device_master.CreateAdvertiser(meta_, nullptr, ORB_QSIZE);
-
-    return dev_ != nullptr;
-  }
+  unsigned instance_{0};
+  orb_publication_t *handle_{nullptr};
 };
 
 /**
