@@ -38,7 +38,8 @@
 
 #include "uorb/uorb.h"
 
-#include "uorb/base/orb_errno.h"
+#include <cerrno>
+
 #include "uorb/device_master.h"
 #include "uorb/device_node.h"
 #include "uorb/subscription_impl.h"
@@ -48,7 +49,7 @@ using namespace uorb;
 #define ORB_CHECK_TRUE(condition, error_code, error_action) \
   ({                                                        \
     if (!static_cast<bool>(condition)) {                    \
-      orb_errno = error_code;                               \
+      errno = error_code;                                   \
       error_action;                                         \
     }                                                       \
   })
@@ -66,7 +67,7 @@ orb_publication_t *orb_create_publication_multi(const struct orb_metadata *meta,
   auto &device_master = DeviceMaster::get_instance();
   auto *dev_ = device_master.CreateAdvertiser(meta_, instance, queue_size);
 
-  ORB_CHECK_TRUE(dev_, orb_errno, return nullptr);
+  ORB_CHECK_TRUE(dev_, ENOMEM, return nullptr);
 
   return (orb_publication_t *)dev_;
 }

@@ -32,8 +32,6 @@
  ****************************************************************************/
 
 #include "uorb/device_master.h"
-
-#include "uorb/base/orb_errno.h"
 #include "uorb/device_node.h"
 
 uorb::DeviceMaster uorb::DeviceMaster::instance_;
@@ -65,7 +63,7 @@ uorb::DeviceNode *uorb::DeviceMaster::CreateAdvertiser(const orb_metadata &meta,
     if (!device_node) {
       device_node = new DeviceNode(meta, group_tries, queue_size);
       if (!device_node) {
-        orb_errno = ENOMEM;
+        errno = ENOMEM;
         return nullptr;
       }
       device_node->mark_as_advertised();
@@ -77,7 +75,7 @@ uorb::DeviceNode *uorb::DeviceMaster::CreateAdvertiser(const orb_metadata &meta,
 
   // All instances already exist
   if (group_tries >= max_group_tries) {
-    orb_errno = EEXIST;
+    errno = EEXIST;
     return nullptr;
   }
 
@@ -118,7 +116,7 @@ uorb::DeviceNode *uorb::DeviceMaster::OpenDeviceNode(const orb_metadata &meta,
   device_node = new DeviceNode(meta, instance);
 
   if (!device_node) {
-    orb_errno = ENOMEM;
+    errno = ENOMEM;
     return nullptr;
   }
 

@@ -161,7 +161,7 @@ TEST_F(UnitTest, multi_topic) {
     /* Subscribe first and advertise afterwards. */
     auto sfd2 = orb_create_subscription_multi(ORB_ID(orb_multitest), 2);
 
-    ASSERT_NE(sfd2, nullptr) << "errno: " << orb_errno;
+    ASSERT_NE(sfd2, nullptr) << "errno: " << errno;
 
     orb_test_s t{};
     orb_test_s u{};

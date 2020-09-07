@@ -34,8 +34,7 @@
 #include "uorb/device_node.h"
 
 #include <cstring>
-
-#include "uorb/base/orb_errno.h"
+#include <cerrno>
 
 uorb::DeviceNode::DeviceNode(const struct orb_metadata &meta, uint8_t instance,
                              uint16_t queue_size)
@@ -99,7 +98,7 @@ bool uorb::DeviceNode::CheckUpdate(const unsigned int &sub_generation) const {
 
 bool uorb::DeviceNode::Publish(const void *data) {
   if (data == nullptr) {
-    orb_errno = EFAULT;
+    errno = EFAULT;
     return false;
   }
 
@@ -110,7 +109,7 @@ bool uorb::DeviceNode::Publish(const void *data) {
 
     /* failed or could not allocate */
     if (nullptr == data_) {
-      orb_errno = ENOMEM;
+      errno = ENOMEM;
       return false;
     }
   }
@@ -156,7 +155,7 @@ bool uorb::DeviceNode::IsSameWith(const orb_metadata &meta) const {
 
 bool uorb::DeviceNode::RegisterCallback(Callback *callback) {
   if (!callback) {
-    orb_errno = EINVAL;
+    errno = EINVAL;
     return false;
   }
 

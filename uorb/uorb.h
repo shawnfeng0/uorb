@@ -38,10 +38,9 @@
  * API for the uORB lightweight object request broker.
  */
 
+#include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
-
-#include "uorb/base/orb_errno.h"
 
 #if __GNUC__ >= 4
 #ifdef __EXPORT
@@ -255,7 +254,7 @@ static inline bool orb_publish_auto(const struct orb_metadata *meta,
                                     orb_publication_t **handle_ptr,
                                     const void *data, unsigned int *instance) {
   if (!meta || !handle_ptr) {
-    orb_errno = EINVAL;
+    errno = EINVAL;
     return false;
   }
 
