@@ -34,7 +34,7 @@
 #include "uorb_unit_test.hpp"
 
 #include <gtest/gtest.h>
-#include <uorb/base/abs_time.h>
+#include <uorb/abs_time.h>
 
 #include <cerrno>
 #include <cstdarg>

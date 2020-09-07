@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2012-2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,33 +32,64 @@
  ****************************************************************************/
 
 /**
- * @file visibility.h
+ * @file Publication.hpp
  *
- * Definitions controlling symbol naming and visibility.
- *
- * This file is normally included automatically by the build system.
  */
 
 #pragma once
 
-#if __GNUC__ >= 4
-#ifdef __EXPORT
-#undef __EXPORT
-#endif
-#define __EXPORT __attribute__((visibility("default")))
-#ifdef __PRIVATE
-#undef __PRIVATE
-#endif
-#define __PRIVATE __attribute__((visibility("hidden")))
-#else
-#define __EXPORT
-#define __PRIVATE
-#endif
+#include "uorb/uorb.h"
 
-#ifdef __cplusplus
-#define __BEGIN_DECLS extern "C" {
-#define __END_DECLS }
-#else
-#define __BEGIN_DECLS
-#define __END_DECLS
-#endif
+namespace uorb {
+
+/**
+ * uORB publication wrapper class
+ */
+template <const orb_metadata &meta, uint8_t queue_size = 1>
+class PublicationMulti {
+  using Type = typename msg::TypeMap<meta>::type;
+
+ public:
+  ~PublicationMulti() { handle_ &&orb_destroy_publication(&handle_); }
+
+  /**
+   * Publish the struct
+   * @param data The uORB message struct we are updating.
+   */
+  bool publish(const Type &data) {
+    if (!handle_) {
+      unsigned instance;
+      handle_ = orb_create_publication_multi(&meta, &instance, queue_size);
+    }
+
+    return handle_ && orb_publish(handle_, &data);
+  }
+
+ private:
+  orb_publication_t *handle_{nullptr};
+};
+
+/**
+ * The publication class with data embedded.
+ */
+template <const orb_metadata &T, uint8_t queue_size = 1>
+class PublicationMultiData : public PublicationMulti<T, queue_size> {
+  using Type = typename msg::TypeMap<T>::type;
+
+ public:
+  PublicationMultiData() = default;
+
+  Type &get() { return data_; }
+  auto set(const Type &data) -> decltype(*this) {
+    data_ = data;
+    return *this;
+  }
+
+  // Publishes the embedded struct.
+  bool publish() { return PublicationMulti<T, queue_size>::publish(data_); }
+
+ private:
+  Type data_{};
+};
+
+}  // namespace uorb

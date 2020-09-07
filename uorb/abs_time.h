@@ -42,9 +42,9 @@
 #include <inttypes.h>
 #include <time.h>
 
-#include "uorb/base/visibility.h"
-
-__BEGIN_DECLS
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /**
  * Absolute time, in microsecond units.
@@ -77,27 +77,6 @@ static inline orb_abstime_us orb_elapsed_time_us(const orb_abstime_us *then) {
   return then ? orb_absolute_time_us() - *then : 0;
 }
 
-__END_DECLS
-
 #ifdef __cplusplus
-
-namespace time_literals {
-
-// User-defined integer literals for different time units.
-// The base unit is orb_abstime in microseconds
-
-constexpr orb_abstime_us operator"" _s(unsigned long long seconds) {
-  return orb_abstime_us(seconds * 1000000ULL);
 }
-
-constexpr orb_abstime_us operator"" _ms(unsigned long long seconds) {
-  return orb_abstime_us(seconds * 1000ULL);
-}
-
-constexpr orb_abstime_us operator"" _us(unsigned long long seconds) {
-  return orb_abstime_us(seconds);
-}
-
-} /* namespace time_literals */
-
-#endif /* __cplusplus */
+#endif

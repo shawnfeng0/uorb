@@ -38,7 +38,7 @@
 
 #pragma once
 
-#include "uorb/base/abs_time.h"
+#include "uorb/abs_time.h"
 #include "uorb/subscription.h"
 #include "uorb/uorb.h"
 

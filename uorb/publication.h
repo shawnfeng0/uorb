@@ -50,7 +50,6 @@ class Publication {
   using Type = typename msg::TypeMap<meta>::type;
 
  public:
-  explicit Publication(uint8_t instance = 0) : instance_(instance) {}
   ~Publication() { handle_ &&orb_destroy_publication(&handle_); }
 
   /**
@@ -59,18 +58,13 @@ class Publication {
    */
   bool publish(const Type &data) {
     if (!handle_) {
-      if (instance_ != 0) {
-        handle_ = orb_create_publication_multi(&meta, &instance_, queue_size);
-      } else {
         handle_ = orb_create_publication(&meta, queue_size);
-      }
     }
 
     return handle_ && orb_publish(handle_, &data);
   }
 
  private:
-  unsigned instance_{0};
   orb_publication_t *handle_{nullptr};
 };
 

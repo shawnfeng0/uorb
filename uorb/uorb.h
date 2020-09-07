@@ -42,7 +42,20 @@
 #include <stdint.h>
 
 #include "uorb/base/orb_errno.h"
-#include "uorb/base/visibility.h"
+
+#if __GNUC__ >= 4
+#ifdef __EXPORT
+#undef __EXPORT
+#endif
+#define __EXPORT __attribute__((visibility("default")))
+#ifdef __PRIVATE
+#undef __PRIVATE
+#endif
+#define __PRIVATE __attribute__((visibility("hidden")))
+#else
+#define __EXPORT
+#define __PRIVATE
+#endif
 
 /**
  * Object metadata.
@@ -123,7 +136,9 @@ struct TypeMap;
   const struct orb_metadata *__orb_##_name() { return &uorb::msg::_name; } \
   struct hack
 
-__BEGIN_DECLS
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /**
  * ORB topic advertiser handle
@@ -393,4 +408,6 @@ int orb_poll(struct orb_pollfd *fds, unsigned int nfds,
  */
 const char *orb_version(void);
 
-__END_DECLS
+#ifdef __cplusplus
+}
+#endif
