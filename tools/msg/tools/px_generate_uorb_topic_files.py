@@ -80,7 +80,7 @@ __license__ = "BSD"
 __email__ = "thomasgubler@gmail.com"
 
 TEMPLATE_FILE = ['msg.h.em', 'msg.cc.em']
-TOPICS_LIST_TEMPLATE_FILE = 'uorb_topics.cc.em'
+TOPICS_LIST_TEMPLATE_FILE = ['uorb_topics.h.em', 'uorb_topics.cc.em']
 OUTPUT_FILE_EXT = ['.h', '.cc']
 INCL_DEFAULT = ['std_msgs:./msg/std_msgs']
 PACKAGE = 'px4'
@@ -449,7 +449,7 @@ def convert_dir_save(format_idx, inputdir, outputdir, package, templatedir, temp
     # Create new headers in temporary output directory
     convert_dir(format_idx, inputdir, temporarydir, package, templatedir)
     if generate_idx == 1:
-        generate_topics_list_file(inputdir, temporarydir, TOPICS_LIST_TEMPLATE_FILE, templatedir)
+        generate_topics_list_file(inputdir, temporarydir, TOPICS_LIST_TEMPLATE_FILE[1], templatedir)
     # Copy changed headers from temporary dir to output dir
     copy_changed(temporarydir, outputdir, prefix, quiet)
 
@@ -533,9 +533,8 @@ if __name__ == "__main__":
         for f in args.file:
             generate_output_from_file(
                 generate_idx, f, args.temporarydir, args.package, args.templatedir, INCL_DEFAULT)
-        if generate_idx == 1:
-            generate_topics_list_file_from_files(
-                args.file, args.outputdir, TOPICS_LIST_TEMPLATE_FILE, args.templatedir)
+        generate_topics_list_file_from_files(
+            args.file, args.outputdir, TOPICS_LIST_TEMPLATE_FILE[generate_idx], args.templatedir)
         copy_changed(args.temporarydir, args.outputdir, args.prefix, args.quiet)
     elif args.dir is not None:
         convert_dir_save(

@@ -45,7 +45,6 @@
  ****************************************************************************/
 
 #include <uorb/uorb.h>
-#include <uorb/uorb_topics.h>
 @{
 msg_names = [mn.replace(".msg", "") for mn in msgs]
 msgs_count = len(msg_names)
