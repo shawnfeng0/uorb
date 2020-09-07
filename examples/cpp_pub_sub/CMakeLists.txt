@@ -1,0 +1,1 @@
+add_executable(uorb_example_cpp_pub_sub cpp_pub_sub.cc)

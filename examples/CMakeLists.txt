@@ -20,3 +20,4 @@ include_directories(PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Examples
 add_subdirectory(c_pub_sub)
+add_subdirectory(cpp_pub_sub)

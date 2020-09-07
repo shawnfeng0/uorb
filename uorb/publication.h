@@ -73,7 +73,7 @@ class Publication : public PublicationBase {
     if (!dev_) advertise();
 
     if (dev_) {
-      return dev_->Publish(meta_, &data);
+      return dev_->Publish(&data);
     }
 
     return false;

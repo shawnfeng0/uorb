@@ -219,20 +219,20 @@ bool orb_publish(orb_publication_t *handle, const void *data) __EXPORT;
  * @see orb_advertise_multi() for meaning of the individual parameters
  */
 static inline bool orb_publish_auto(const struct orb_metadata *meta,
-                                    orb_publication_t **handle,
+                                    orb_publication_t **handle_ptr,
                                     const void *data, unsigned int *instance) {
-  if (!meta || !handle) {
+  if (!meta || !handle_ptr) {
     orb_errno = EINVAL;
     return false;
   }
 
-  if (!*handle) {
-    *handle = orb_create_publication_multi(meta, instance, 1);
-    if (!*handle) {
+  if (!*handle_ptr) {
+    *handle_ptr = orb_create_publication_multi(meta, instance, 1);
+    if (!*handle_ptr) {
       return false;
     }
   }
-  return orb_publish(*handle, data);
+  return orb_publish(*handle_ptr, data);
 }
 
 /**
