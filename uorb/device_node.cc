@@ -33,14 +33,14 @@
 
 #include "uorb/device_node.h"
 
-#include <cstring>
 #include <cerrno>
+#include <cstring>
 
 uorb::DeviceNode::DeviceNode(const struct orb_metadata &meta, uint8_t instance,
                              uint16_t queue_size)
     : meta_(meta),
       instance_(instance),
-      queue_size_(GenerateQueueSize(queue_size)) {}
+      queue_size_(RoundUpPowOfTwo(queue_size)) {}
 
 uorb::DeviceNode::~DeviceNode() { delete[] data_; }
 
@@ -174,4 +174,23 @@ bool uorb::DeviceNode::RegisterCallback(Callback *callback) {
 void uorb::DeviceNode::UnregisterCallback(Callback *callback) {
   base::WriterLockGuard lg(lock_);
   callbacks_.Remove(callback);
+}
+
+uint64_t uorb::DeviceNode::RoundUpPowOfTwo(uint64_t n) {
+  if (n == 0) return 1;
+
+  // Avoid is already a power of 2
+  n--;
+
+  // count leading zero
+  unsigned clz = 0;
+  if (!(n & 0xFFFFFFFF00000000)) clz += 32, n <<= 32U;
+  if (!(n & 0xFFFF000000000000)) clz += 16, n <<= 16U;
+  if (!(n & 0xFF00000000000000)) clz += 8, n <<= 8U;
+  if (!(n & 0xF000000000000000)) clz += 4, n <<= 4U;
+  if (!(n & 0xC000000000000000)) clz += 2, n <<= 2U;
+  if (!(n & 0x8000000000000000)) clz += 1, n <<= 1U;
+  if (!(n & 0x8000000000000000)) clz += 1;
+
+  return 1UL << (64 - clz);
 }

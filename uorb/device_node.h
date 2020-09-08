@@ -128,7 +128,7 @@ class DeviceNode : public ListNode<DeviceNode *> {
     return (queue_size_ < generation_) ? generation_ - queue_size_ : 0;
   }
 
-  uint16_t get_queue_size() const { return queue_size_; }
+  uint16_t queue_size() const { return queue_size_; }
   bool set_queue_size(uint16_t queue_size) {
     base::WriterLockGuard lg(lock_);
 
@@ -136,15 +136,12 @@ class DeviceNode : public ListNode<DeviceNode *> {
       return false;
     }
 
-    queue_size_ = queue_size;
+    queue_size_ = RoundUpPowOfTwo(queue_size);
     return true;
   }
 
-  unsigned published_message_count() const { return generation_; }
-
-  const char *get_name() const { return meta_.o_name; }
-
-  uint8_t get_instance() const { return instance_; }
+  const char *name() const { return meta_.o_name; }
+  uint8_t instance() const { return instance_; }
 
   /**
    * Copies data and the corresponding generation
@@ -189,29 +186,7 @@ class DeviceNode : public ListNode<DeviceNode *> {
              uint16_t queue_size = 1);
   ~DeviceNode();
 
-  static inline uint16_t GenerateQueueSize(uint16_t queue_size) {
-    return queue_size < 2 ? 1 : RoundupPowOfTwo(queue_size);
-  }
-
   // round up to nearest power of two
-  static inline unsigned long RoundupPowOfTwo(unsigned long n) {
-    return 1UL << (unsigned int)fls(n - 1U);
-  }
-
-  // fls: find last bit set.
-  static inline int fls(uint64_t x) { return 64 - clz64(x); }
-
-  // Returns the number of leading 0-bits in x, starting at the most significant
-  // bit position. If x is 0, the result is undefined.
-  static inline int clz64(uint64_t x) {
-    int r = 0;
-    if (!(x & 0xFFFFFFFF00000000)) r += 32, x <<= 32U;
-    if (!(x & 0xFFFF000000000000)) r += 16, x <<= 16U;
-    if (!(x & 0xFF00000000000000)) r += 8, x <<= 8U;
-    if (!(x & 0xF000000000000000)) r += 4, x <<= 4U;
-    if (!(x & 0xC000000000000000)) r += 2, x <<= 2U;
-    if (!(x & 0x8000000000000000)) r += 1;
-    return r;
-  }
+  static uint64_t RoundUpPowOfTwo(uint64_t n);
 };
 }  // namespace uorb
