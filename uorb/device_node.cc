@@ -47,9 +47,9 @@ uorb::DeviceNode::~DeviceNode() { delete[] data_; }
 template <typename T>
 static inline bool is_in_range(const T &left, const T &value, const T &right) {
   if (right > left) {
-    return left <= value && value <= right;
+    return (left <= value) && (value <= right);
   } else {  // Maybe the data overflowed and a wraparound occurred
-    return left <= value || value <= right;
+    return (left <= value) || (value <= right);
   }
 }
 
@@ -60,28 +60,22 @@ bool uorb::DeviceNode::Copy(void *dst, unsigned &sub_generation) {
 
   base::ReaderLockGuard lg(lock_);
 
+  /* The subscriber already read the latest message, but nothing new was
+   * published yet. Return the previous message */
   if (generation_ == sub_generation) {
-    /* The subscriber already read the latest message, but nothing new was
-     * published yet. Return the previous message
-     */
     --sub_generation;
   }
 
-  // The queue is full and any value of "generation" is valid. If it is not in
-  // the queue, it can only be considered as data loss.
-  if (queue_is_full_) {
-    const unsigned queue_start = generation_ - queue_size_;
-    // If queue_size is 3 and cur_generation is 10, then 7, 8, 9 are in the
-    // range, and others are not.
-    if (!is_in_range(queue_start, sub_generation, generation_ - 1)) {
-      // Reader is too far behind: some messages are lost
-      sub_generation = queue_start;
-    }
-  } else {
-    if (sub_generation > generation_) {
-      // Insufficient data generation, invalid input
-      sub_generation = 0;
-    }
+  // Before the queue is filled, if the incoming sub_generation points to
+  // unpublished data, invalid data will be obtained. Such incorrect usage should
+  // not be handled.
+  const unsigned queue_start = generation_ - queue_size_;
+
+  // If queue_size is 3 and cur_generation is 10, then 7, 8, 9 are in the
+  // range, and others are not.
+  if (!is_in_range(queue_start, sub_generation, generation_ - 1)) {
+    // Reader is too far behind: some messages are lost
+    sub_generation = queue_start;
   }
 
   memcpy(dst, data_ + (meta_.o_size * (sub_generation % queue_size_)),
@@ -114,13 +108,8 @@ bool uorb::DeviceNode::Publish(const void *data) {
     }
   }
 
-  /* wrap-around happens after ~49 days, assuming a publisher rate of 1 kHz */
   memcpy(data_ + (meta_.o_size * (generation_ % queue_size_)),
          (const char *)data, meta_.o_size);
-
-  if (!queue_is_full_ && (generation_ >= queue_size_ - 1)) {
-    queue_is_full_ = true;
-  }
 
   generation_++;
 

@@ -143,6 +143,9 @@ class DeviceNode : public ListNode<DeviceNode *> {
   const char *name() const { return meta_.o_name; }
   uint8_t instance() const { return instance_; }
 
+  // Is it valid, there is at least one valid data published
+  bool valid() const { return nullptr != data_; }
+
   /**
    * Copies data and the corresponding generation
    * from a node to the buffer provided.
@@ -171,7 +174,6 @@ class DeviceNode : public ListNode<DeviceNode *> {
   uint8_t *data_{nullptr}; /**< allocated object buffer */
   uint16_t queue_size_;    /**< maximum number of elements in the queue */
   unsigned generation_{0}; /**< object generation count */
-  bool queue_is_full_{false};
 
   base::RwMutex lock_; /**< lock to protect access to all class members
   (also for derived classes) */
