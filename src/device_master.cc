@@ -31,8 +31,8 @@
  *
  ****************************************************************************/
 
-#include "uorb/device_master.h"
-#include "uorb/device_node.h"
+#include "device_master.h"
+#include "device_node.h"
 
 uorb::DeviceMaster uorb::DeviceMaster::instance_;
 

@@ -40,9 +40,9 @@
 
 #include <cerrno>
 
-#include "uorb/device_master.h"
-#include "uorb/device_node.h"
-#include "uorb/subscription_impl.h"
+#include "device_master.h"
+#include "device_node.h"
+#include "subscription_impl.h"
 
 using namespace uorb;
 

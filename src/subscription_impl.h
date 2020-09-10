@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "uorb/device_node.h"
+#include "device_node.h"
 
 namespace uorb{
 

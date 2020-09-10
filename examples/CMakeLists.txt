@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.5)
 
 # uorb library
 link_libraries(uorb)
-include_directories(PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
+include_directories(PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
 
 # pthread
 find_package(Threads REQUIRED)

@@ -4,9 +4,9 @@
 
 #include <pthread.h>
 #include <unistd.h>
-#include <uorb/topics/example_string.h>
 
 #include "slog.h"
+#include "uorb/topics/example_string.h"
 
 void *thread_publisher(void *arg) {
   struct example_string_s example_string;

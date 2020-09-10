@@ -31,7 +31,7 @@
  *
  ****************************************************************************/
 
-#include "uorb/device_node.h"
+#include "device_node.h"
 
 #include <cerrno>
 #include <cstring>

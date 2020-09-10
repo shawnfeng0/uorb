@@ -6,7 +6,7 @@ include_directories(${PROJECT_SOURCE_DIR}/src ${GTEST_INCLUDE_DIRS})
 
 # uorb
 link_libraries(uorb)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../..)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../include)
 
 # pthread
 find_package(Threads REQUIRED)

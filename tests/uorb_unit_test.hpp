@@ -33,19 +33,19 @@
 
 #pragma once
 
+#include <uorb/abs_time.h>
 #include <uorb/topics/orb_test.h>
 #include <uorb/topics/orb_test_large.h>
 #include <uorb/topics/orb_test_medium.h>
 #include <uorb/uorb.h>
-#include <uorb/abs_time.h>
 
 typedef const orb_metadata *orb_id_t;
 
 #include <gtest/gtest.h>
-#include <cmath>
 #include <unistd.h>
 
 #include <cerrno>
+#include <cmath>
 #include <thread>
 
 #include "slog.h"
@@ -101,8 +101,7 @@ void uORBTest::UnitTest::latency_test(orb_id_t T) {
     auto test_multi_sub = orb_create_subscription(ORB_ID(orb_test));
     auto test_multi_sub_medium =
         orb_create_subscription(ORB_ID(orb_test_medium));
-    auto test_multi_sub_large =
-        orb_create_subscription(ORB_ID(orb_test_large));
+    auto test_multi_sub_large = orb_create_subscription(ORB_ID(orb_test_large));
 
     orb_test_large_s t{};
 

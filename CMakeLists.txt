@@ -65,21 +65,21 @@ endif ()
 message(STATUS "uORB version: ${UORB_GIT_TAG}")
 
 configure_file(
-        "${CMAKE_SOURCE_DIR}/uorb/git_version.cc.in"
-        "${CMAKE_BINARY_DIR}/uorb/git_version.cc"
+        "src/git_version.cc.in"
+        "src/git_version.cc"
 )
 
 # uorb library
-aux_source_directory(${CMAKE_SOURCE_DIR}/uorb UORB_SOURCE)
-aux_source_directory(${CMAKE_SOURCE_DIR}/uorb/base UORB_SOURCE)
-add_library(uorb ${UORB_SOURCE} ${CMAKE_BINARY_DIR}/uorb/git_version.cc)
-target_include_directories(uorb PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+include_directories(src include)
+aux_source_directory(src UORB_SOURCE)
+aux_source_directory(src/base UORB_SOURCE)
+add_library(uorb ${UORB_SOURCE} ${CMAKE_BINARY_DIR}/src/git_version.cc)
 
 # install uorb
 install(TARGETS uorb
         ARCHIVE DESTINATION lib)
 
-file(GLOB UORB_HEADERS uorb/abs_time.h uorb/uorb.h uorb/publication*.h uorb/subscription.h uorb/subscription_interval.h)
+file(GLOB UORB_HEADERS include/uorb/*)
 install(FILES ${UORB_HEADERS} DESTINATION include/uorb)
 
 if (UORB_BUILD_EXAMPLES)

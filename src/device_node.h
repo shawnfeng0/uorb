@@ -33,11 +33,11 @@
 
 #pragma once
 
-#include "uorb/base/condition_variable.h"
-#include "uorb/base/intrusive_list.h"
-#include "uorb/base/mutex.h"
-#include "uorb/base/rw_mutex.h"
 #include "uorb/uorb.h"
+#include "base/condition_variable.h"
+#include "base/intrusive_list.h"
+#include "base/mutex.h"
+#include "base/rw_mutex.h"
 
 namespace uorb {
 class DeviceMaster;

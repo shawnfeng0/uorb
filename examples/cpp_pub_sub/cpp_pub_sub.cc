@@ -4,11 +4,13 @@
 
 #include <pthread.h>
 #include <unistd.h>
-#include <uorb/publication.h>
-#include <uorb/subscription.h>
-#include <uorb/topics/example_string.h>
 
 #include "slog.h"
+#include "uorb/publication.h"
+#include "uorb/publication_multi.h"
+#include "uorb/subscription.h"
+#include "uorb/subscription_interval.h"
+#include "uorb/topics/example_string.h"
 
 void *thread_publisher(void *arg) {
   uorb::PublicationData<uorb::msg::example_string, 3> pub_example_string;
