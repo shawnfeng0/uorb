@@ -4,6 +4,4 @@
 
 #include "uorb/uorb.h"
 
-const char *orb_version() {
-  return "@UORB_GIT_TAG@";
-}
+const char *orb_version() { return "@UORB_GIT_TAG@"; }

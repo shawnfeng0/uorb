@@ -159,6 +159,14 @@ class DeviceNode : public ListNode<DeviceNode *> {
    */
   bool Copy(void *dst, unsigned &sub_generation);
 
+  /**
+   * Check if there is newer data than sub_generation
+   * @param sub_generation
+   * @return
+   *   Returns true if have new data.
+   */
+  bool CheckUpdate(const unsigned &sub_generation) const;
+
  private:
   const orb_metadata &meta_; /**< object metadata information */
   const uint8_t instance_;   /**< orb multi instance identifier */

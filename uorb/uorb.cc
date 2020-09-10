@@ -41,7 +41,7 @@
 #include "uorb/base/orb_errno.h"
 #include "uorb/device_master.h"
 #include "uorb/device_node.h"
-#include "uorb/subscription_interval.h"
+#include "uorb/subscription_impl.h"
 
 using namespace uorb;
 
@@ -53,22 +53,14 @@ using namespace uorb;
     }                                                       \
   })
 
-class SubscriberC : public SubscriptionInterval {
- public:
-  explicit SubscriberC(const orb_metadata &meta, uint32_t interval_us = 0,
-                       uint8_t instance = 0)
-      : SubscriptionInterval(meta, interval_us, instance) {}
-  auto get_node() -> decltype(node_) { return node_; }
-};
-
 orb_publication_t *orb_create_publication(const struct orb_metadata *meta,
                                           unsigned int queue_size) {
   return orb_create_publication_multi(meta, nullptr, queue_size);
 }
 
 orb_publication_t *orb_create_publication_multi(const struct orb_metadata *meta,
-                                          unsigned int *instance,
-                                          unsigned int queue_size) {
+                                                unsigned int *instance,
+                                                unsigned int queue_size) {
   ORB_CHECK_TRUE(meta, EINVAL, return nullptr);
   auto &meta_ = *meta;
   auto &device_master = DeviceMaster::get_instance();
@@ -104,24 +96,30 @@ orb_subscription_t *orb_create_subscription(const struct orb_metadata *meta) {
   return orb_create_subscription_multi(meta, 0);
 }
 
-orb_subscription_t *orb_create_subscription_multi(const struct orb_metadata *meta,
-                                            unsigned instance) {
+orb_subscription_t *orb_create_subscription_multi(
+    const struct orb_metadata *meta, unsigned instance) {
   ORB_CHECK_TRUE(meta, EINVAL, return nullptr);
 
-  auto *sub = new SubscriberC(*meta, 0, instance);
-  ORB_CHECK_TRUE(sub, ENOMEM, return nullptr);
+  DeviceMaster &device_master = uorb::DeviceMaster::get_instance();
 
-  return (orb_subscription_t *)sub;
+  auto *dev = device_master.OpenDeviceNode(*meta, instance);
+  ORB_CHECK_TRUE(dev, ENOMEM, return nullptr);
+
+  // Create a subscriber, if it fails, we don't have to release device_node (it
+  // only increases but not decreases)
+  auto *subscriber = new SubscriptionImpl(*dev);
+  ORB_CHECK_TRUE(subscriber, ENOMEM, return nullptr);
+
+  return (orb_subscription_t *)subscriber;
 }
 
 bool orb_destroy_subscription(orb_subscription_t **handle_ptr) {
-  ORB_CHECK_TRUE(handle_ptr, EINVAL, return false);
+  ORB_CHECK_TRUE(handle_ptr && *handle_ptr, EINVAL, return false);
 
-  orb_subscription_t *&handle = *handle_ptr;
-  ORB_CHECK_TRUE(handle, EINVAL, return false);
+  orb_subscription_t *&subscription = *handle_ptr;
 
-  delete (SubscriberC *)handle;
-  handle = nullptr;
+  delete (SubscriptionImpl *)subscription;
+  subscription = nullptr;  // Set the original pointer to null
 
   return true;
 }
@@ -129,14 +127,17 @@ bool orb_destroy_subscription(orb_subscription_t **handle_ptr) {
 bool orb_copy(orb_subscription_t *handle, void *buffer) {
   ORB_CHECK_TRUE(handle && buffer, EINVAL, return false);
 
-  auto &sub = *(SubscriberC *)handle;
-  return sub.copy(buffer);
+  auto &sub = *(SubscriptionImpl *)handle;
+
+  return sub.Copy(buffer);
 }
 
 bool orb_check_update(orb_subscription_t *handle) {
   ORB_CHECK_TRUE(handle, EINVAL, return false);
-  auto &sub = *(SubscriberC *)handle;
-  return sub.updated();
+
+  auto &sub = *(SubscriptionImpl *)handle;
+
+  return sub.CheckUpdate();
 }
 
 bool orb_exists(const struct orb_metadata *meta, unsigned int instance) {
@@ -145,9 +146,7 @@ bool orb_exists(const struct orb_metadata *meta, unsigned int instance) {
   auto &master = DeviceMaster::get_instance();
   auto *dev = master.GetDeviceNode(*meta, instance);
 
-  if (dev) return dev->is_advertised();
-
-  return false;
+  return dev && dev->is_advertised();
 }
 
 unsigned int orb_group_count(const struct orb_metadata *meta) {
@@ -169,24 +168,27 @@ int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
   int updated_num = 0;  // Number of new messages
 
   for (unsigned i = 0; i < nfds; i++) {
-    orb_subscription_t *&subscriber = fds[i].fd;
+    orb_subscription_t *subscriber = fds[i].fd;
     if (!subscriber) continue;
 
-    auto &sub = *((SubscriberC *)subscriber);
-    if (!sub.get_node()) sub.subscribe();
-    if (!sub.get_node()) continue;
+    auto &sub = *((SubscriptionImpl *)subscriber);
 
     unsigned &event = fds[i].events;
     unsigned &revent = fds[i].revents;
 
     // Maybe there is new data before the callback is registered
-    if (sub.updated()) {
+    if (sub.CheckUpdate()) {
       revent = event & POLLIN;
       ++updated_num;
     } else {
-      // TODO: There may also be updates before execution
-      sub.get_node()->RegisterCallback(&semaphore_callback);
+      sub.RegisterCallback(&semaphore_callback);
       revent = 0;
+      // It may have been updated before RegisterCallback() after CheckUpdate()
+      // is executed, to handle this situation
+      if (sub.CheckUpdate()) {
+        revent = event & POLLIN;
+        ++updated_num;
+      }
     }
   }
 
@@ -196,19 +198,17 @@ int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
   // Cancel registration callback, re-count the number of new messages
   updated_num = 0;
   for (unsigned i = 0; i < nfds; i++) {
-    orb_subscription_t *&subscriber = fds[i].fd;
+    orb_subscription_t *subscriber = fds[i].fd;
     if (!subscriber) continue;
 
-    auto &sub = *((SubscriberC *)subscriber);
-    if (!sub.get_node()) sub.subscribe();
-    if (!sub.get_node()) continue;
+    auto &sub = *((SubscriptionImpl *)subscriber);
 
     unsigned &event = fds[i].events;
     unsigned &revent = fds[i].revents;
 
-    sub.get_node()->UnregisterCallback(&semaphore_callback);
+    sub.UnregisterCallback(&semaphore_callback);
 
-    if (sub.updated()) {
+    if (sub.CheckUpdate()) {
       revent |= event & POLLIN;
       ++updated_num;
     }
