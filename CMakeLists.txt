@@ -34,6 +34,8 @@ cmake_minimum_required(VERSION 3.5)
 
 project(uorb_lib)
 
+set(CMAKE_CXX_STANDARD 11)
+
 option(UORB_BUILD_EXAMPLES "Build examples" OFF)
 option(UORB_BUILD_TESTS "Build tests" OFF)
 
