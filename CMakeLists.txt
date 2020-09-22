@@ -30,9 +30,9 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 ############################################################################
-project(uorb)
-
 cmake_minimum_required(VERSION 3.5)
+
+project(uorb_lib)
 
 option(UORB_BUILD_EXAMPLES "Build examples" OFF)
 option(UORB_BUILD_TESTS "Build tests" OFF)
@@ -87,5 +87,6 @@ if (UORB_BUILD_EXAMPLES)
 endif ()
 
 if (UORB_BUILD_TESTS)
+    enable_testing()
     add_subdirectory(tests)
 endif ()
