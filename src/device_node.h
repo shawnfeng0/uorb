@@ -136,7 +136,7 @@ class DeviceNode : public ListNode<DeviceNode *> {
       return false;
     }
 
-    queue_size_ = RoundUpPowOfTwo(queue_size);
+    queue_size_ = RoundPowOfTwo(queue_size);
     return true;
   }
 
@@ -189,6 +189,6 @@ class DeviceNode : public ListNode<DeviceNode *> {
   ~DeviceNode();
 
   // round up to nearest power of two
-  static uint64_t RoundUpPowOfTwo(uint64_t n);
+  static uint16_t RoundPowOfTwo(uint16_t n);
 };
 }  // namespace uorb

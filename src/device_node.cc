@@ -40,7 +40,7 @@ uorb::DeviceNode::DeviceNode(const struct orb_metadata &meta, uint8_t instance,
                              uint16_t queue_size)
     : meta_(meta),
       instance_(instance),
-      queue_size_(RoundUpPowOfTwo(queue_size)) {}
+      queue_size_(RoundPowOfTwo(queue_size)) {}
 
 uorb::DeviceNode::~DeviceNode() { delete[] data_; }
 
@@ -67,8 +67,8 @@ bool uorb::DeviceNode::Copy(void *dst, unsigned &sub_generation) {
   }
 
   // Before the queue is filled, if the incoming sub_generation points to
-  // unpublished data, invalid data will be obtained. Such incorrect usage should
-  // not be handled.
+  // unpublished data, invalid data will be obtained. Such incorrect usage
+  // should not be handled.
   const unsigned queue_start = generation_ - queue_size_;
 
   // If queue_size is 3 and cur_generation is 10, then 7, 8, 9 are in the
@@ -165,21 +165,24 @@ void uorb::DeviceNode::UnregisterCallback(Callback *callback) {
   callbacks_.Remove(callback);
 }
 
-uint64_t uorb::DeviceNode::RoundUpPowOfTwo(uint64_t n) {
-  if (n == 0) return 1;
+uint16_t uorb::DeviceNode::RoundPowOfTwo(uint16_t n) {
+  if (n == 0) {
+    return 1;
+  }
 
   // Avoid is already a power of 2
-  n--;
+  uint32_t value = n - 1;
 
-  // count leading zero
-  unsigned clz = 0;
-  if (!(n & 0xFFFFFFFF00000000)) clz += 32, n <<= 32U;
-  if (!(n & 0xFFFF000000000000)) clz += 16, n <<= 16U;
-  if (!(n & 0xFF00000000000000)) clz += 8, n <<= 8U;
-  if (!(n & 0xF000000000000000)) clz += 4, n <<= 4U;
-  if (!(n & 0xC000000000000000)) clz += 2, n <<= 2U;
-  if (!(n & 0x8000000000000000)) clz += 1, n <<= 1U;
-  if (!(n & 0x8000000000000000)) clz += 1;
+  // Fill 1
+  value |= value >> 1U;
+  value |= value >> 2U;
+  value |= value >> 4U;
+  value |= value >> 8U;
 
-  return 1UL << (64 - clz);
+  // Unable to round-up, take the value of round-down
+  if (value == UINT16_MAX) {
+    value >>= 1U;
+  }
+
+  return value + 1;
 }
