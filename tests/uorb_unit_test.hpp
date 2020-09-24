@@ -174,6 +174,7 @@ void uORBTest::UnitTest::latency_test(orb_id_t T) {
 
     delete[] timings;
 
+    ORB_INFO("uORB version: %s", orb_version());
     ORB_INFO("mean:    %8.4f us", static_cast<double>(mean));
     ORB_INFO("std dev: %8.4f us",
              static_cast<double>(sqrtf(std_dev / (max_runs - 1))));
