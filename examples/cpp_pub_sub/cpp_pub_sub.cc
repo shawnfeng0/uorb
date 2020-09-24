@@ -38,20 +38,20 @@ void *thread_subscriber(void *unused) {
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 #endif
 
-  const int period_ms = 20;
-  int timeout_ms = 0;
+  int timeout_ms = 2000;
+
+  struct orb_pollfd pollfds[] = {
+      {.fd = sub_example_string.handle(), .events = POLLIN}};
+
   while (true) {
-    if (sub_example_string.Update()) {
-      timeout_ms = 0;
-      LOGGER_INFO("Receive msg: \"%s\"", sub_example_string.get().string);
-    } else {
-      timeout_ms += period_ms;
-      if (timeout_ms >= 2000) {
-        LOGGER_WARN("Got no data within %d milliseconds", 2000);
-        break;
+    if (0 < orb_poll(pollfds, ARRAY_SIZE(pollfds), timeout_ms)) {
+      if (sub_example_string.Update()) {
+        LOGGER_INFO("Receive msg: \"%s\"", sub_example_string.get().string);
       }
+    } else {
+      LOGGER_WARN("Got no data within %d milliseconds", 2000);
+      break;
     }
-    usleep(period_ms * 1000);
   }
 
   LOGGER_WARN("subscription over");

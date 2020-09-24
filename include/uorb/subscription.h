@@ -46,6 +46,15 @@ template <const orb_metadata &meta>
 class Subscription {
   using Type = typename msg::TypeMap<meta>::type;
 
+ protected:
+  const uint8_t instance_{0};
+  orb_subscription_t *handle_{nullptr};
+
+  /**
+   * Check if there is a new update.
+   */
+  virtual bool Updated() { return Subscribed() && orb_check_update(handle_); }
+
  public:
   /**
    * Constructor
@@ -72,10 +81,7 @@ class Subscription {
     return handle_ = orb_create_subscription_multi(&meta, instance_);
   }
 
-  /**
-   * Check if there is a new update.
-   */
-  virtual bool Updated() { return Subscribed() && orb_check_update(handle_); }
+  decltype(handle_) handle() { return Subscribed() ? handle_ : nullptr; }
 
   /**
    * Update the struct
@@ -90,10 +96,6 @@ class Subscription {
   virtual bool Copy(Type *dst) {
     return Subscribed() && orb_copy(handle_, dst);
   }
-
- protected:
-  const uint8_t instance_{0};
-  orb_subscription_t *handle_{nullptr};
 };
 
 // Subscription wrapper class with data
