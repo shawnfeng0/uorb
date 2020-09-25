@@ -33,11 +33,11 @@
 
 #pragma once
 
-#include "uorb/uorb.h"
 #include "base/condition_variable.h"
 #include "base/intrusive_list.h"
 #include "base/mutex.h"
 #include "base/rw_mutex.h"
+#include "uorb/uorb.h"
 
 namespace uorb {
 class DeviceMaster;
@@ -150,13 +150,8 @@ class DeviceNode : public ListNode<DeviceNode *> {
    */
   bool Copy(void *dst, unsigned &sub_generation);
 
-  /**
-   * Check if there is newer data than sub_generation
-   * @param sub_generation
-   * @return
-   *   Returns true if have new data.
-   */
-  bool CheckUpdate(const unsigned &sub_generation) const;
+  // Returns the number of updated data relative to the parameter 'generation'
+  unsigned UpdatesAvailable(unsigned generation) const;
 
  private:
   const orb_metadata &meta_; /**< object metadata information */

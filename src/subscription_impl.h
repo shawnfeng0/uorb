@@ -6,7 +6,7 @@
 
 #include "device_node.h"
 
-namespace uorb{
+namespace uorb {
 
 struct SubscriptionImpl {
   explicit SubscriptionImpl(DeviceNode &device_node)
@@ -17,7 +17,9 @@ struct SubscriptionImpl {
   ~SubscriptionImpl() { dev_.ReduceSubscriberCount(); }
 
   bool Copy(void *buffer) { return dev_.Copy(buffer, last_generation_); }
-  bool CheckUpdate() const { return dev_.CheckUpdate(last_generation_); }
+  unsigned UpdatesAvailable() const {
+    return dev_.UpdatesAvailable(last_generation_);
+  }
 
   void UnregisterCallback(DeviceNode::Callback *callback) {
     dev_.UnregisterCallback(callback);
@@ -30,4 +32,4 @@ struct SubscriptionImpl {
   DeviceNode &dev_;
   unsigned last_generation_; /**< last generation the subscriber has seen */
 };
-}
+}  // namespace uorb
