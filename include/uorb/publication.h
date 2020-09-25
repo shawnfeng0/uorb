@@ -56,7 +56,7 @@ class Publication {
    * Publish the struct
    * @param data The uORB message struct we are updating.
    */
-  bool publish(const Type &data) {
+  bool Publish(const Type &data) {
     if (!handle_) {
         handle_ = orb_create_publication(&meta, queue_size);
     }
@@ -85,7 +85,7 @@ class PublicationData : public Publication<T, queue_size> {
   }
 
   // Publishes the embedded struct.
-  bool publish() { return Publication<T, queue_size>::publish(data_); }
+  bool Publish() { return Publication<T, queue_size>::Publish(data_); }
 
  private:
   Type data_{};

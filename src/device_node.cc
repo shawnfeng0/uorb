@@ -36,7 +36,7 @@
 #include <cerrno>
 #include <cstring>
 
-static inline bool is_in_range(unsigned left, unsigned value, unsigned right) {
+static inline bool IsInRange(unsigned left, unsigned value, unsigned right) {
   if (right > left) {
     return (left <= value) && (value <= right);
   } else {  // Maybe the data overflowed and a wraparound occurred
@@ -94,7 +94,7 @@ bool uorb::DeviceNode::Copy(void *dst, unsigned &sub_generation) {
 
   // If queue_size is 3 and cur_generation is 10, then 7, 8, 9 are in the
   // range, and others are not.
-  if (!is_in_range(queue_start, sub_generation, generation_ - 1)) {
+  if (!IsInRange(queue_start, sub_generation, generation_ - 1)) {
     // Reader is too far behind: some messages are lost
     sub_generation = queue_start;
   }

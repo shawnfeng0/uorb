@@ -20,7 +20,7 @@ void *thread_publisher(void *arg) {
              example_string_s::STRING_LENGTH, "%d: %s", i,
              "This is a string message.");
 
-    if (!pub_example_string.publish()) {
+    if (!pub_example_string.Publish()) {
       LOGGER_ERROR("Publish error");
     }
 

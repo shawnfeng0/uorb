@@ -56,7 +56,7 @@ class PublicationMulti {
    * Publish the struct
    * @param data The uORB message struct we are updating.
    */
-  bool publish(const Type &data) {
+  bool Publish(const Type &data) {
     if (!handle_) {
       unsigned instance;
       handle_ = orb_create_publication_multi(&meta, &instance, queue_size);
@@ -86,7 +86,7 @@ class PublicationMultiData : public PublicationMulti<T, queue_size> {
   }
 
   // Publishes the embedded struct.
-  bool publish() { return PublicationMulti<T, queue_size>::publish(data_); }
+  bool Publish() { return PublicationMulti<T, queue_size>::Publish(data_); }
 
  private:
   Type data_{};

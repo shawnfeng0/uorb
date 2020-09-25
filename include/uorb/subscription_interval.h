@@ -50,7 +50,7 @@ class SubscriptionInterval : public Subscription<T> {
 
  private:
   template <typename Tp>
-  constexpr Tp constrain(Tp val, Tp min_val, Tp max_val) {
+  constexpr Tp constrain(Tp val, Tp min_val, Tp max_val) const {
     return (val < min_val) ? min_val : ((val > max_val) ? max_val : val);
   }
 
