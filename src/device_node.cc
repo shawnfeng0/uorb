@@ -36,6 +36,36 @@
 #include <cerrno>
 #include <cstring>
 
+static inline bool is_in_range(unsigned left, unsigned value, unsigned right) {
+  if (right > left) {
+    return (left <= value) && (value <= right);
+  } else {  // Maybe the data overflowed and a wraparound occurred
+    return (left <= value) || (value <= right);
+  }
+}
+
+static inline uint16_t RoundPowOfTwo(uint16_t n) {
+  if (n == 0) {
+    return 1;
+  }
+
+  // Avoid is already a power of 2
+  uint32_t value = n - 1;
+
+  // Fill 1
+  value |= value >> 1U;
+  value |= value >> 2U;
+  value |= value >> 4U;
+  value |= value >> 8U;
+
+  // Unable to round-up, take the value of round-down
+  if (value == UINT16_MAX) {
+    value >>= 1U;
+  }
+
+  return value + 1;
+}
+
 uorb::DeviceNode::DeviceNode(const struct orb_metadata &meta, uint8_t instance,
                              uint16_t queue_size)
     : meta_(meta),
@@ -43,15 +73,6 @@ uorb::DeviceNode::DeviceNode(const struct orb_metadata &meta, uint8_t instance,
       queue_size_(RoundPowOfTwo(queue_size)) {}
 
 uorb::DeviceNode::~DeviceNode() { delete[] data_; }
-
-template <typename T>
-static inline bool is_in_range(const T &left, const T &value, const T &right) {
-  if (right > left) {
-    return (left <= value) && (value <= right);
-  } else {  // Maybe the data overflowed and a wraparound occurred
-    return (left <= value) || (value <= right);
-  }
-}
 
 bool uorb::DeviceNode::Copy(void *dst, unsigned &sub_generation) {
   if ((dst == nullptr) || (data_ == nullptr) || (generation_ == 0)) {
@@ -165,24 +186,13 @@ void uorb::DeviceNode::UnregisterCallback(Callback *callback) {
   callbacks_.Remove(callback);
 }
 
-uint16_t uorb::DeviceNode::RoundPowOfTwo(uint16_t n) {
-  if (n == 0) {
-    return 1;
+bool uorb::DeviceNode::set_queue_size(uint16_t queue_size) {
+  base::WriterLockGuard lg(lock_);
+
+  if (data_ || queue_size_ > queue_size) {
+    return false;
   }
 
-  // Avoid is already a power of 2
-  uint32_t value = n - 1;
-
-  // Fill 1
-  value |= value >> 1U;
-  value |= value >> 2U;
-  value |= value >> 4U;
-  value |= value >> 8U;
-
-  // Unable to round-up, take the value of round-down
-  if (value == UINT16_MAX) {
-    value >>= 1U;
-  }
-
-  return value + 1;
+  queue_size_ = RoundPowOfTwo(queue_size);
+  return true;
 }

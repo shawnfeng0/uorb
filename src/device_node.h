@@ -129,16 +129,7 @@ class DeviceNode : public ListNode<DeviceNode *> {
   }
 
   uint16_t queue_size() const { return queue_size_; }
-  bool set_queue_size(uint16_t queue_size) {
-    base::WriterLockGuard lg(lock_);
-
-    if (data_ || queue_size_ > queue_size) {
-      return false;
-    }
-
-    queue_size_ = RoundPowOfTwo(queue_size);
-    return true;
-  }
+  bool set_queue_size(uint16_t queue_size);
 
   const char *name() const { return meta_.o_name; }
   uint8_t instance() const { return instance_; }
@@ -187,8 +178,5 @@ class DeviceNode : public ListNode<DeviceNode *> {
   DeviceNode(const struct orb_metadata &meta, uint8_t instance,
              uint16_t queue_size = 1);
   ~DeviceNode();
-
-  // round up to nearest power of two
-  static uint16_t RoundPowOfTwo(uint16_t n);
 };
 }  // namespace uorb
