@@ -128,6 +128,8 @@ class DeviceNode : public ListNode<DeviceNode *> {
   void mark_as_unadvertised() { advertised_ = false; }
   void mark_as_advertised() { advertised_ = true; }
 
+  // Returns the number of updated data relative to the parameter 'generation'
+  unsigned updates_available(unsigned generation) const;
   void initial_generation(unsigned &generation);
 
   uint16_t queue_size() const { return queue_size_; }
@@ -135,9 +137,6 @@ class DeviceNode : public ListNode<DeviceNode *> {
 
   const char *name() const { return meta_.o_name; }
   uint8_t instance() const { return instance_; }
-
-  // Is it valid, there is at least one valid data published
-  bool valid() const { return nullptr != data_; }
 
   /**
    * Copies data and the corresponding generation
@@ -151,9 +150,6 @@ class DeviceNode : public ListNode<DeviceNode *> {
    *   Returns true if the data was copied.
    */
   bool Copy(void *dst, unsigned &sub_generation);
-
-  // Returns the number of updated data relative to the parameter 'generation'
-  unsigned UpdatesAvailable(unsigned generation) const;
 
  private:
   friend uORBTest::UnitTest;

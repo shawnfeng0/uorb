@@ -107,7 +107,7 @@ bool uorb::DeviceNode::Copy(void *dst, unsigned &sub_generation) {
   return true;
 }
 
-unsigned uorb::DeviceNode::UpdatesAvailable(unsigned generation) const {
+unsigned uorb::DeviceNode::updates_available(unsigned generation) const {
   return generation_ - generation;
 }
 

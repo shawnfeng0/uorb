@@ -138,7 +138,7 @@ bool orb_check_update(orb_subscription_t *handle) {
 
   auto &sub = *(SubscriptionImpl *)handle;
 
-  return sub.UpdatesAvailable();
+  return sub.updates_available();
 }
 
 bool orb_exists(const struct orb_metadata *meta, unsigned int instance) {
@@ -178,15 +178,15 @@ int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
     unsigned &revent = fds[i].revents;
 
     // Maybe there is new data before the callback is registered
-    if (sub.UpdatesAvailable()) {
+    if (sub.updates_available()) {
       revent = event & POLLIN;
       ++updated_num;
     } else {
       sub.RegisterCallback(&semaphore_callback);
       revent = 0;
-      // It may have been updated before RegisterCallback() after UpdatesAvailable()
+      // It may have been updated before RegisterCallback() after updates_available()
       // is executed, to handle this situation
-      if (sub.UpdatesAvailable()) {
+      if (sub.updates_available()) {
         revent = event & POLLIN;
         ++updated_num;
       }
@@ -209,7 +209,7 @@ int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
 
     sub.UnregisterCallback(&semaphore_callback);
 
-    if (sub.UpdatesAvailable()) {
+    if (sub.updates_available()) {
       revent |= event & POLLIN;
       ++updated_num;
     }

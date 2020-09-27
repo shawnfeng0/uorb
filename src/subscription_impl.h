@@ -17,8 +17,8 @@ struct SubscriptionImpl {
   ~SubscriptionImpl() { dev_.ReduceSubscriberCount(); }
 
   bool Copy(void *buffer) { return dev_.Copy(buffer, last_generation_); }
-  unsigned UpdatesAvailable() const {
-    return dev_.UpdatesAvailable(last_generation_);
+  unsigned updates_available() const {
+    return dev_.updates_available(last_generation_);
   }
 
   void UnregisterCallback(DeviceNode::Callback *callback) {
