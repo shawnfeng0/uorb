@@ -75,7 +75,7 @@ uorb::DeviceNode::DeviceNode(const struct orb_metadata &meta, uint8_t instance,
 uorb::DeviceNode::~DeviceNode() { delete[] data_; }
 
 bool uorb::DeviceNode::Copy(void *dst, unsigned &sub_generation) {
-  if ((dst == nullptr) || (data_ == nullptr) || (generation_ == 0)) {
+  if ((dst == nullptr) || (data_ == nullptr)) {
     return false;
   }
 
