@@ -373,6 +373,106 @@ TEST_F(UnitTest, queue) {
   ASSERT_TRUE(orb_destroy_publication(&ptopic));
 }
 
+TEST_F(UnitTest, wrap_around) {
+  orb_test_medium_s t{};
+  orb_test_medium_s u{};
+  orb_publication_t *ptopic{nullptr};
+
+  auto sfd = orb_create_subscription(ORB_ID(orb_test_medium_wrap_around));
+
+  ASSERT_NE(sfd, nullptr) << "subscribe failed: " << errno;
+
+  const int queue_size = 16;
+  t.val = 0;
+  ptopic = orb_create_publication(ORB_ID(orb_test_medium_wrap_around), queue_size);
+  ASSERT_NE(ptopic, nullptr) << "advertise failed: " << errno;
+  orb_publish(ptopic, &t);
+
+  // Set generation to the location where wrap-around is about to be
+  {
+    auto node = uorb::DeviceMaster::get_instance().GetDeviceNode(
+        *ORB_ID(orb_test_medium_wrap_around), 0);
+    ASSERT_NE(node, nullptr);
+    set_generation(*node, unsigned(-(queue_size / 2)));
+
+    // Refresh the subscriber's generation
+    for (int i = 0; i < queue_size; i++) {
+      if (!orb_check_update(sfd)) {
+        break;
+      }
+      orb_copy(sfd, &u);
+    }
+  }
+
+  orb_publish(ptopic, &t);
+
+  ASSERT_TRUE(orb_check_update(sfd)) << "update flag not set";
+
+  ASSERT_TRUE(orb_copy(sfd, &u)) << "copy(1) failed: " << errno;
+
+  ASSERT_EQ(u.val, t.val) << "copy(1) mismatch";
+
+  ASSERT_FALSE(orb_check_update(sfd)) << "spurious updated flag";
+
+  // no messages in the queue anymore
+
+  //  Testing to write some elements...
+
+  for (int i = 0; i < queue_size - 2; ++i) {
+    t.val = i;
+    orb_publish(ptopic, &t);
+  }
+
+  for (int i = 0; i < queue_size - 2; ++i) {
+    ASSERT_TRUE(orb_check_update(sfd)) << "update flag not set, element " << i;
+    orb_copy(sfd, &u);
+    ASSERT_EQ(u.val, i) << "got wrong element from the queue (got" << u.val
+                        << "should be" << i << ")";
+  }
+
+  ASSERT_FALSE(orb_check_update(sfd))
+      << "update flag set, element " << queue_size;
+
+  //  Testing overflow...
+  int overflow_by = 3;
+
+  for (int i = 0; i < queue_size + overflow_by; ++i) {
+    t.val = i;
+    orb_publish(ptopic, &t);
+  }
+
+  for (int i = 0; i < queue_size; ++i) {
+    ASSERT_TRUE(orb_check_update(sfd)) << "update flag not set, element " << i;
+    orb_copy(sfd, &u);
+    ASSERT_EQ(u.val, i + overflow_by)
+        << "got wrong element from the queue (got " << u.val << "should be"
+        << i + overflow_by << ")";
+  }
+
+  ASSERT_FALSE(orb_check_update(sfd))
+      << "update flag set, element " << queue_size;
+
+  //  Testing underflow...
+
+  for (int i = 0; i < queue_size; ++i) {
+    ASSERT_FALSE(orb_check_update(sfd)) << "update flag set, element " << i;
+    orb_copy(sfd, &u);
+    ASSERT_EQ(u.val, queue_size + overflow_by - 1)
+        << "got wrong element from the queue (got " << u.val << ", should be "
+        << queue_size + overflow_by - 1 << ")";
+  }
+
+  t.val = 943;
+  orb_publish(ptopic, &t);
+  ASSERT_TRUE(orb_check_update(sfd)) << "update flag not set, element " << -1;
+
+  orb_copy(sfd, &u);
+  ASSERT_EQ(u.val, t.val) << "got wrong element from the queue (got " << u.val
+                          << ", should be " << t.val << ")";
+
+  ASSERT_TRUE(orb_destroy_publication(&ptopic));
+}
+
 TEST_F(UnitTest, queue_poll_notify) {
   orb_test_medium_s t{};
   orb_subscription_t *sfd;
@@ -442,18 +542,6 @@ TEST_F(UnitTest, queue_poll_notify) {
 
   ASSERT_EQ(num_messages_sent, next_expected_val)
       << "number of sent and received messages mismatch";
-}
-
-int uORBTest::UnitTest::test_note(const char *fmt, ...) {
-  va_list ap;
-
-  fprintf(stderr, "uORB note: ");
-  va_start(ap, fmt);
-  vfprintf(stderr, fmt, ap);
-  va_end(ap);
-  fprintf(stderr, "\n");
-  fflush(stderr);
-  return true;
 }
 
 }  // namespace uORBTest

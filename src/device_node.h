@@ -39,6 +39,10 @@
 #include "base/rw_mutex.h"
 #include "uorb/uorb.h"
 
+namespace uORBTest {
+class UnitTest;
+}
+
 namespace uorb {
 class DeviceMaster;
 
@@ -152,6 +156,8 @@ class DeviceNode : public ListNode<DeviceNode *> {
   unsigned UpdatesAvailable(unsigned generation) const;
 
  private:
+  friend uORBTest::UnitTest;
+
   const orb_metadata &meta_; /**< object metadata information */
   const uint8_t instance_;   /**< orb multi instance identifier */
 

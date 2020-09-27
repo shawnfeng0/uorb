@@ -39,6 +39,9 @@
 #include <uorb/topics/orb_test_medium.h>
 #include <uorb/uorb.h>
 
+#include "device_master.h"
+#include "device_node.h"
+
 typedef const orb_metadata *orb_id_t;
 
 #include <gtest/gtest.h>
@@ -60,6 +63,12 @@ class UnitTest;
 
 class uORBTest::UnitTest : public testing::Test {
  public:
+
+  // Assist in testing the wrap-around situation
+  static void set_generation(uorb::DeviceNode &node, unsigned generation) {
+    node.generation_ = generation;
+  }
+
   template <typename S>
   void latency_test(orb_id_t T);
 
@@ -69,8 +78,6 @@ class uORBTest::UnitTest : public testing::Test {
   void TearDown() override {}
   void TestBody() override {}
   UnitTest() = default;
-
-  static int test_note(const char *fmt, ...);
 };
 
 template <typename S>
