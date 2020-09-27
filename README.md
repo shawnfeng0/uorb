@@ -1,5 +1,7 @@
 # uORB
 
+![Tests](https://github.com/ShawnFeng0/uorb/workflows/Tests/badge.svg)
+
 The uORB is an asynchronous publish() / subscribe() messaging API used for inter-thread communication. "UORB" is the abbreviation of Micro Object Request Broker.
 
 uORB was originally a messaging middleware in PX4 Autopilot, run on Nuttx rtos or Linux:
