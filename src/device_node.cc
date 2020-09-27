@@ -196,3 +196,10 @@ bool uorb::DeviceNode::set_queue_size(uint16_t queue_size) {
   queue_size_ = RoundPowOfTwo(queue_size);
   return true;
 }
+
+void uorb::DeviceNode::initial_generation(unsigned &generation) {
+  base::WriterLockGuard lg(lock_);
+
+  // If there any previous publications allow the subscriber to read them
+  generation = generation_ - (data_ ? 1 : 0);
+}

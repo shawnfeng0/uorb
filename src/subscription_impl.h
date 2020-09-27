@@ -9,8 +9,8 @@
 namespace uorb {
 
 struct SubscriptionImpl {
-  explicit SubscriptionImpl(DeviceNode &device_node)
-      : dev_(device_node), last_generation_(device_node.oldest_data_index()) {
+  explicit SubscriptionImpl(DeviceNode &device_node) : dev_(device_node) {
+    device_node.initial_generation(last_generation_);
     dev_.IncreaseSubscriberCount();
   }
 
@@ -24,12 +24,13 @@ struct SubscriptionImpl {
   void UnregisterCallback(DeviceNode::Callback *callback) {
     dev_.UnregisterCallback(callback);
   }
+
   bool RegisterCallback(DeviceNode::Callback *callback) {
     return dev_.RegisterCallback(callback);
   }
 
  private:
   DeviceNode &dev_;
-  unsigned last_generation_; /**< last generation the subscriber has seen */
+  unsigned last_generation_{}; /**< last generation the subscriber has seen */
 };
 }  // namespace uorb

@@ -124,9 +124,7 @@ class DeviceNode : public ListNode<DeviceNode *> {
   void mark_as_unadvertised() { advertised_ = false; }
   void mark_as_advertised() { advertised_ = true; }
 
-  unsigned oldest_data_index() const {
-    return (queue_size_ < generation_) ? generation_ - queue_size_ : 0;
-  }
+  void initial_generation(unsigned &generation);
 
   uint16_t queue_size() const { return queue_size_; }
   bool set_queue_size(uint16_t queue_size);
