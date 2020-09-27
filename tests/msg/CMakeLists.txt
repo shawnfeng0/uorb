@@ -37,6 +37,14 @@ cmake_minimum_required(VERSION 3.5)
 # Support IN_LIST if() operator
 cmake_policy(SET CMP0057 NEW)
 
+find_package(PythonInterp 3)
+# We have a custom error message to tell users how to install python3.
+if (NOT PYTHONINTERP_FOUND)
+    message(FATAL_ERROR "Python 3 not found. Please install Python 3:\n"
+            "    Ubuntu: sudo apt install python3 python3-dev python3-pip\n"
+            "    macOS: brew install python")
+endif ()
+
 file(GLOB msg_files
         *.msg
         )
