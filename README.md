@@ -10,16 +10,28 @@ uORB was originally a messaging middleware in PX4 Autopilot, run on Nuttx rtos o
 
 The project was re-implemented based on POSIX based on the original API, some redundant software layers were removed, and only most of the core functions were retained.
 
-* [Comparison with uORB of PX4](docs/contrast_with_px4_uorb.md)
+* [Comparison with uORB of PX4](docs/ComparisonWithPx4Uorb.md)
 
-## Development status
+## Features
 
-* Unit test passed, basically available
-* Documentation and engineering are being improved
+* Based on POSIX, good compatibility
+* Real-time response mechanism similar to poll() function
+* A more flexible and easy-to-use C++ interface, which can operate topics like local structures
 
-## Getting started
+## Dependencies
 
-TODO
+Compiling the uorb library requires the support of c++11, and most compilations are currently supported.
+
+We have a message generator that can easily generate message meta-data. These libraries are needed to make it work:
+
+```shell
+pip3 install -r ${UORB_REPO_PATH}/tools/msg/tools/requirements.txt
+```
+
+## Documentation
+
+* [Getting Started Guide](docs/GettingStarted.md)
+* API reference (TODO)
 
 ## Examples
 
