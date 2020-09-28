@@ -81,11 +81,6 @@ for field in spec.parsed_fields():
             print('#include <uorb/topics/%s.h>'%(name))
 }@
 
-/* register this as object request broker structure */
-@[for multi_topic in topics]@
-ORB_DECLARE(@multi_topic);
-@[end for]
-
 @# Constants c style
 #ifndef __cplusplus
 @[for constant in spec.constants]@
@@ -133,14 +128,7 @@ for constant in spec.constants:
 #endif
 };
 
-#ifdef __cplusplus
-namespace uorb {
-namespace msg {
+/* register this as object request broker structure */
 @[for multi_topic in topics]@
-template<> struct TypeMap<@multi_topic> {
-    using type = @(uorb_struct);
-};
+ORB_DECLARE(@multi_topic, @uorb_struct);
 @[end for]
-}
-}
-#endif

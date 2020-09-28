@@ -98,15 +98,19 @@ struct TypeMap;
  * @param _name		The name of the topic.
  */
 #if defined(__cplusplus)
-#define ORB_DECLARE(_name)                \
+#define ORB_DECLARE(_name, _struct)       \
   namespace uorb {                        \
   namespace msg {                         \
   extern const struct orb_metadata _name; \
+  template <>                             \
+  struct TypeMap<_name> {                 \
+    using type = _struct;                 \
+  };                                      \
   }                                       \
   }                                       \
   extern "C" const struct orb_metadata *__orb_##_name() __EXPORT
 #else
-#define ORB_DECLARE(_name) \
+#define ORB_DECLARE(_name, _struct) \
   extern const struct orb_metadata *__orb_##_name() __EXPORT
 #endif
 
@@ -125,15 +129,19 @@ struct TypeMap;
  * @param _fields	All fields in a semicolon separated list
  *                      e.g: "float[3] position;bool armed"
  */
-#define ORB_DEFINE(_name, _struct, _size_no_padding, _fields)              \
-  namespace uorb {                                                         \
-  namespace msg {                                                          \
-  const struct orb_metadata _name = {#_name, sizeof(_struct),              \
-                                     _size_no_padding, _fields};           \
-  }                                                                        \
-  }                                                                        \
-  const struct orb_metadata *__orb_##_name() { return &uorb::msg::_name; } \
+#define ORB_DEFINE(_name, _struct, _size_no_padding, _fields)               \
+  const struct orb_metadata uorb::msg::_name = {#_name, sizeof(_struct),    \
+                                                _size_no_padding, _fields}; \
+  const struct orb_metadata *__orb_##_name() {                              \
+    using namespace uorb::msg;                                              \
+    return &(_name);                                                        \
+  }                                                                         \
   struct hack
+
+/**
+ * Simple define ORB topics, ignore _size_no_padding and _fields
+ */
+#define ORB_SIMPLE_DEFINE(_name, _struct) ORB_DEFINE(_name, _struct, 0, "")
 
 #ifdef __cplusplus
 extern "C" {
