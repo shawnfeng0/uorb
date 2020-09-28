@@ -71,7 +71,7 @@ class uorb::DeviceMaster {
    * DeviceNode that can be used to publish to the topic.
    */
   DeviceNode *CreateAdvertiser(const orb_metadata &meta, unsigned int *instance,
-                               uint16_t queue_size);
+                               unsigned int queue_size);
 
   DeviceNode *OpenDeviceNode(const orb_metadata &meta, unsigned int instance);
 

@@ -132,8 +132,8 @@ class DeviceNode : public ListNode<DeviceNode *> {
   unsigned updates_available(unsigned generation) const;
   void initial_generation(unsigned &generation);
 
-  uint16_t queue_size() const { return queue_size_; }
-  bool set_queue_size(uint16_t queue_size);
+  unsigned queue_size() const { return queue_size_; }
+  bool set_queue_size(unsigned int queue_size);
 
   const char *name() const { return meta_.o_name; }
   uint8_t instance() const { return instance_; }
@@ -171,7 +171,7 @@ class DeviceNode : public ListNode<DeviceNode *> {
                               published data yet) */
 
   DeviceNode(const struct orb_metadata &meta, uint8_t instance,
-             uint16_t queue_size = 1);
+             unsigned int queue_size = 1);
   ~DeviceNode();
 };
 }  // namespace uorb

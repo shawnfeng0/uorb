@@ -45,7 +45,7 @@ namespace uorb {
 /**
  * uORB publication wrapper class
  */
-template <const orb_metadata &meta, uint8_t queue_size = 1>
+template <const orb_metadata &meta, uint16_t queue_size = 1>
 class PublicationMulti {
   using Type = typename msg::TypeMap<meta>::type;
 
@@ -72,7 +72,7 @@ class PublicationMulti {
 /**
  * The publication class with data embedded.
  */
-template <const orb_metadata &T, uint8_t queue_size = 1>
+template <const orb_metadata &T, uint16_t queue_size = 1>
 class PublicationMultiData : public PublicationMulti<T, queue_size> {
   using Type = typename msg::TypeMap<T>::type;
 

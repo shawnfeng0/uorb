@@ -32,13 +32,13 @@
  ****************************************************************************/
 
 #include "device_master.h"
+
 #include "device_node.h"
 
 uorb::DeviceMaster uorb::DeviceMaster::instance_;
 
-uorb::DeviceNode *uorb::DeviceMaster::CreateAdvertiser(const orb_metadata &meta,
-                                                       unsigned int *instance,
-                                                       uint16_t queue_size) {
+uorb::DeviceNode *uorb::DeviceMaster::CreateAdvertiser(
+    const orb_metadata &meta, unsigned int *instance, unsigned int queue_size) {
   const bool is_single_instance = !instance;
   const unsigned max_group_tries =
       is_single_instance ? 1 : ORB_MULTI_MAX_INSTANCES;

@@ -67,10 +67,11 @@ static inline uint16_t RoundPowOfTwo(uint16_t n) {
 }
 
 uorb::DeviceNode::DeviceNode(const struct orb_metadata &meta, uint8_t instance,
-                             uint16_t queue_size)
+                             unsigned int queue_size)
     : meta_(meta),
       instance_(instance),
-      queue_size_(RoundPowOfTwo(queue_size)) {}
+      queue_size_(
+          RoundPowOfTwo(queue_size > UINT16_MAX ? UINT16_MAX : queue_size)) {}
 
 uorb::DeviceNode::~DeviceNode() { delete[] data_; }
 
@@ -186,14 +187,15 @@ void uorb::DeviceNode::UnregisterCallback(Callback *callback) {
   callbacks_.Remove(callback);
 }
 
-bool uorb::DeviceNode::set_queue_size(uint16_t queue_size) {
+bool uorb::DeviceNode::set_queue_size(unsigned int queue_size) {
   base::WriterLockGuard lg(lock_);
 
   if (data_ || queue_size_ > queue_size) {
     return false;
   }
 
-  queue_size_ = RoundPowOfTwo(queue_size);
+  queue_size_ =
+      RoundPowOfTwo(queue_size > UINT16_MAX ? UINT16_MAX : queue_size);
   return true;
 }
 
