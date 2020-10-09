@@ -2,20 +2,19 @@
 
 The main difference lies in the implementation of the bottom layer, and the application program interface changes relatively little. It also passed the uORB unit test of PX4 Autopilot.
 
-## API interface difference
+## API interface difference(v1.11)
 
 * Unified publication and subscription type: `orb_publication_t*` and `orb_subscription_t*`
 * Pass pointers when unpublishing and unsubscribing to avoid wild pointers(Reference from zmq)
 * Use ``bool`` type (include in ``<stdbool.h>``) to indicate whether the operation is successful
-* Remove the concept of uORB priority(``ORB_PRIO``) completely
 * Add independent ``orb_poll`` function, instead of ``px4_poll`` in PX4 Autopilot
 
 | PX4 uORB                                                     | Current uORB                                                 |
 | :----------------------------------------------------------- | :----------------------------------------------------------- |
 | ~~orb_advert_t orb_advertise(const struct orb_metadata \*meta, const void \*data)~~ |                                                              |
 | **orb_advert_t** orb_advertise_queue(const struct orb_metadata \*meta, const void \*data, unsigned int queue_size) | **orb_publication_t** \*orb_create_publication(const struct orb_metadata \*meta, unsigned int queue_size) |
-| ~~orb_advert_t orb_advertise_multi(const struct orb_metadata \*meta, const void \*data, int \*instance, enum ORB_PRIO priority)~~ |                                                              |
-| **orb_advert_t** orb_advertise_multi_queue(const struct orb_metadata \*meta, ~~const void \*data~~, int \*instance, ~~enum ORB_PRIO priority~~, unsigned queue_size) | **orb_publication_t** \*orb_create_publication_multi(const struct orb_metadata \*meta, unsigned int \*instance, unsigned int queue_size) |
+| ~~orb_advert_t orb_advertise_multi(const struct orb_metadata \*meta, const void \*data, int \*instance)~~ |                                                              |
+| **orb_advert_t** orb_advertise_multi_queue(const struct orb_metadata \*meta, ~~const void \*data~~, int \*instance, unsigned queue_size) | **orb_publication_t** \*orb_create_publication_multi(const struct orb_metadata \*meta, unsigned int \*instance, unsigned int queue_size) |
 | **int** orb_publish(~~const struct orb_metadata \*meta,~~ orb_advert_t handle, const void \*data) | **bool** orb_publish(**orb_publication_t \*handle**, const void *data) |
 | **int** orb_unadvertise(orb_advert_t **handle**)             | **bool** orb_destroy_publication(**orb_publication_t \*\*handle_ptr**) |
 | **int** orb_subscribe(const struct orb_metadata \*meta)      | **orb_subscription_t ***orb_create_subscription(const struct orb_metadata *meta) |
@@ -23,7 +22,6 @@ The main difference lies in the implementation of the bottom layer, and the appl
 | **int** orb_unsubscribe(**int handle**)                      | bool orb_destroy_subscription(**orb_subscription_t handle_ptr\*\***) |
 | **int** orb_copy(~~const struct orb_metadata \*meta,~~ **int handle**, void \*buffer) | **bool** orb_copy(**orb_subscription_t *handle**, void *buffer) |
 | **int** orb_check(**int handle** ~~, bool \*updated~~)       | **bool** orb_check_update(**orb_subscription_t *handle**)    |
-| ~~int orb_priority(int handle, enum ORB_PRIO \*priority)~~   |                                                              |
 | ~~int orb_set_interval(int handle, unsigned interval)~~      |                                                              |
 | ~~int orb_get_interval(int handle, unsigned \*interval)~~    |                                                              |
 | int px4_poll(**px4_pollfd_struct_t** \*fds, unsigned int nfds, int timeout) | int orb_poll(**struct orb_pollfd** \*fds, unsigned int nfds, int timeout_ms) |
