@@ -6,18 +6,19 @@
 #include <unistd.h>
 
 #include "slog.h"
+#include "uorb/abs_time.h"
 #include "uorb/publication.h"
-#include "uorb/publication_multi.h"
 #include "uorb/subscription.h"
-#include "uorb/subscription_interval.h"
 #include "uorb/topics/example_string.h"
 
 void *thread_publisher(void *arg) {
-  uorb::PublicationData<uorb::msg::example_string, 3> pub_example_string;
+  uorb::PublicationData<uorb::msg::example_string> pub_example_string;
 
   for (int i = 0; i < 10; i++) {
-    snprintf((char *)pub_example_string.get().string,
-             example_string_s::STRING_LENGTH, "%d: %s", i,
+    auto &data = pub_example_string.get();
+
+    data.timestamp = orb_absolute_time_us();
+    snprintf((char *)data.string, example_string_s::STRING_LENGTH, "%d: %s", i,
              "This is a string message.");
 
     if (!pub_example_string.Publish()) {
@@ -46,7 +47,9 @@ void *thread_subscriber(void *unused) {
   while (true) {
     if (0 < orb_poll(pollfds, ARRAY_SIZE(pollfds), timeout_ms)) {
       if (sub_example_string.Update()) {
-        LOGGER_INFO("Receive msg: \"%s\"", sub_example_string.get().string);
+        auto data = sub_example_string.get();
+        LOGGER_INFO("timestamp: %" PRIu64 "[us], Receive msg: \"%s\"",
+                    data.timestamp, data.string);
       }
     } else {
       LOGGER_WARN("Got no data within %d milliseconds", 2000);
