@@ -10,7 +10,7 @@ uORB was originally a messaging middleware in PX4 Autopilot, run on Nuttx rtos o
 
 The project was re-implemented based on POSIX based on the original API, some redundant software layers were removed, and only most of the core functions were retained.
 
-* [Comparison with uORB of PX4](docs/ComparisonWithPx4Uorb.md)
+* [Comparison with uORB of PX4](docs/comparison_with_px4_uorb.md)
 
 ## Features
 
@@ -30,7 +30,7 @@ pip3 install -r ${UORB_REPO_PATH}/tools/msg/tools/requirements.txt
 
 ## Documentation
 
-* [Getting Started Guide](docs/GettingStarted.md)
+* [Getting Started Guide](docs/getting_started.md)
 * API reference (TODO)
 
 ## Examples

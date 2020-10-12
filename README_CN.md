@@ -10,7 +10,7 @@ uORB源自PX4开源飞控的消息中间件，运行在Nuttx rtos和Linux上：
 
 这个项目重新在原始API的上基于POSIX重新实现了，去除了一些冗余的软件层，并且保留了大部分核心功能。
 
-* [与PX4的uORB的对比](docs/ComparisonWithPx4Uorb.md)
+* [与PX4的uORB的对比](docs/comparison_with_px4_uorb.md)
 
 ## 特性
 
@@ -30,7 +30,7 @@ pip3 install -r ${UORB_REPO_PATH}/tools/msg/tools/requirements.txt
 
 ## 文档
 
-* [入门指导](docs/GettingStarted.md)
+* [入门指导](docs/getting_started.md)
 * API 参考 (TODO)
 
 ## 示例
