@@ -1,6 +1,6 @@
 # uORB
 
-![Tests](https://github.com/ShawnFeng0/uorb/workflows/Tests/badge.svg)
+![Tests](https://github.com/ShawnFeng0/uorb/workflows/Tests/badge.svg) [中文说明](README_CN.md)
 
 The uORB is an asynchronous publish() / subscribe() messaging API used for inter-thread communication. "UORB" is the abbreviation of Micro Object Request Broker.
 
