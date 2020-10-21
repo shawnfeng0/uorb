@@ -9,6 +9,7 @@ uORB was originally a messaging middleware in PX4 Autopilot, run on Nuttx rtos o
 * [Introduction of uORB in PX4](https://dev.px4.io/master/en/middleware/uorb.html)
 
 The project was re-implemented based on POSIX based on the original API, some redundant software layers were removed, and only most of the core functions were retained.
+Some of these improvements and fixes have been merged upstream of PX4.
 
 * [Comparison with uORB of PX4](docs/comparison_with_px4_uorb.md)
 
@@ -16,7 +17,7 @@ The project was re-implemented based on POSIX based on the original API, some re
 
 * Based on POSIX, good compatibility
 * Real-time response mechanism similar to poll() function
-* A more flexible and easy-to-use C++ interface, which can operate topics like local structures
+* A flexible and easy-to-use C++ interface, which can operate topics like local structures
 
 ## Dependencies
 

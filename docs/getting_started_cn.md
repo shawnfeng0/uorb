@@ -53,25 +53,25 @@ uORB的C接口在uorb / uorb.h中定义。
 
 ## 创建uORB话题
 
-uORB话题由以下宏定义，并且需要传入话题名称和与该话题相对应的结构参数。
+uORB话题由以下宏定义，需要传入话题名称和与该话题对应的结构体参数。
 
 ```C++
 // uorb/uorb.h
 // To declare a topic, usually declare a topic in the header file.
-#define ORB_DECLARE(name, struct) ...
+#define ORB_DECLARE(_name, _struct) ...
 ```
 
 ```C++
 // uorb/uorb.h
 // Define a topic, usually define a topic in the source file, can only be defined once and need to be compiled in the C++ source file (*.cpp/*.cc)
-#define ORB_SIMPLE_DEFINE(name, struct) ...
+#define ORB_SIMPLE_DEFINE(_name, _struct) ...
 ```
 
 ### 使用工具管理uORB话题
 
 为了以统一的方式管理和修改话题，我们使用消息生成工具，该工具使用类似于ROS的方式来定义话题。
 
-我偷了个懒 ： ）。 我目前不熟悉代码生成工具，因此生成工具仍在使用官方的PX4（可能会在以后删除），但是用于生成uORB话题的模板文件已被修改。
+我偷了个懒 ： ）。 我目前不熟悉代码生成工具，所以目前仍使用PX4的代码生成工具（可能会在以后删除），但是用于生成uORB话题的模板文件已被修改。
 
 #### 添加uORB话题
 
@@ -112,11 +112,11 @@ link_libraries(uorb_examples_msgs)
 
 ### 手动管理uORB话题
 
-尽管不建议这样做，但我们也支持直接使用宏手动定义话题，这可能对初学者很有用。 您需要确保在话题头文件中声明ORB_DECLARE，并在C ++源文件中定义ORB_SIMPLE_DEFINE。
+尽管不建议这样做，但我们也支持直接使用宏手动定义话题，这可能对初学者很有用。 您需要确保在话题头文件中使用`ORB_DECLARE`声明，并在C++源文件中使用`ORB_SIMPLE_DEFINE`定义。
 
 #### 声明uORB话题
 
-只需在话题头文件中包含uorb / uorb.h头文件，然后直接声明话题即可。
+只需在话题头文件中包含`uorb/uorb.h`头文件，然后直接声明话题即可。
 
 ```C++
 // orb_topic.h
@@ -142,7 +142,7 @@ ORB_DECLARE(example_struct_number, orb_example_struct_number);
 
 #### 定义uORB话题
 
-与声明类似，在包含uorb / uorb.h之后在源文件中定义uORB话题。
+与声明类似，在包含`uorb/uorb.h`之后在源文件中定义uORB话题。
 
 ```C++
 // orb_topic.cc
@@ -171,7 +171,7 @@ ORB_SIMPLE_DEFINE(example_struct_number, orb_example_struct_number);
 #include "orb_topic.h"
 ```
 
-定义要发布的数据类型，使用`uorb::msg::{topic_name}`指定消息名称（* .msg文件名或用ORB_DECLARE声明的话题名）：
+定义要发布的数据类型，使用`uorb::msg::{topic_name}`指定消息名称（*.msg文件名或用`ORB_DECLARE`声明的话题名）：
 
 ```c++
 uorb::PublicationData<uorb::msg::example_string> pub_example_string;

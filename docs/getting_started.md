@@ -59,13 +59,13 @@ The topic is defined by the following macros and needs to include the topic name
 ```C++
 // uorb/uorb.h
 // To declare a topic, usually declare a topic in the header file.
-#define ORB_DECLARE(name, struct) ...
+#define ORB_DECLARE(_name, _struct) ...
 ```
 
 ```C++
 // uorb/uorb.h
 // Define a topic, usually define a topic in the source file, can only be defined once and need to be compiled in the C++ source file (*.cpp/*.cc)
-#define ORB_SIMPLE_DEFINE(name, struct) ...
+#define ORB_SIMPLE_DEFINE(_name, _struct) ...
 ```
 
 ### Use tools to manage uORB topics
