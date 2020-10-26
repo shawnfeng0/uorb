@@ -11,10 +11,10 @@ namespace uorb {
 struct SubscriptionImpl {
   explicit SubscriptionImpl(DeviceNode &device_node) : dev_(device_node) {
     device_node.initial_generation(last_generation_);
-    dev_.IncreaseSubscriberCount();
+    dev_.add_subscriber();
   }
 
-  ~SubscriptionImpl() { dev_.ReduceSubscriberCount(); }
+  ~SubscriptionImpl() { dev_.remove_subscriber(); }
 
   bool Copy(void *buffer) { return dev_.Copy(buffer, last_generation_); }
   unsigned updates_available() const {

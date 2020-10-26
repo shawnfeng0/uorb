@@ -136,7 +136,7 @@ bool uorb::DeviceNode::Publish(const void *data) {
   generation_++;
 
   // Mark advertise status
-  if (!advertised_) advertised_ = true;
+  if (!publisher_count_) publisher_count_ = 1;
 
   for (auto callback : callbacks_) {
     (*callback)();
@@ -145,12 +145,12 @@ bool uorb::DeviceNode::Publish(const void *data) {
   return true;
 }
 
-void uorb::DeviceNode::IncreaseSubscriberCount() {
+void uorb::DeviceNode::add_subscriber() {
   base::WriterLockGuard lg(lock_);
   subscriber_count_++;
 }
 
-void uorb::DeviceNode::ReduceSubscriberCount() {
+void uorb::DeviceNode::remove_subscriber() {
   base::WriterLockGuard lg(lock_);
   subscriber_count_--;
 }
@@ -203,5 +203,17 @@ void uorb::DeviceNode::initial_generation(unsigned &generation) {
   base::WriterLockGuard lg(lock_);
 
   // If there any previous publications allow the subscriber to read them
-  generation = generation_ - (data_ ? 1 : 0);
+  generation = generation_ - (data_ && have_publisher() ? 1 : 0);
+}
+
+bool uorb::DeviceNode::have_publisher() const { return publisher_count_ != 0; }
+
+void uorb::DeviceNode::remove_publisher() {
+  base::WriterLockGuard lg(lock_);
+  publisher_count_--;
+}
+
+void uorb::DeviceNode::add_publisher() {
+  base::WriterLockGuard lg(lock_);
+  publisher_count_++;
 }

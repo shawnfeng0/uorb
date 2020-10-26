@@ -88,7 +88,7 @@ class DeviceNode : public ListNode<DeviceNode *> {
    * @param sd
    *   the subscriber to be added.
    */
-  void IncreaseSubscriberCount();
+  void add_subscriber();
 
   /**
    * Removes the subscriber from the list.  Also notifies the remote
@@ -96,7 +96,17 @@ class DeviceNode : public ListNode<DeviceNode *> {
    * @param sd
    *   the Subscriber to be removed.
    */
-  void ReduceSubscriberCount();
+  void remove_subscriber();
+
+  /**
+   * Return true if this topic has been advertised.
+   *
+   * This is used in the case of multi_pub/sub to check if it's valid to
+   * advertise and publish to this node or if another node should be tried. */
+  bool have_publisher() const;
+
+  void add_publisher();
+  void remove_publisher();
 
   // Whether meta and instance are the same as the current one
   bool IsSameWith(const orb_metadata &meta, uint8_t instance) const;
@@ -107,26 +117,6 @@ class DeviceNode : public ListNode<DeviceNode *> {
 
   // remove item from list of work items
   void UnregisterCallback(Callback *callback);
-
-  /**
-   * Return true if this topic has been advertised.
-   *
-   * This is used in the case of multi_pub/sub to check if it's valid to
-   * advertise and publish to this node or if another node should be tried. */
-  bool is_advertised() const { return advertised_; }
-
-  /*
-   * We are cheating a bit here. First, with the current implementation, we can
-   * only have multiple publishers for instance 0. In this case the caller will
-   * have instance=nullptr and _published has no effect at all. Thus no
-   * unadvertise is necessary. In case of multiple instances, we have at most 1
-   * publisher per instance and we can signal an instance as 'free' by setting
-   * _published to false. We never really free the DeviceNode, for this we would
-   * need reference counting of subscribers and publishers. But we also do not
-   * have a leak since future publishers reuse the same DeviceNode object.
-   */
-  void mark_as_unadvertised() { advertised_ = false; }
-  void mark_as_advertised() { advertised_ = true; }
 
   // Returns the number of updated data relative to the parameter 'generation'
   unsigned updates_available(unsigned generation) const;
@@ -165,10 +155,9 @@ class DeviceNode : public ListNode<DeviceNode *> {
   (also for derived classes) */
 
   uint8_t subscriber_count_{0};
-  List<Callback *> callbacks_;
+  uint8_t publisher_count_{0};
 
-  bool advertised_{false}; /**< has ever been advertised (not necessarily
-                              published data yet) */
+  List<Callback *> callbacks_;
 
   DeviceNode(const struct orb_metadata &meta, uint8_t instance,
              unsigned int queue_size = 1);

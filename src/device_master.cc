@@ -54,9 +54,9 @@ uorb::DeviceNode *uorb::DeviceMaster::CreateAdvertiser(
   // - Unregistered device
   do {
     device_node = GetDeviceNodeLocked(meta, group_tries);
-    if (device_node && (!device_node->is_advertised() || is_single_instance)) {
+    if (device_node && (!device_node->have_publisher() || is_single_instance)) {
       device_node->set_queue_size(queue_size);
-      device_node->mark_as_advertised();
+      device_node->add_publisher();
       break;  // Find a unadvertised device or single instance device
     }
 
@@ -66,7 +66,7 @@ uorb::DeviceNode *uorb::DeviceMaster::CreateAdvertiser(
         errno = ENOMEM;
         return nullptr;
       }
-      device_node->mark_as_advertised();
+      device_node->add_publisher();
       node_list_.Add(device_node);
       break;  // Create new device
     }

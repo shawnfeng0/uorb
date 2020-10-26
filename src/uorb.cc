@@ -79,7 +79,7 @@ bool orb_destroy_publication(orb_publication_t **handle_ptr) {
   ORB_CHECK_TRUE(handle, EINVAL, return false);
 
   auto &dev = *(uorb::DeviceNode *)handle;
-  dev.mark_as_unadvertised();
+  dev.remove_publisher();
 
   handle = nullptr;
 
@@ -147,7 +147,7 @@ bool orb_exists(const struct orb_metadata *meta, unsigned int instance) {
   auto &master = DeviceMaster::get_instance();
   auto *dev = master.GetDeviceNode(*meta, instance);
 
-  return dev && dev->is_advertised();
+  return dev && dev->have_publisher();
 }
 
 unsigned int orb_group_count(const struct orb_metadata *meta) {
