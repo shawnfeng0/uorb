@@ -8,6 +8,7 @@
 #include "slog.h"
 #include "uorb/abs_time.h"
 #include "uorb/publication.h"
+#include "uorb/publication_multi.h"
 #include "uorb/subscription.h"
 #include "uorb/topics/example_string.h"
 

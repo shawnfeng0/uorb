@@ -45,7 +45,9 @@ namespace uorb {
 /**
  * uORB publication wrapper class
  */
-template <const orb_metadata &meta, uint16_t queue_size = 1>
+template <const orb_metadata &meta,
+          uint16_t queue_size =
+              DefaultQueueSize<typename msg::TypeMap<meta>::type>::value>
 class PublicationMulti {
   using Type = typename msg::TypeMap<meta>::type;
 
@@ -72,8 +74,8 @@ class PublicationMulti {
 /**
  * The publication class with data embedded.
  */
-template <const orb_metadata &T, uint16_t queue_size = 1>
-class PublicationMultiData : public PublicationMulti<T, queue_size> {
+template <const orb_metadata &T>
+class PublicationMultiData : public PublicationMulti<T> {
   using Type = typename msg::TypeMap<T>::type;
 
  public:
@@ -86,7 +88,7 @@ class PublicationMultiData : public PublicationMulti<T, queue_size> {
   }
 
   // Publishes the embedded struct.
-  bool Publish() { return PublicationMulti<T, queue_size>::Publish(data_); }
+  bool Publish() { return PublicationMulti<T>::Publish(data_); }
 
  private:
   Type data_{};

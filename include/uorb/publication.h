@@ -42,10 +42,29 @@
 
 namespace uorb {
 
+template <typename U>
+class DefaultQueueSize {
+ private:
+  template <typename T>
+  static constexpr uint8_t get_queue_size(decltype(T::ORB_QUEUE_LENGTH) *) {
+    return T::ORB_QUEUE_LENGTH;
+  }
+
+  template <typename T>
+  static constexpr uint8_t get_queue_size(...) {
+    return 1;
+  }
+
+ public:
+  static constexpr unsigned value = get_queue_size<U>(nullptr);
+};
+
 /**
  * uORB publication wrapper class
  */
-template <const orb_metadata &meta, uint16_t queue_size = 1>
+template <const orb_metadata &meta,
+          uint16_t queue_size =
+              DefaultQueueSize<typename msg::TypeMap<meta>::type>::value>
 class Publication {
   using Type = typename msg::TypeMap<meta>::type;
 
@@ -58,7 +77,7 @@ class Publication {
    */
   bool Publish(const Type &data) {
     if (!handle_) {
-        handle_ = orb_create_publication(&meta, queue_size);
+      handle_ = orb_create_publication(&meta, queue_size);
     }
 
     return handle_ && orb_publish(handle_, &data);
@@ -71,8 +90,8 @@ class Publication {
 /**
  * The publication class with data embedded.
  */
-template <const orb_metadata &T, uint16_t queue_size = 1>
-class PublicationData : public Publication<T, queue_size> {
+template <const orb_metadata &T>
+class PublicationData : public Publication<T> {
   using Type = typename msg::TypeMap<T>::type;
 
  public:
@@ -85,7 +104,7 @@ class PublicationData : public Publication<T, queue_size> {
   }
 
   // Publishes the embedded struct.
-  bool Publish() { return Publication<T, queue_size>::Publish(data_); }
+  bool Publish() { return Publication<T>::Publish(data_); }
 
  private:
   Type data_{};
