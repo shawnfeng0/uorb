@@ -135,9 +135,6 @@ bool uorb::DeviceNode::Publish(const void *data) {
 
   generation_++;
 
-  // Mark advertise status
-  if (!publisher_count_) publisher_count_ = 1;
-
   for (auto callback : callbacks_) {
     (*callback)();
   }
