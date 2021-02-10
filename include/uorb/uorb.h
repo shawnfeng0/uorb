@@ -246,9 +246,27 @@ bool orb_destroy_publication(orb_publication_t **handle_ptr) __EXPORT;
  *
  * @param handle  The handle returned from orb_advertise.
  * @param data    A pointer to the data to be published.
- * @return    true on success, false with orb_errno set accordingly.
+ *                The length must correspond to the topic structure.
+ * @return        true on success, false with orb_errno set accordingly.
  */
 bool orb_publish(orb_publication_t *handle, const void *data) __EXPORT;
+
+/**
+ * Anonymously publish data on the topic instance 0,
+ *
+ * Using this API cannot be counted into the number of publishers, and topic
+ * nodes will be marked as having anonymous publishers.
+ *
+ * Not recommended. It is generally used as a transitional API when the software
+ * architecture just starts to use the publish and subscribe mechanism.
+ *
+ * @param meta  The uORB metadata (usually from the ORB_ID() macro) for the
+ * topic.
+ * @param data @see orb_publish()
+ * @return @see orb_publish()
+ */
+bool orb_publish_anonymous(const struct orb_metadata *meta,
+                           const void *data) __EXPORT;
 
 /**
  * Advertise as the publisher of a topic.
@@ -338,9 +356,26 @@ bool orb_destroy_subscription(orb_subscription_t **handle_ptr) __EXPORT;
  *
  * @param handle  A handle returned from orb_create_subscription.
  * @param buffer  Pointer to the buffer receiving the data.
+ *                The length must correspond to the topic structure.
  * @return    true on success, false otherwise with orb_errno set accordingly.
  */
 bool orb_copy(orb_subscription_t *handle, void *buffer) __EXPORT;
+
+/**
+ * Anonymously copy data on the topic instance 0,
+ *
+ * Using this API cannot be counted into the number of subscribers, and topic
+ * nodes will be marked as having anonymous subscribers.
+ *
+ * Not recommended. It is generally used as a transitional API when the software
+ * architecture just starts to use the publish and subscribe mechanism.
+ *
+ * @param meta  The uORB metadata (usually from the ORB_ID() macro) for the
+ * topic.
+ * @param buffer @see orb_copy()
+ * @return @see orb_copy()
+ */
+bool orb_copy_anonymous(const struct orb_metadata *meta, void *buffer) __EXPORT;
 
 /**
  * Check whether a topic has been published to since the last orb_copy.

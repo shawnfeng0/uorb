@@ -81,32 +81,15 @@ class DeviceNode : public ListNode<DeviceNode *> {
    */
   bool Publish(const void *data);
 
-  /**
-   * Add the subscriber to the node's list of subscriber.  If there is
-   * remote proxy to which this subscription needs to be sent, it will
-   * done via uORBCommunicator::IChannel interface.
-   * @param sd
-   *   the subscriber to be added.
-   */
   void add_subscriber();
-
-  /**
-   * Removes the subscriber from the list.  Also notifies the remote
-   * if there a uORBCommunicator::IChannel instance.
-   * @param sd
-   *   the Subscriber to be removed.
-   */
   void remove_subscriber();
-
-  /**
-   * Return true if this topic has been advertised.
-   *
-   * This is used in the case of multi_pub/sub to check if it's valid to
-   * advertise and publish to this node or if another node should be tried. */
-  bool have_publisher() const;
+  uint8_t subscriber_count() const { return subscriber_count_; }
+  void mark_anonymous_subscriber() { has_anonymous_subscriber_ = true; }
 
   void add_publisher();
   void remove_publisher();
+  uint8_t publisher_count() const { return publisher_count_; }
+  void mark_anonymous_publisher() { has_anonymous_publisher_ = true; }
 
   // Whether meta and instance are the same as the current one
   bool IsSameWith(const orb_metadata &meta, uint8_t instance) const;
@@ -155,7 +138,9 @@ class DeviceNode : public ListNode<DeviceNode *> {
   (also for derived classes) */
 
   uint8_t subscriber_count_{0};
+  bool has_anonymous_subscriber_{false};
   uint8_t publisher_count_{0};
+  bool has_anonymous_publisher_{false};
 
   List<Callback *> callbacks_;
 

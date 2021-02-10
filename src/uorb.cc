@@ -93,6 +93,18 @@ bool orb_publish(orb_publication_t *handle, const void *data) {
   return dev.Publish(data);
 }
 
+bool orb_publish_anonymous(const struct orb_metadata *meta, const void *data) {
+  ORB_CHECK_TRUE(meta, EINVAL, return false);
+
+  auto &device_master = DeviceMaster::get_instance();
+  auto *dev = device_master.OpenDeviceNode(*meta, 0);
+  ORB_CHECK_TRUE(dev, ENOMEM, return false);
+
+  // Mark as an anonymous publisher, then copy the latest data
+  dev->mark_anonymous_publisher();
+  return dev->Publish(data);
+}
+
 orb_subscription_t *orb_create_subscription(const struct orb_metadata *meta) {
   return orb_create_subscription_multi(meta, 0);
 }
@@ -133,6 +145,20 @@ bool orb_copy(orb_subscription_t *handle, void *buffer) {
   return sub.Copy(buffer);
 }
 
+bool orb_copy_anonymous(const struct orb_metadata *meta, void *buffer) {
+  ORB_CHECK_TRUE(meta, EINVAL, return false);
+
+  auto &device_master = DeviceMaster::get_instance();
+  auto *dev = device_master.OpenDeviceNode(*meta, 0);
+  ORB_CHECK_TRUE(dev, ENOMEM, return false);
+
+  // Mark as anonymous subscription, then copy the latest data
+  dev->mark_anonymous_subscriber();
+  unsigned last_generation_;
+  dev->initial_generation(last_generation_);
+  return dev->Copy(buffer, last_generation_);
+}
+
 bool orb_check_update(orb_subscription_t *handle) {
   ORB_CHECK_TRUE(handle, EINVAL, return false);
 
@@ -147,7 +173,7 @@ bool orb_exists(const struct orb_metadata *meta, unsigned int instance) {
   auto &master = DeviceMaster::get_instance();
   auto *dev = master.GetDeviceNode(*meta, instance);
 
-  return dev && dev->have_publisher();
+  return dev && dev->publisher_count();
 }
 
 unsigned int orb_group_count(const struct orb_metadata *meta) {

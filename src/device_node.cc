@@ -200,10 +200,8 @@ void uorb::DeviceNode::initial_generation(unsigned &generation) {
   base::WriterLockGuard lg(lock_);
 
   // If there any previous publications allow the subscriber to read them
-  generation = generation_ - (data_ && have_publisher() ? 1 : 0);
+  generation = generation_ - (data_ && publisher_count() ? 1 : 0);
 }
-
-bool uorb::DeviceNode::have_publisher() const { return publisher_count_ != 0; }
 
 void uorb::DeviceNode::remove_publisher() {
   base::WriterLockGuard lg(lock_);

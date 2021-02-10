@@ -31,5 +31,5 @@ mkdir -p "$SOURCE_DIR/cmake-build-$PLATFORM_NAME" &&
     -DCMAKE_TOOLCHAIN_FILE="$PLATFORM_TOOLCHAIN_FILE" \
     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
     .. &&
-  make -j4 &&
+  make -j &&
   make install

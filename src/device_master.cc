@@ -54,7 +54,7 @@ uorb::DeviceNode *uorb::DeviceMaster::CreateAdvertiser(
   // - Unregistered device
   do {
     device_node = GetDeviceNodeLocked(meta, group_tries);
-    if (device_node && (!device_node->have_publisher() || is_single_instance)) {
+    if (device_node && (!device_node->publisher_count() || is_single_instance)) {
       device_node->set_queue_size(queue_size);
       device_node->add_publisher();
       break;  // Find a unadvertised device or single instance device
