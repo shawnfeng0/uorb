@@ -42,11 +42,11 @@ void *thread_subscriber(void *unused) {
 
   int timeout_ms = 2000;
 
-  struct orb_pollfd pollfds[] = {
+  struct orb_pollfd poll_fds[] = {
       {.fd = sub_example_string.handle(), .events = POLLIN}};
 
   while (true) {
-    if (0 < orb_poll(pollfds, ARRAY_SIZE(pollfds), timeout_ms)) {
+    if (0 < orb_poll(poll_fds, ARRAY_SIZE(poll_fds), timeout_ms)) {
       if (sub_example_string.Update()) {
         auto data = sub_example_string.get();
         LOGGER_INFO("timestamp: %" PRIu64 "[us], Receive msg: \"%s\"",
@@ -62,15 +62,22 @@ void *thread_subscriber(void *unused) {
   return nullptr;
 }
 
-int main(int argc, char *argv[]) {
+int main(int, char *[]) {
   LOGGER_INFO("uORB version: %s", orb_version());
 
   // One publishing thread, three subscription threads
   pthread_t pthread_id;
   pthread_create(&pthread_id, nullptr, thread_publisher, nullptr);
+  pthread_detach(pthread_id);
+
   pthread_create(&pthread_id, nullptr, thread_subscriber, nullptr);
+  pthread_detach(pthread_id);
+
   pthread_create(&pthread_id, nullptr, thread_subscriber, nullptr);
+  pthread_detach(pthread_id);
+
   pthread_create(&pthread_id, nullptr, thread_subscriber, nullptr);
+  pthread_detach(pthread_id);
 
   // Wait for all threads to finish
   pthread_exit(nullptr);

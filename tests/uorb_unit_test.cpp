@@ -104,13 +104,37 @@ TEST_F(UnitTest, single_topic) {
       << "orb_destroy_publication failed";
 }
 
+TEST_F(UnitTest, anonymous_pub_sub) {
+  orb_test_s pub_data{};
+
+  ASSERT_TRUE(orb_publish_anonymous(ORB_ID(orb_test), &pub_data))
+      << "publish(1) failed: " << errno;
+
+  orb_test_s sub_data{};
+  sub_data.val = 1;
+
+  ASSERT_TRUE(orb_copy_anonymous(ORB_ID(orb_test), &sub_data))
+      << "copy(1) failed: " << errno;
+
+  ASSERT_EQ(sub_data.val, pub_data.val) << "copy(1) mismatch";
+
+  pub_data.val = 2;
+  ASSERT_TRUE(orb_publish_anonymous(ORB_ID(orb_test), &pub_data))
+      << "publish(2) failed" << errno;
+
+  ASSERT_TRUE(orb_copy_anonymous(ORB_ID(orb_test), &sub_data))
+      << "copy(2) failed: " << errno;
+
+  ASSERT_EQ(sub_data.val, pub_data.val) << "copy(2) mismatch";
+}
+
 TEST_F(UnitTest, multi_topic) {
   orb_publication_t *pfd[4]{};  ///< used for test_multi and test_multi_reversed
 
   /* this routine tests the multi-topic support */
   {
-    orb_test_s t{};
-    orb_test_s u{};
+    orb_test_s pub_data{};
+    orb_test_s sub_data{};
 
     unsigned instance0;
     pfd[0] = orb_create_publication_multi(ORB_ID(orb_multitest), &instance0, 1);
@@ -122,26 +146,26 @@ TEST_F(UnitTest, multi_topic) {
 
     ASSERT_EQ(instance1, 1) << "mult. id1: " << instance1;
 
-    t.val = 103;
+    pub_data.val = 103;
 
-    ASSERT_TRUE(orb_publish(pfd[0], &t)) << "mult. pub0 fail";
+    ASSERT_TRUE(orb_publish(pfd[0], &pub_data)) << "mult. pub0 fail";
 
-    t.val = 203;
+    pub_data.val = 203;
 
-    ASSERT_TRUE(orb_publish(pfd[1], &t)) << "mult. pub1 fail";
+    ASSERT_TRUE(orb_publish(pfd[1], &pub_data)) << "mult. pub1 fail";
 
     /* subscribe to both topics and ensure valid data is received */
     auto sfd0 = orb_create_subscription_multi(ORB_ID(orb_multitest), 0);
 
-    ASSERT_TRUE(orb_copy(sfd0, &u)) << "sub #0 copy failed: " << errno;
+    ASSERT_TRUE(orb_copy(sfd0, &sub_data)) << "sub #0 copy failed: " << errno;
 
-    ASSERT_EQ(u.val, 103) << "sub #0 val. mismatch: " << u.val;
+    ASSERT_EQ(sub_data.val, 103) << "sub #0 val. mismatch: " << sub_data.val;
 
     auto sfd1 = orb_create_subscription_multi(ORB_ID(orb_multitest), 1);
 
-    ASSERT_TRUE(orb_copy(sfd1, &u)) << "sub #1 copy failed: " << errno;
+    ASSERT_TRUE(orb_copy(sfd1, &sub_data)) << "sub #1 copy failed: " << errno;
 
-    ASSERT_EQ(u.val, 203) << "sub #1 val. mismatch: " << u.val;
+    ASSERT_EQ(sub_data.val, 203) << "sub #1 val. mismatch: " << sub_data.val;
 
     latency_test<orb_test_s>(ORB_ID(orb_test));
 
@@ -159,10 +183,10 @@ TEST_F(UnitTest, multi_topic) {
 
     ASSERT_NE(sfd2, nullptr) << "errno: " << errno;
 
-    orb_test_s t{};
-    orb_test_s u{};
+    orb_test_s pub_data{};
+    orb_test_s sub_data{};
 
-    t.val = 0;
+    pub_data.val = 0;
 
     unsigned int instance2;
     pfd[2] = orb_create_publication_multi(ORB_ID(orb_multitest), &instance2, 1);
@@ -172,21 +196,21 @@ TEST_F(UnitTest, multi_topic) {
     pfd[3] = orb_create_publication_multi(ORB_ID(orb_multitest), &instance3, 1);
     ASSERT_EQ(instance3, 3) << "mult. id3: " << instance3;
 
-    t.val = 204;
-    ASSERT_TRUE(orb_publish(pfd[2], &t)) << "mult. pub0 fail";
+    pub_data.val = 204;
+    ASSERT_TRUE(orb_publish(pfd[2], &pub_data)) << "mult. pub0 fail";
 
-    t.val = 304;
-    ASSERT_TRUE(orb_publish(pfd[3], &t)) << "mult. pub1 fail";
+    pub_data.val = 304;
+    ASSERT_TRUE(orb_publish(pfd[3], &pub_data)) << "mult. pub1 fail";
 
-    ASSERT_TRUE(orb_copy(sfd2, &u)) << "sub #2 copy failed: " << errno;
+    ASSERT_TRUE(orb_copy(sfd2, &sub_data)) << "sub #2 copy failed: " << errno;
 
-    ASSERT_EQ(u.val, 204) << "sub #3 val. mismatch: " << u.val;
+    ASSERT_EQ(sub_data.val, 204) << "sub #3 val. mismatch: " << sub_data.val;
 
     auto sfd3 = orb_create_subscription_multi(ORB_ID(orb_multitest), 3);
 
-    ASSERT_TRUE(orb_copy(sfd3, &u)) << "sub #3 copy failed: " << errno;
+    ASSERT_TRUE(orb_copy(sfd3, &sub_data)) << "sub #3 copy failed: " << errno;
 
-    ASSERT_EQ(u.val, 304) << "sub #3 val. mismatch: " << u.val;
+    ASSERT_EQ(sub_data.val, 304) << "sub #3 val. mismatch: " << sub_data.val;
   }
 
   // we still have the advertisements from the previous test_multi calls.
@@ -291,8 +315,8 @@ TEST_F(UnitTest, multi_topic2_queue_simulation) {
 }  // namespace uORBTest
 
 TEST_F(UnitTest, queue) {
-  orb_test_medium_s t{};
-  orb_test_medium_s u{};
+  orb_test_medium_s pub_data{};
+  orb_test_medium_s sub_data{};
   orb_publication_t *ptopic{nullptr};
 
   auto sfd = orb_create_subscription(ORB_ID(orb_test_medium_queue));
@@ -300,17 +324,17 @@ TEST_F(UnitTest, queue) {
   ASSERT_NE(sfd, nullptr) << "subscribe failed: " << errno;
 
   const int queue_size = 16;
-  t.val = 0;
+  pub_data.val = 0;
   ptopic = orb_create_publication(ORB_ID(orb_test_medium_queue), queue_size);
   ASSERT_NE(ptopic, nullptr) << "advertise failed: " << errno;
 
-  orb_publish(ptopic, &t);
+  orb_publish(ptopic, &pub_data);
 
   ASSERT_TRUE(orb_check_update(sfd)) << "update flag not set";
 
-  ASSERT_TRUE(orb_copy(sfd, &u)) << "copy(1) failed: " << errno;
+  ASSERT_TRUE(orb_copy(sfd, &sub_data)) << "copy(1) failed: " << errno;
 
-  ASSERT_EQ(u.val, t.val) << "copy(1) mismatch";
+  ASSERT_EQ(sub_data.val, pub_data.val) << "copy(1) mismatch";
 
   ASSERT_FALSE(orb_check_update(sfd)) << "spurious updated flag";
 
@@ -319,14 +343,14 @@ TEST_F(UnitTest, queue) {
   //  Testing to write some elements...
 
   for (int i = 0; i < queue_size - 2; ++i) {
-    t.val = i;
-    orb_publish(ptopic, &t);
+    pub_data.val = i;
+    orb_publish(ptopic, &pub_data);
   }
 
   for (int i = 0; i < queue_size - 2; ++i) {
     ASSERT_TRUE(orb_check_update(sfd)) << "update flag not set, element " << i;
-    orb_copy(sfd, &u);
-    ASSERT_EQ(u.val, i) << "got wrong element from the queue (got" << u.val
+    orb_copy(sfd, &sub_data);
+    ASSERT_EQ(sub_data.val, i) << "got wrong element from the queue (got" << sub_data.val
                         << "should be" << i << ")";
   }
 
@@ -337,15 +361,15 @@ TEST_F(UnitTest, queue) {
   int overflow_by = 3;
 
   for (int i = 0; i < queue_size + overflow_by; ++i) {
-    t.val = i;
-    orb_publish(ptopic, &t);
+    pub_data.val = i;
+    orb_publish(ptopic, &pub_data);
   }
 
   for (int i = 0; i < queue_size; ++i) {
     ASSERT_TRUE(orb_check_update(sfd)) << "update flag not set, element " << i;
-    orb_copy(sfd, &u);
-    ASSERT_EQ(u.val, i + overflow_by)
-        << "got wrong element from the queue (got " << u.val << "should be"
+    orb_copy(sfd, &sub_data);
+    ASSERT_EQ(sub_data.val, i + overflow_by)
+        << "got wrong element from the queue (got " << sub_data.val << "should be"
         << i + overflow_by << ")";
   }
 
@@ -356,26 +380,26 @@ TEST_F(UnitTest, queue) {
 
   for (int i = 0; i < queue_size; ++i) {
     ASSERT_FALSE(orb_check_update(sfd)) << "update flag set, element " << i;
-    orb_copy(sfd, &u);
-    ASSERT_EQ(u.val, queue_size + overflow_by - 1)
-        << "got wrong element from the queue (got " << u.val << ", should be "
+    orb_copy(sfd, &sub_data);
+    ASSERT_EQ(sub_data.val, queue_size + overflow_by - 1)
+        << "got wrong element from the queue (got " << sub_data.val << ", should be "
         << queue_size + overflow_by - 1 << ")";
   }
 
-  t.val = 943;
-  orb_publish(ptopic, &t);
+  pub_data.val = 943;
+  orb_publish(ptopic, &pub_data);
   ASSERT_TRUE(orb_check_update(sfd)) << "update flag not set, element " << -1;
 
-  orb_copy(sfd, &u);
-  ASSERT_EQ(u.val, t.val) << "got wrong element from the queue (got " << u.val
-                          << ", should be " << t.val << ")";
+  orb_copy(sfd, &sub_data);
+  ASSERT_EQ(sub_data.val, pub_data.val) << "got wrong element from the queue (got " << sub_data.val
+                          << ", should be " << pub_data.val << ")";
 
   ASSERT_TRUE(orb_destroy_publication(&ptopic));
 }
 
 TEST_F(UnitTest, wrap_around) {
-  orb_test_medium_s t{};
-  orb_test_medium_s u{};
+  orb_test_medium_s pub_data{};
+  orb_test_medium_s sub_data{};
   orb_publication_t *ptopic{nullptr};
 
   auto sfd = orb_create_subscription(ORB_ID(orb_test_medium_wrap_around));
@@ -383,10 +407,11 @@ TEST_F(UnitTest, wrap_around) {
   ASSERT_NE(sfd, nullptr) << "subscribe failed: " << errno;
 
   const int queue_size = 16;
-  t.val = 0;
-  ptopic = orb_create_publication(ORB_ID(orb_test_medium_wrap_around), queue_size);
+  pub_data.val = 0;
+  ptopic =
+      orb_create_publication(ORB_ID(orb_test_medium_wrap_around), queue_size);
   ASSERT_NE(ptopic, nullptr) << "advertise failed: " << errno;
-  orb_publish(ptopic, &t);
+  orb_publish(ptopic, &pub_data);
 
   // Set generation to the location where wrap-around is about to be
   {
@@ -400,17 +425,17 @@ TEST_F(UnitTest, wrap_around) {
       if (!orb_check_update(sfd)) {
         break;
       }
-      orb_copy(sfd, &u);
+      orb_copy(sfd, &sub_data);
     }
   }
 
-  orb_publish(ptopic, &t);
+  orb_publish(ptopic, &pub_data);
 
   ASSERT_TRUE(orb_check_update(sfd)) << "update flag not set";
 
-  ASSERT_TRUE(orb_copy(sfd, &u)) << "copy(1) failed: " << errno;
+  ASSERT_TRUE(orb_copy(sfd, &sub_data)) << "copy(1) failed: " << errno;
 
-  ASSERT_EQ(u.val, t.val) << "copy(1) mismatch";
+  ASSERT_EQ(sub_data.val, pub_data.val) << "copy(1) mismatch";
 
   ASSERT_FALSE(orb_check_update(sfd)) << "spurious updated flag";
 
@@ -419,14 +444,14 @@ TEST_F(UnitTest, wrap_around) {
   //  Testing to write some elements...
 
   for (int i = 0; i < queue_size - 2; ++i) {
-    t.val = i;
-    orb_publish(ptopic, &t);
+    pub_data.val = i;
+    orb_publish(ptopic, &pub_data);
   }
 
   for (int i = 0; i < queue_size - 2; ++i) {
     ASSERT_TRUE(orb_check_update(sfd)) << "update flag not set, element " << i;
-    orb_copy(sfd, &u);
-    ASSERT_EQ(u.val, i) << "got wrong element from the queue (got" << u.val
+    orb_copy(sfd, &sub_data);
+    ASSERT_EQ(sub_data.val, i) << "got wrong element from the queue (got" << sub_data.val
                         << "should be" << i << ")";
   }
 
@@ -437,15 +462,15 @@ TEST_F(UnitTest, wrap_around) {
   int overflow_by = 3;
 
   for (int i = 0; i < queue_size + overflow_by; ++i) {
-    t.val = i;
-    orb_publish(ptopic, &t);
+    pub_data.val = i;
+    orb_publish(ptopic, &pub_data);
   }
 
   for (int i = 0; i < queue_size; ++i) {
     ASSERT_TRUE(orb_check_update(sfd)) << "update flag not set, element " << i;
-    orb_copy(sfd, &u);
-    ASSERT_EQ(u.val, i + overflow_by)
-        << "got wrong element from the queue (got " << u.val << "should be"
+    orb_copy(sfd, &sub_data);
+    ASSERT_EQ(sub_data.val, i + overflow_by)
+        << "got wrong element from the queue (got " << sub_data.val << "should be"
         << i + overflow_by << ")";
   }
 
@@ -456,19 +481,19 @@ TEST_F(UnitTest, wrap_around) {
 
   for (int i = 0; i < queue_size; ++i) {
     ASSERT_FALSE(orb_check_update(sfd)) << "update flag set, element " << i;
-    orb_copy(sfd, &u);
-    ASSERT_EQ(u.val, queue_size + overflow_by - 1)
-        << "got wrong element from the queue (got " << u.val << ", should be "
+    orb_copy(sfd, &sub_data);
+    ASSERT_EQ(sub_data.val, queue_size + overflow_by - 1)
+        << "got wrong element from the queue (got " << sub_data.val << ", should be "
         << queue_size + overflow_by - 1 << ")";
   }
 
-  t.val = 943;
-  orb_publish(ptopic, &t);
+  pub_data.val = 943;
+  orb_publish(ptopic, &pub_data);
   ASSERT_TRUE(orb_check_update(sfd)) << "update flag not set, element " << -1;
 
-  orb_copy(sfd, &u);
-  ASSERT_EQ(u.val, t.val) << "got wrong element from the queue (got " << u.val
-                          << ", should be " << t.val << ")";
+  orb_copy(sfd, &sub_data);
+  ASSERT_EQ(sub_data.val, pub_data.val) << "got wrong element from the queue (got " << sub_data.val
+                          << ", should be " << pub_data.val << ")";
 
   ASSERT_TRUE(orb_destroy_publication(&ptopic));
 }
@@ -484,7 +509,7 @@ TEST_F(UnitTest, queue_poll_notify) {
       << "subscribe failed: " << errno;
 
   std::thread test_queue_thread{[&]() {
-    orb_test_medium_s t{};
+    orb_test_medium_s pub_data{};
     orb_publication_t *ptopic{nullptr};
     const int queue_size = 50;
     ptopic =
@@ -503,15 +528,15 @@ TEST_F(UnitTest, queue_poll_notify) {
 
       while (burst_counter++ <
              queue_size / 2 + 7) {  // make interval non-boundary aligned
-        orb_publish(ptopic, &t);
-        ++t.val;
+        orb_publish(ptopic, &pub_data);
+        ++pub_data.val;
       }
 
       message_counter += burst_counter;
       usleep(20 * 1000);  // give subscriber a chance to catch up
     }
 
-    num_messages_sent = t.val;
+    num_messages_sent = pub_data.val;
     usleep(100 * 1000);
     thread_should_exit = true;
     orb_destroy_publication(&ptopic);

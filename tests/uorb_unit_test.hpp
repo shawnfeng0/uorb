@@ -82,20 +82,20 @@ class uORBTest::UnitTest : public testing::Test {
 
 template <typename S>
 void uORBTest::UnitTest::latency_test(orb_id_t T) {
-  S t{};
-  t.val = 308;
-  t.timestamp = orb_absolute_time_us();
+  S pub_data{};
+  pub_data.val = 308;
+  pub_data.timestamp = orb_absolute_time_us();
 
   orb_publication_t *pfd0 = orb_create_publication(T, 1);
   ASSERT_NE(pfd0, nullptr) << "orb_advertise failed: " << errno;
 
-  orb_publish(pfd0, &t);
+  orb_publish(pfd0, &pub_data);
 
   bool pub_sub_test_passed = false;
 
   /* test pub / sub latency */
 
-  // Can't pass a pointer in args, must be a null terminated
+  // Can'pub_data pass a pointer in args, must be a null terminated
   // array of strings because the strings are copied to
   // prevent access if the caller data goes out of scope
   std::thread pub_sub_latency_thread{[&]() {
@@ -110,12 +110,12 @@ void uORBTest::UnitTest::latency_test(orb_id_t T) {
         orb_create_subscription(ORB_ID(orb_test_medium));
     auto test_multi_sub_large = orb_create_subscription(ORB_ID(orb_test_large));
 
-    orb_test_large_s t{};
+    orb_test_large_s pub_data_large{};
 
     /* clear all ready flags */
-    orb_copy(test_multi_sub, &t);
-    orb_copy(test_multi_sub_medium, &t);
-    orb_copy(test_multi_sub_large, &t);
+    orb_copy(test_multi_sub, &pub_data_large);
+    orb_copy(test_multi_sub_medium, &pub_data_large);
+    orb_copy(test_multi_sub_large, &pub_data_large);
 
     fds[0].fd = test_multi_sub;
     fds[0].events = POLLIN;
@@ -125,7 +125,7 @@ void uORBTest::UnitTest::latency_test(orb_id_t T) {
     fds[2].events = POLLIN;
 
     const unsigned max_runs = 1000;
-    int current_value = t.val;
+    int current_value = pub_data_large.val;
     int num_missed = 0;
 
     // timings has to be on the heap to keep frame size below 2048 bytes
@@ -137,13 +137,13 @@ void uORBTest::UnitTest::latency_test(orb_id_t T) {
       int pret = orb_poll(&fds[0], (sizeof(fds) / sizeof(fds[0])), 500);
 
       if (fds[0].revents & POLLIN) {
-        orb_copy(test_multi_sub, &t);
+        orb_copy(test_multi_sub, &pub_data_large);
 
       } else if (fds[1].revents & POLLIN) {
-        orb_copy(test_multi_sub_medium, &t);
+        orb_copy(test_multi_sub_medium, &pub_data_large);
 
       } else if (fds[2].revents & POLLIN) {
-        orb_copy(test_multi_sub_large, &t);
+        orb_copy(test_multi_sub_large, &pub_data_large);
       }
 
       if (pret < 0) {
@@ -151,10 +151,10 @@ void uORBTest::UnitTest::latency_test(orb_id_t T) {
         continue;
       }
 
-      num_missed += t.val - current_value - 1;
-      current_value = t.val;
+      num_missed += pub_data_large.val - current_value - 1;
+      current_value = pub_data_large.val;
 
-      auto elt = (unsigned)orb_elapsed_time_us(&t.timestamp);
+      auto elt = (unsigned)orb_elapsed_time_us(&pub_data_large.timestamp);
       latency_integral += elt;
       timings[i] = elt;
 
@@ -195,10 +195,10 @@ void uORBTest::UnitTest::latency_test(orb_id_t T) {
   }};
   /* give the test task some data */
   while (!pub_sub_test_passed) {
-    ++t.val;
-    t.timestamp = orb_absolute_time_us();
+    ++pub_data.val;
+    pub_data.timestamp = orb_absolute_time_us();
 
-    ASSERT_TRUE(orb_publish(pfd0, &t)) << "mult. pub0 timing fail";
+    ASSERT_TRUE(orb_publish(pfd0, &pub_data)) << "mult. pub0 timing fail";
 
     /* simulate >800 Hz system operation */
     usleep(1000);
