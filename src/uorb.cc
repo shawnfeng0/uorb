@@ -154,8 +154,7 @@ bool orb_copy_anonymous(const struct orb_metadata *meta, void *buffer) {
 
   // Mark as anonymous subscription, then copy the latest data
   dev->mark_anonymous_subscriber();
-  unsigned last_generation_;
-  dev->initial_generation(last_generation_);
+  unsigned last_generation_ = dev->initial_generation();
   return dev->Copy(buffer, last_generation_);
 }
 

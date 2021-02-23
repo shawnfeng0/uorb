@@ -10,7 +10,7 @@ namespace uorb {
 
 struct SubscriptionImpl {
   explicit SubscriptionImpl(DeviceNode &device_node) : dev_(device_node) {
-    device_node.initial_generation(last_generation_);
+    last_generation_ = device_node.initial_generation();
     dev_.add_subscriber();
   }
 

@@ -75,7 +75,7 @@ uorb::DeviceNode::DeviceNode(const struct orb_metadata &meta, uint8_t instance,
 
 uorb::DeviceNode::~DeviceNode() { delete[] data_; }
 
-bool uorb::DeviceNode::Copy(void *dst, unsigned &sub_generation) {
+bool uorb::DeviceNode::Copy(void *dst, unsigned &sub_generation) const {
   if ((dst == nullptr) || (data_ == nullptr)) {
     return false;
   }
@@ -152,15 +152,6 @@ void uorb::DeviceNode::remove_subscriber() {
   subscriber_count_--;
 }
 
-bool uorb::DeviceNode::IsSameWith(const orb_metadata &meta,
-                                  uint8_t instance) const {
-  return IsSameWith(meta) && (instance_ == instance);
-}
-
-bool uorb::DeviceNode::IsSameWith(const orb_metadata &meta) const {
-  return &meta_ == &meta;
-}
-
 bool uorb::DeviceNode::RegisterCallback(Callback *callback) {
   if (!callback) {
     errno = EINVAL;
@@ -196,11 +187,11 @@ bool uorb::DeviceNode::set_queue_size(unsigned int queue_size) {
   return true;
 }
 
-void uorb::DeviceNode::initial_generation(unsigned &generation) {
+unsigned uorb::DeviceNode::initial_generation() const {
   base::WriterLockGuard lg(lock_);
 
   // If there any previous publications allow the subscriber to read them
-  generation = generation_ - (data_ && publisher_count() ? 1 : 0);
+  return generation_ - (data_ && publisher_count() ? 1 : 0);
 }
 
 void uorb::DeviceNode::remove_publisher() {

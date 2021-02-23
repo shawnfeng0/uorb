@@ -92,8 +92,13 @@ class DeviceNode : public ListNode<DeviceNode *> {
   void mark_anonymous_publisher() { has_anonymous_publisher_ = true; }
 
   // Whether meta and instance are the same as the current one
-  bool IsSameWith(const orb_metadata &meta, uint8_t instance) const;
-  bool IsSameWith(const orb_metadata &meta) const;
+  inline bool IsSameWith(const orb_metadata &meta, uint8_t instance) const {
+    return IsSameWith(meta) && (instance_ == instance);
+  }
+
+  inline bool IsSameWith(const orb_metadata &meta) const {
+    return &meta_ == &meta;
+  }
 
   // add item to list of work items to schedule on node update
   bool RegisterCallback(Callback *callback);
@@ -103,7 +108,7 @@ class DeviceNode : public ListNode<DeviceNode *> {
 
   // Returns the number of updated data relative to the parameter 'generation'
   unsigned updates_available(unsigned generation) const;
-  void initial_generation(unsigned &generation);
+  unsigned initial_generation() const;
 
   unsigned queue_size() const { return queue_size_; }
   bool set_queue_size(unsigned int queue_size);
@@ -122,7 +127,7 @@ class DeviceNode : public ListNode<DeviceNode *> {
    * @return bool
    *   Returns true if the data was copied.
    */
-  bool Copy(void *dst, unsigned &sub_generation);
+  bool Copy(void *dst, unsigned &sub_generation) const;
 
  private:
   friend uORBTest::UnitTest;
@@ -134,7 +139,7 @@ class DeviceNode : public ListNode<DeviceNode *> {
   uint16_t queue_size_;    /**< maximum number of elements in the queue */
   unsigned generation_{0}; /**< object generation count */
 
-  base::RwMutex lock_; /**< lock to protect access to all class members
+  mutable base::RwMutex lock_; /**< lock to protect access to all class members
   (also for derived classes) */
 
   uint8_t subscriber_count_{0};

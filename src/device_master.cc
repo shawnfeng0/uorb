@@ -84,7 +84,7 @@ uorb::DeviceNode *uorb::DeviceMaster::CreateAdvertiser(
 }
 
 uorb::DeviceNode *uorb::DeviceMaster::GetDeviceNode(const orb_metadata &meta,
-                                                    uint8_t instance) {
+                                                    uint8_t instance) const {
   uorb::base::ReaderLockGuard lg(lock_);
   return GetDeviceNodeLocked(meta, instance);
 }

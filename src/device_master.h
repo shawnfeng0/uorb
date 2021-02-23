@@ -36,10 +36,10 @@
 #include <cstdint>
 #include <list>
 
-#include "uorb/uorb.h"
 #include "base/intrusive_list.h"
 #include "base/mutex.h"
 #include "base/rw_mutex.h"
+#include "uorb/uorb.h"
 
 namespace uorb {
 class DeviceNode;
@@ -79,7 +79,7 @@ class uorb::DeviceMaster {
    * Public interface for GetDeviceNodeLocked(). Takes care of synchronization.
    * @return node if exists, nullptr otherwise
    */
-  DeviceNode *GetDeviceNode(const orb_metadata &meta, uint8_t instance);
+  DeviceNode *GetDeviceNode(const orb_metadata &meta, uint8_t instance) const;
 
  private:
   /**
@@ -97,6 +97,6 @@ class uorb::DeviceMaster {
   static DeviceMaster instance_;
 
   List<DeviceNode *> node_list_;
-  base::RwMutex lock_; /**< lock to protect access to all class members
+  mutable base::RwMutex lock_; /**< lock to protect access to all class members
                              (also for derived classes) */
 };
