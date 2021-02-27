@@ -190,52 +190,43 @@ unsigned int orb_group_count(const struct orb_metadata *meta) {
 int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
   ORB_CHECK_TRUE(fds && nfds, EINVAL, return -1);
 
+  int updated_num = 0;  // Number of new messages
   uorb::DeviceNode::SemaphoreCallback semaphore_callback;
 
-  for (unsigned i = 0; i < nfds; i++) {
-    orb_subscription_t *subscriber = fds[i].fd;
-    if (!subscriber) continue;
-
-    auto &sub = *((SubscriptionImpl *)subscriber);
-
-    unsigned &event = fds[i].events;
-    unsigned &revent = fds[i].revents;
-    revent = 0;
-
-    // Maybe there is new data before the callback is registered
-    if (sub.updates_available()) {
-      revent = event & POLLIN;
-      return 1;
+  for (unsigned i = 0; i < nfds; ++i) {
+    auto &item = fds[i];
+    if (!item.fd) {
+      continue;
     }
 
-    sub.RegisterCallback(&semaphore_callback);
-    // It may have been updated before RegisterCallback() after
-    // updates_available() is executed, to handle this situation
-    if (sub.updates_available()) {
-      sub.UnregisterCallback(&semaphore_callback);
-      revent = event & POLLIN;
-      return 1;
+    auto &item_sub = *((SubscriptionImpl *)item.fd);
+    item_sub.RegisterCallback(&semaphore_callback);
+
+    if (item_sub.updates_available() > 0) {
+      ++updated_num;
     }
   }
 
   // No new data, waiting for update
-  semaphore_callback.try_acquire_for(timeout_ms);
+  if (updated_num == 0) {
+    semaphore_callback.try_acquire_for(timeout_ms);
 
-  int updated_num = 0;  // Number of new messages
+  } else {
+    updated_num = 0;
+  }
 
-  for (unsigned i = 0; i < nfds; i++) {
-    orb_subscription_t *subscriber = fds[i].fd;
-    if (!subscriber) continue;
+  for (unsigned i = 0; i < nfds; ++i) {
+    auto &item = fds[i];
+    if (!item.fd) {
+      continue;
+    }
 
-    auto &sub = *((SubscriptionImpl *)subscriber);
+    auto &item_sub = *((SubscriptionImpl *)item.fd);
+    item_sub.UnregisterCallback(&semaphore_callback);
 
-    unsigned &event = fds[i].events;
-    unsigned &revent = fds[i].revents;
-
-    sub.UnregisterCallback(&semaphore_callback);
-
-    if (sub.updates_available()) {
-      revent |= event & POLLIN;
+    item.revents = 0;
+    if (item_sub.updates_available()) {
+      item.revents |= item.events & POLLIN;
       ++updated_num;
     }
   }

@@ -21,8 +21,8 @@ struct SubscriptionImpl {
     return dev_.updates_available(last_generation_);
   }
 
-  void UnregisterCallback(DeviceNode::Callback *callback) {
-    dev_.UnregisterCallback(callback);
+  bool UnregisterCallback(DeviceNode::Callback *callback) {
+    return dev_.UnregisterCallback(callback);
   }
 
   bool RegisterCallback(DeviceNode::Callback *callback) {

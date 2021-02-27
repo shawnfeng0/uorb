@@ -33,6 +33,8 @@
 
 #pragma once
 
+#include <set>
+
 #include "base/condition_variable.h"
 #include "base/intrusive_list.h"
 #include "base/mutex.h"
@@ -53,8 +55,7 @@ class DeviceNode : public ListNode<DeviceNode *> {
   friend DeviceMaster;
 
  public:
-  class Callback : public ListNode<Callback *> {
-   public:
+  struct Callback {
     virtual void operator()() = 0;
   };
 
@@ -100,7 +101,7 @@ class DeviceNode : public ListNode<DeviceNode *> {
   bool RegisterCallback(Callback *callback);
 
   // remove item from list of work items
-  void UnregisterCallback(Callback *callback);
+  bool UnregisterCallback(Callback *callback);
 
   // Returns the number of updated data relative to the parameter 'generation'
   unsigned updates_available(unsigned generation) const;
@@ -135,15 +136,15 @@ class DeviceNode : public ListNode<DeviceNode *> {
   uint16_t queue_size_;    /**< maximum number of elements in the queue */
   unsigned generation_{0}; /**< object generation count */
 
-  mutable base::RwMutex lock_; /**< lock to protect access to all class members
-  (also for derived classes) */
+  mutable base::RwMutex lock_; /**< lock to protect access to all class
+  members (also for derived classes) */
 
   uint8_t subscriber_count_{0};
   bool has_anonymous_subscriber_{false};
   uint8_t publisher_count_{0};
   bool has_anonymous_publisher_{false};
 
-  List<Callback *> callbacks_;
+  std::set<Callback *> callbacks_;
 
   DeviceNode(const struct orb_metadata &meta, uint8_t instance,
              unsigned int queue_size = 1);

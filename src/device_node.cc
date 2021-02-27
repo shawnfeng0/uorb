@@ -159,20 +159,13 @@ bool uorb::DeviceNode::RegisterCallback(Callback *callback) {
   }
 
   base::WriterLockGuard lg(lock_);
-
-  // prevent duplicate registrations
-  for (auto existing_callback : callbacks_) {
-    if (callback == existing_callback) {
-      return true;
-    }
-  }
-
-  return callbacks_.Add(callback);
+  callbacks_.emplace(callback);
+  return true;
 }
 
-void uorb::DeviceNode::UnregisterCallback(Callback *callback) {
+bool uorb::DeviceNode::UnregisterCallback(Callback *callback) {
   base::WriterLockGuard lg(lock_);
-  callbacks_.Remove(callback);
+  return callbacks_.erase(callback) != 0;
 }
 
 bool uorb::DeviceNode::set_queue_size(unsigned int queue_size) {
