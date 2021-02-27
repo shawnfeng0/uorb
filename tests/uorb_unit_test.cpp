@@ -203,12 +203,13 @@ TEST_F(UnitTest, multi_topic) {
     ASSERT_TRUE(orb_publish(pfd[3], &pub_data)) << "mult. pub1 fail";
 
     ASSERT_TRUE(orb_copy(sfd2, &sub_data)) << "sub #2 copy failed: " << errno;
+    orb_destroy_subscription(&sfd2);
 
     ASSERT_EQ(sub_data.val, 204) << "sub #3 val. mismatch: " << sub_data.val;
 
     auto sfd3 = orb_create_subscription_multi(ORB_ID(orb_multitest), 3);
-
     ASSERT_TRUE(orb_copy(sfd3, &sub_data)) << "sub #3 copy failed: " << errno;
+    orb_destroy_subscription(&sfd3);
 
     ASSERT_EQ(sub_data.val, 304) << "sub #3 val. mismatch: " << sub_data.val;
   }
@@ -350,8 +351,8 @@ TEST_F(UnitTest, queue) {
   for (int i = 0; i < queue_size - 2; ++i) {
     ASSERT_TRUE(orb_check_update(sfd)) << "update flag not set, element " << i;
     orb_copy(sfd, &sub_data);
-    ASSERT_EQ(sub_data.val, i) << "got wrong element from the queue (got" << sub_data.val
-                        << "should be" << i << ")";
+    ASSERT_EQ(sub_data.val, i) << "got wrong element from the queue (got"
+                               << sub_data.val << "should be" << i << ")";
   }
 
   ASSERT_FALSE(orb_check_update(sfd))
@@ -369,8 +370,8 @@ TEST_F(UnitTest, queue) {
     ASSERT_TRUE(orb_check_update(sfd)) << "update flag not set, element " << i;
     orb_copy(sfd, &sub_data);
     ASSERT_EQ(sub_data.val, i + overflow_by)
-        << "got wrong element from the queue (got " << sub_data.val << "should be"
-        << i + overflow_by << ")";
+        << "got wrong element from the queue (got " << sub_data.val
+        << "should be" << i + overflow_by << ")";
   }
 
   ASSERT_FALSE(orb_check_update(sfd))
@@ -382,8 +383,8 @@ TEST_F(UnitTest, queue) {
     ASSERT_FALSE(orb_check_update(sfd)) << "update flag set, element " << i;
     orb_copy(sfd, &sub_data);
     ASSERT_EQ(sub_data.val, queue_size + overflow_by - 1)
-        << "got wrong element from the queue (got " << sub_data.val << ", should be "
-        << queue_size + overflow_by - 1 << ")";
+        << "got wrong element from the queue (got " << sub_data.val
+        << ", should be " << queue_size + overflow_by - 1 << ")";
   }
 
   pub_data.val = 943;
@@ -391,10 +392,12 @@ TEST_F(UnitTest, queue) {
   ASSERT_TRUE(orb_check_update(sfd)) << "update flag not set, element " << -1;
 
   orb_copy(sfd, &sub_data);
-  ASSERT_EQ(sub_data.val, pub_data.val) << "got wrong element from the queue (got " << sub_data.val
-                          << ", should be " << pub_data.val << ")";
+  ASSERT_EQ(sub_data.val, pub_data.val)
+      << "got wrong element from the queue (got " << sub_data.val
+      << ", should be " << pub_data.val << ")";
 
   ASSERT_TRUE(orb_destroy_publication(&ptopic));
+  ASSERT_TRUE(orb_destroy_subscription(&sfd));
 }
 
 TEST_F(UnitTest, wrap_around) {
@@ -451,8 +454,8 @@ TEST_F(UnitTest, wrap_around) {
   for (int i = 0; i < queue_size - 2; ++i) {
     ASSERT_TRUE(orb_check_update(sfd)) << "update flag not set, element " << i;
     orb_copy(sfd, &sub_data);
-    ASSERT_EQ(sub_data.val, i) << "got wrong element from the queue (got" << sub_data.val
-                        << "should be" << i << ")";
+    ASSERT_EQ(sub_data.val, i) << "got wrong element from the queue (got"
+                               << sub_data.val << "should be" << i << ")";
   }
 
   ASSERT_FALSE(orb_check_update(sfd))
@@ -470,8 +473,8 @@ TEST_F(UnitTest, wrap_around) {
     ASSERT_TRUE(orb_check_update(sfd)) << "update flag not set, element " << i;
     orb_copy(sfd, &sub_data);
     ASSERT_EQ(sub_data.val, i + overflow_by)
-        << "got wrong element from the queue (got " << sub_data.val << "should be"
-        << i + overflow_by << ")";
+        << "got wrong element from the queue (got " << sub_data.val
+        << "should be" << i + overflow_by << ")";
   }
 
   ASSERT_FALSE(orb_check_update(sfd))
@@ -483,8 +486,8 @@ TEST_F(UnitTest, wrap_around) {
     ASSERT_FALSE(orb_check_update(sfd)) << "update flag set, element " << i;
     orb_copy(sfd, &sub_data);
     ASSERT_EQ(sub_data.val, queue_size + overflow_by - 1)
-        << "got wrong element from the queue (got " << sub_data.val << ", should be "
-        << queue_size + overflow_by - 1 << ")";
+        << "got wrong element from the queue (got " << sub_data.val
+        << ", should be " << queue_size + overflow_by - 1 << ")";
   }
 
   pub_data.val = 943;
@@ -492,21 +495,23 @@ TEST_F(UnitTest, wrap_around) {
   ASSERT_TRUE(orb_check_update(sfd)) << "update flag not set, element " << -1;
 
   orb_copy(sfd, &sub_data);
-  ASSERT_EQ(sub_data.val, pub_data.val) << "got wrong element from the queue (got " << sub_data.val
-                          << ", should be " << pub_data.val << ")";
+  ASSERT_EQ(sub_data.val, pub_data.val)
+      << "got wrong element from the queue (got " << sub_data.val
+      << ", should be " << pub_data.val << ")";
 
   ASSERT_TRUE(orb_destroy_publication(&ptopic));
+  ASSERT_TRUE(orb_destroy_subscription(&sfd));
 }
 
 TEST_F(UnitTest, queue_poll_notify) {
   orb_test_medium_s t{};
-  orb_subscription_t *sfd;
   volatile int num_messages_sent = 0;
   volatile bool thread_should_exit = false;
 
+  orb_subscription_t *sfd;
   ASSERT_NE(sfd = orb_create_subscription(ORB_ID(orb_test_medium_queue_poll)),
             nullptr)
-      << "subscribe failed: " << errno;
+                << "subscribe failed: " << errno;
 
   std::thread test_queue_thread{[&]() {
     orb_test_medium_s pub_data{};
@@ -564,6 +569,8 @@ TEST_F(UnitTest, queue_poll_notify) {
       ++next_expected_val;
     }
   }
+
+  ASSERT_TRUE(orb_destroy_subscription(&sfd));
 
   ASSERT_EQ(num_messages_sent, next_expected_val)
       << "number of sent and received messages mismatch";

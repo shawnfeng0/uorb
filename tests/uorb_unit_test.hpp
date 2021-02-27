@@ -191,7 +191,7 @@ void uORBTest::UnitTest::latency_test(orb_id_t T) {
 
     pub_sub_test_passed = true;
 
-    ASSERT_LT(static_cast<float>(latency_integral / max_runs), 100.0f);
+    ASSERT_LT(static_cast<float>(latency_integral / max_runs), 200.0f);
   }};
   /* give the test task some data */
   while (!pub_sub_test_passed) {
