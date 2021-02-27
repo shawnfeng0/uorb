@@ -106,13 +106,11 @@ class List {
   Iterator end() { return Iterator(nullptr); }
   Iterator end() const { return Iterator(nullptr); }
 
-  bool Empty() const { return head_ == nullptr; }
+  bool empty() const { return head_ == nullptr; }
 
-  unsigned Size() const {
+  unsigned size() const {
     unsigned sz = 0;
-
     for (auto node : *this) sz++;
-
     return sz;
   }
 
