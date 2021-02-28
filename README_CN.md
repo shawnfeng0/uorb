@@ -33,6 +33,7 @@ pip3 install -r ${UORB_REPO_PATH}/tools/msg/tools/requirements.txt
 
 * [入门指导](docs/getting_started_cn.md)
 * API 参考 (TODO)
+* [变更日志](CHANGELOG.md)
 
 ## 示例
 

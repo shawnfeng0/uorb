@@ -1,15 +1,19 @@
 # uORB
 
-![Tests](https://github.com/ShawnFeng0/uorb/workflows/Tests/badge.svg) [中文说明](README_CN.md)
+![Tests](https://github.com/ShawnFeng0/uorb/workflows/Tests/badge.svg)
 
-The uORB is an asynchronous publish() / subscribe() messaging API used for inter-thread communication. "UORB" is the abbreviation of Micro Object Request Broker.
+English | [中文](README_CN.md)
+
+The uORB is an asynchronous publish() / subscribe() messaging API used for inter-thread communication. "UORB" is the
+abbreviation of Micro Object Request Broker.
 
 uORB was originally a messaging middleware in PX4 Autopilot, run on Nuttx rtos or Linux:
 
 * [Introduction of uORB in PX4](https://dev.px4.io/master/en/middleware/uorb.html)
 
-The project was re-implemented based on POSIX based on the original API, some redundant software layers were removed, and only most of the core functions were retained.
-Some of these improvements and fixes have been merged upstream of PX4.
+The project was re-implemented based on POSIX based on the original API, some redundant software layers were removed,
+and only most of the core functions were retained. Some of these improvements and fixes have been merged upstream of
+PX4.
 
 * [Comparison with uORB of PX4](docs/comparison_with_px4_uorb.md)
 
@@ -33,6 +37,8 @@ pip3 install -r ${UORB_REPO_PATH}/tools/msg/tools/requirements.txt
 
 * [Getting Started Guide](docs/getting_started.md)
 * API reference (TODO)
+* [Changelog](CHANGELOG.md)
+
 
 ## Examples
 
