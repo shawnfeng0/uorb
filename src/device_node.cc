@@ -136,7 +136,7 @@ bool uorb::DeviceNode::Publish(const void *data) {
   generation_++;
 
   for (auto callback : callbacks_) {
-    (*callback)();
+    (*callback).Notify();
   }
 
   return true;
@@ -150,22 +150,6 @@ void uorb::DeviceNode::add_subscriber() {
 void uorb::DeviceNode::remove_subscriber() {
   base::WriterLockGuard lg(lock_);
   subscriber_count_--;
-}
-
-bool uorb::DeviceNode::RegisterCallback(Callback *callback) {
-  if (!callback) {
-    errno = EINVAL;
-    return false;
-  }
-
-  base::WriterLockGuard lg(lock_);
-  callbacks_.emplace(callback);
-  return true;
-}
-
-bool uorb::DeviceNode::UnregisterCallback(Callback *callback) {
-  base::WriterLockGuard lg(lock_);
-  return callbacks_.erase(callback) != 0;
 }
 
 bool uorb::DeviceNode::set_queue_size(unsigned int queue_size) {

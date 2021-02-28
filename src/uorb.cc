@@ -191,7 +191,7 @@ int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
   ORB_CHECK_TRUE(fds && nfds, EINVAL, return -1);
 
   int updated_num = 0;  // Number of new messages
-  uorb::DeviceNode::SemaphoreCallback semaphore_callback;
+  uorb::SemaphoreCallback semaphore_callback;
 
   for (unsigned i = 0; i < nfds; ++i) {
     auto &item = fds[i];

@@ -94,7 +94,7 @@ typedef ConditionVariable<CLOCK_REALTIME> RealClockCond;
 template <clockid_t clock_id>
 class SimpleSemaphore {
  public:
-  explicit SimpleSemaphore(unsigned int count) : count_(count) {}
+  explicit SimpleSemaphore(unsigned int count = 0) : count_(count) {}
   SimpleSemaphore(const SimpleSemaphore &) = delete;
   SimpleSemaphore &operator=(const SimpleSemaphore &) = delete;
 

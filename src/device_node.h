@@ -33,12 +33,14 @@
 
 #pragma once
 
+#include <cerrno>
 #include <set>
 
 #include "base/condition_variable.h"
 #include "base/intrusive_list.h"
 #include "base/mutex.h"
 #include "base/rw_mutex.h"
+#include "callback.h"
 #include "uorb/uorb.h"
 
 namespace uORBTest {
@@ -55,17 +57,6 @@ class DeviceNode : public ListNode<DeviceNode *> {
   friend DeviceMaster;
 
  public:
-  struct Callback {
-    virtual void operator()() = 0;
-  };
-
-  class SemaphoreCallback : public Callback,
-                            public base::SimpleSemaphore<CLOCK_MONOTONIC> {
-   public:
-    SemaphoreCallback() : SimpleSemaphore(0) {}
-    void operator()() override { release(); }
-  };
-
   /* do not allow copying this class */
   // no copy, assignment, move, move assignment
   DeviceNode(const DeviceNode &) = delete;
@@ -98,10 +89,24 @@ class DeviceNode : public ListNode<DeviceNode *> {
   }
 
   // add item to list of work items to schedule on node update
-  bool RegisterCallback(Callback *callback);
+  template <typename Callback>
+  bool RegisterCallback(Callback *callback) {
+    if (!callback) {
+      errno = EINVAL;
+      return false;
+    }
+
+    uorb::base::WriterLockGuard lg(uorb::DeviceNode::lock_);
+    uorb::DeviceNode::callbacks_.emplace(callback);
+    return true;
+  }
 
   // remove item from list of work items
-  bool UnregisterCallback(Callback *callback);
+  template <typename Callback>
+  bool UnregisterCallback(Callback *callback) {
+    uorb::base::WriterLockGuard lg(uorb::DeviceNode::lock_);
+    return uorb::DeviceNode::callbacks_.erase(callback) != 0;
+  }
 
   // Returns the number of updated data relative to the parameter 'generation'
   unsigned updates_available(unsigned generation) const;
@@ -144,7 +149,7 @@ class DeviceNode : public ListNode<DeviceNode *> {
   uint8_t publisher_count_{0};
   bool has_anonymous_publisher_{false};
 
-  std::set<Callback *> callbacks_;
+  std::set<detail::CallbackBase *> callbacks_;
 
   DeviceNode(const struct orb_metadata &meta, uint8_t instance,
              unsigned int queue_size = 1);
