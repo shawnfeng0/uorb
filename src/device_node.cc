@@ -168,7 +168,7 @@ unsigned uorb::DeviceNode::initial_generation() const {
   base::WriterLockGuard lg(lock_);
 
   // If there any previous publications allow the subscriber to read them
-  return generation_ - (data_ && publisher_count() ? 1 : 0);
+  return generation_ - (data_ ? 1 : 0);
 }
 
 void uorb::DeviceNode::remove_publisher() {
