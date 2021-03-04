@@ -80,6 +80,8 @@ class ConditionVariable {
     // Calculate an absolute time in the future
     const decltype(out.tv_nsec) kSec2Nsec = 1000 * 1000 * 1000;
     clock_gettime(clockid, &out);
+    out.tv_sec += time_ms / 1000;
+    time_ms %= 1000;
     uint64_t nano_secs = out.tv_nsec + ((uint64_t)time_ms * 1000 * 1000);
     out.tv_nsec = nano_secs % kSec2Nsec;
     out.tv_sec += nano_secs / kSec2Nsec;
