@@ -154,7 +154,7 @@ void uORBTest::UnitTest::latency_test(orb_id_t T) {
       num_missed += pub_data_large.val - current_value - 1;
       current_value = pub_data_large.val;
 
-      auto elt = (unsigned)orb_elapsed_time_us(&pub_data_large.timestamp);
+      auto elt = (unsigned)orb_elapsed_time_us(pub_data_large.timestamp);
       latency_integral += elt;
       timings[i] = elt;
 

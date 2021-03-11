@@ -73,10 +73,33 @@ static inline orb_abstime_us orb_absolute_time_us() {
  * Compute the delta between a timestamp taken in the past
  * and now.
  */
-static inline orb_abstime_us orb_elapsed_time_us(const orb_abstime_us *then) {
-  return then ? orb_absolute_time_us() - *then : 0;
+static inline orb_abstime_us orb_elapsed_time_us(const orb_abstime_us then) {
+  return orb_absolute_time_us() - then;
 }
 
 #ifdef __cplusplus
 }
 #endif
+
+#ifdef __cplusplus
+
+namespace time_literals {
+
+// User-defined integer literals for different time units.
+// The base unit is orb_abstime_us in microseconds
+
+constexpr orb_abstime_us operator"" _s(unsigned long long time) {
+  return orb_abstime_us(time * 1000000ULL);
+}
+
+constexpr orb_abstime_us operator"" _ms(unsigned long long time) {
+  return orb_abstime_us(time * 1000ULL);
+}
+
+constexpr orb_abstime_us operator"" _us(unsigned long long time) {
+  return orb_abstime_us(time);
+}
+
+} /* namespace time_literals */
+
+#endif /* __cplusplus */
