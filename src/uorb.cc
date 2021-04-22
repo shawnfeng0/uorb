@@ -40,11 +40,13 @@
 
 #include <cerrno>
 
-#include "device_master.h"
-#include "device_node.h"
-#include "subscription_impl.h"
+#include "src/device_master.h"
+#include "src/device_node.h"
+#include "src/subscription_impl.h"
 
-using namespace uorb;
+using uorb::DeviceMaster;
+using uorb::DeviceNode;
+using uorb::SubscriptionImpl;
 
 #define ORB_CHECK_TRUE(condition, error_code, error_action) \
   ({                                                        \
@@ -69,19 +71,18 @@ orb_publication_t *orb_create_publication_multi(const struct orb_metadata *meta,
 
   ORB_CHECK_TRUE(dev_, ENOMEM, return nullptr);
 
-  return (orb_publication_t *)dev_;
+  return reinterpret_cast<orb_publication_t *>(dev_);
 }
 
 bool orb_destroy_publication(orb_publication_t **handle_ptr) {
-  ORB_CHECK_TRUE(handle_ptr, EINVAL, return false);
+  ORB_CHECK_TRUE(handle_ptr && *handle_ptr, EINVAL, return false);
 
-  orb_publication_t *&handle = *handle_ptr;
-  ORB_CHECK_TRUE(handle, EINVAL, return false);
+  auto &publication_handle = *handle_ptr;
 
-  auto &dev = *(uorb::DeviceNode *)handle;
+  auto &dev = *(uorb::DeviceNode *)publication_handle;
   dev.remove_publisher();
 
-  handle = nullptr;
+  publication_handle = nullptr;
 
   return true;
 }
@@ -123,16 +124,16 @@ orb_subscription_t *orb_create_subscription_multi(
   auto *subscriber = new SubscriptionImpl(*dev);
   ORB_CHECK_TRUE(subscriber, ENOMEM, return nullptr);
 
-  return (orb_subscription_t *)subscriber;
+  return reinterpret_cast<orb_subscription_t *>(subscriber);
 }
 
 bool orb_destroy_subscription(orb_subscription_t **handle_ptr) {
   ORB_CHECK_TRUE(handle_ptr && *handle_ptr, EINVAL, return false);
 
-  orb_subscription_t *&subscription = *handle_ptr;
+  auto &subscription_handle = *handle_ptr;
 
-  delete (SubscriptionImpl *)subscription;
-  subscription = nullptr;  // Set the original pointer to null
+  delete reinterpret_cast<SubscriptionImpl *>(subscription_handle);
+  subscription_handle = nullptr;  // Set the original pointer to null
 
   return true;
 }
@@ -140,7 +141,7 @@ bool orb_destroy_subscription(orb_subscription_t **handle_ptr) {
 bool orb_copy(orb_subscription_t *handle, void *buffer) {
   ORB_CHECK_TRUE(handle && buffer, EINVAL, return false);
 
-  auto &sub = *(SubscriptionImpl *)handle;
+  auto &sub = *reinterpret_cast<SubscriptionImpl *>(handle);
 
   return sub.Copy(buffer);
 }
@@ -155,13 +156,13 @@ bool orb_copy_anonymous(const struct orb_metadata *meta, void *buffer) {
   // Mark as anonymous subscription, then copy the latest data
   dev->mark_anonymous_subscriber();
   unsigned last_generation_ = dev->initial_generation();
-  return dev->Copy(buffer, last_generation_);
+  return dev->Copy(buffer, &last_generation_);
 }
 
 bool orb_check_update(orb_subscription_t *handle) {
   ORB_CHECK_TRUE(handle, EINVAL, return false);
 
-  auto &sub = *(SubscriptionImpl *)handle;
+  auto &sub = *reinterpret_cast<SubscriptionImpl *>(handle);
 
   return sub.updates_available();
 }
@@ -199,7 +200,7 @@ int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
       continue;
     }
 
-    auto &item_sub = *((SubscriptionImpl *)item.fd);
+    auto &item_sub = *reinterpret_cast<SubscriptionImpl *>(item.fd);
     item_sub.RegisterCallback(&semaphore_callback);
 
     if (item_sub.updates_available() > 0) {
@@ -221,7 +222,7 @@ int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
       continue;
     }
 
-    auto &item_sub = *((SubscriptionImpl *)item.fd);
+    auto &item_sub = *reinterpret_cast<SubscriptionImpl *>(item.fd);
     item_sub.UnregisterCallback(&semaphore_callback);
 
     item.revents = 0;

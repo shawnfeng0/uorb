@@ -1,10 +1,13 @@
+//
+// Copyright (c) 2021 shawnfeng. All rights reserved.
+//
 #pragma once
 
 #include <pthread.h>
 #include <stdint.h>
 #include <time.h>
 
-#include "base/mutex.h"
+#include "src/base/mutex.h"
 
 namespace uorb {
 namespace base {
@@ -29,22 +32,23 @@ class ConditionVariable {
 
   void notify_all() noexcept { pthread_cond_broadcast(&cond_); }
 
-  void wait(Mutex &lock) noexcept {
+  void wait(Mutex &lock) noexcept {  // NOLINT
     pthread_cond_wait(&cond_, lock.GetNativeHandle());
   }
 
   template <typename Predicate>
-  void wait(Mutex &lock, Predicate p) {
+  void wait(Mutex &lock, Predicate p) {  // NOLINT
     while (!p()) wait(lock);
   }
 
   // Return true if successful
-  bool wait_until(Mutex &lock, const struct timespec &atime) {
+  bool wait_until(Mutex &lock, const struct timespec &atime) {  // NOLINT
     return pthread_cond_timedwait(&cond_, lock.GetNativeHandle(), &atime) == 0;
   }
 
   // Return true if successful
   template <typename Predicate>
+  // NOLINTNEXTLINE
   bool wait_until(Mutex &lock, const struct timespec &atime, Predicate p) {
     // Not returned until timeout or other error
     while (!p())
@@ -53,7 +57,7 @@ class ConditionVariable {
   }
 
   // Return true if successful
-  bool wait_for(Mutex &lock, unsigned long time_ms) {
+  bool wait_for(Mutex &lock, unsigned long time_ms) {  // NOLINT
     struct timespec atime {};
     GenerateFutureTime(clock_id, time_ms, atime);
     return wait_until(lock, atime);
@@ -61,9 +65,9 @@ class ConditionVariable {
 
   // Return true if successful
   template <typename Predicate>
-  bool wait_for(Mutex &lock, unsigned long time_ms, Predicate p) {
+  bool wait_for(Mutex &lock, unsigned long time_ms, Predicate p) {  // NOLINT
     struct timespec atime {};
-    GenerateFutureTime(clock_id, time_ms, atime);
+    GenerateFutureTime(clock_id, time_ms, &atime);
 
     // Not returned until timeout or other error
     while (!p())
@@ -75,8 +79,10 @@ class ConditionVariable {
 
  private:
   // Increase time_ms time based on the current clockid time
-  inline void GenerateFutureTime(clockid_t clockid, unsigned long time_ms,
-                                 struct timespec &out) {
+  inline void GenerateFutureTime(clockid_t clockid, uint32_t time_ms,
+                                 struct timespec *out_ptr) {
+    if (!out_ptr) return;
+    auto &out = *out_ptr;
     // Calculate an absolute time in the future
     const decltype(out.tv_nsec) kSec2Nsec = 1000 * 1000 * 1000;
     clock_gettime(clockid, &out);

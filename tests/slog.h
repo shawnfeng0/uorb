@@ -1,3 +1,6 @@
+//
+// Copyright (c) 2021 shawnfeng. All rights reserved.
+//
 #pragma once
 
 #include <stdio.h>
@@ -5,10 +8,12 @@
 
 // Precompiler define to get only filename;
 #if !defined(__FILENAME__)
-#define __FILENAME__                                       \
-  (strrchr(__FILE__, '/')    ? strrchr(__FILE__, '/') + 1  \
-   : strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 \
-                             : __FILE__)
+#define __FILENAME__                                        \
+  ({                                                        \
+    strrchr(__FILE__, '/')    ? strrchr(__FILE__, '/') + 1  \
+    : strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 \
+                              : __FILE__;                   \
+  })
 #endif
 
 #define LOGGER_LEVEL_TRACE "T"

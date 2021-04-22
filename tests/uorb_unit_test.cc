@@ -31,7 +31,7 @@
  *
  ****************************************************************************/
 
-#include "uorb_unit_test.hpp"
+#include "tests/uorb_unit_test.h"
 
 #include <gtest/gtest.h>
 #include <uorb/abs_time.h>
@@ -40,6 +40,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <thread>
+
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
@@ -243,8 +244,6 @@ TEST_F(UnitTest, multi_topic2_queue_simulation) {
     for (int i = 0; i < num_instances; ++i) {
       orb_publication_t *&pub = orb_pub[i];
       unsigned idx = i;
-      //		PX4_WARN("advertise %i, t=%" PRIu64, i,
-      // orb_absolute_time_us());
       pub =
           orb_create_publication_multi(ORB_ID(orb_test_medium_multi), &idx, 1);
 
@@ -268,8 +267,6 @@ TEST_F(UnitTest, multi_topic2_queue_simulation) {
       data_topic.val = data_next_idx;
 
       orb_publish(pub, &data_topic);
-      //		PX4_WARN("publishing msg (idx=%i, t=%" PRIu64 ")",
-      // data_next_idx, data_topic.time);
 
       data_next_idx = (data_next_idx + 1) % num_instances;
 
@@ -511,7 +508,7 @@ TEST_F(UnitTest, queue_poll_notify) {
   orb_subscription_t *sfd;
   ASSERT_NE(sfd = orb_create_subscription(ORB_ID(orb_test_medium_queue_poll)),
             nullptr)
-                << "subscribe failed: " << errno;
+      << "subscribe failed: " << errno;
 
   std::thread test_queue_thread{[&]() {
     orb_test_medium_s pub_data{};

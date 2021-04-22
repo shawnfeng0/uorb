@@ -96,7 +96,6 @@ class uorb::DeviceMaster {
 
   static DeviceMaster instance_;
 
-  List<DeviceNode *> node_list_;
-  mutable base::RwMutex lock_; /**< lock to protect access to all class members
-                             (also for derived classes) */
+  List<DeviceNode *> node_list_{};
+  mutable base::RwMutex lock_{};
 };

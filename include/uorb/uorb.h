@@ -132,10 +132,7 @@ struct TypeMap;
 #define ORB_DEFINE(_name, _struct, _size_no_padding, _fields)               \
   const struct orb_metadata uorb::msg::_name = {#_name, sizeof(_struct),    \
                                                 _size_no_padding, _fields}; \
-  const struct orb_metadata *__orb_##_name() {                              \
-    using namespace uorb::msg;                                              \
-    return &(_name);                                                        \
-  }                                                                         \
+  const struct orb_metadata *__orb_##_name() { return &uorb::msg::_name; }  \
   struct hack
 
 /**
@@ -156,7 +153,7 @@ extern "C" {
  * Advertiser handles are global; once obtained they can be shared freely and do
  * not need to be closed or released.
  */
-typedef struct hack_orb_publication orb_publication_t;
+typedef struct orb_publication orb_publication_t;
 
 /**
  * ORB topic subscriber handle
@@ -164,7 +161,7 @@ typedef struct hack_orb_publication orb_publication_t;
  * "struct orb_subscriber" does not exist, it is only defined to hide the
  * implementation and avoid the implicit conversion of "void*" types.
  */
-typedef struct hack_orb_subscription orb_subscription_t;
+typedef struct orb_subscription orb_subscription_t;
 
 #ifndef POLLIN
 #define POLLIN (0x01u)

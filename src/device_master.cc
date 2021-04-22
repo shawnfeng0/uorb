@@ -31,9 +31,9 @@
  *
  ****************************************************************************/
 
-#include "device_master.h"
+#include "src/device_master.h"
 
-#include "device_node.h"
+#include "src/device_node.h"
 
 uorb::DeviceMaster uorb::DeviceMaster::instance_;
 
@@ -54,7 +54,8 @@ uorb::DeviceNode *uorb::DeviceMaster::CreateAdvertiser(
   // - Unregistered device
   do {
     device_node = GetDeviceNodeLocked(meta, group_tries);
-    if (device_node && (!device_node->publisher_count() || is_single_instance)) {
+    if (device_node &&
+        (!device_node->publisher_count() || is_single_instance)) {
       device_node->set_queue_size(queue_size);
       device_node->add_publisher();
       break;  // Find a unadvertised device or single instance device

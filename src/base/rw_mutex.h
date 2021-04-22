@@ -1,3 +1,6 @@
+//
+// Copyright (c) 2021 shawnfeng. All rights reserved.
+//
 #pragma once
 
 //---------------------------------------------------------

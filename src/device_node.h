@@ -40,7 +40,7 @@
 #include "base/intrusive_list.h"
 #include "base/mutex.h"
 #include "base/rw_mutex.h"
-#include "callback.h"
+#include "src/callback.h"
 #include "uorb/uorb.h"
 
 namespace uORBTest {
@@ -129,7 +129,7 @@ class DeviceNode : public ListNode<DeviceNode *> {
    * @return bool
    *   Returns true if the data was copied.
    */
-  bool Copy(void *dst, unsigned &sub_generation) const;
+  bool Copy(void *dst, unsigned *sub_generation) const;
 
  private:
   friend uORBTest::UnitTest;
@@ -141,8 +141,7 @@ class DeviceNode : public ListNode<DeviceNode *> {
   uint16_t queue_size_;    /**< maximum number of elements in the queue */
   unsigned generation_{0}; /**< object generation count */
 
-  mutable base::RwMutex lock_; /**< lock to protect access to all class
-  members (also for derived classes) */
+  mutable base::RwMutex lock_{};
 
   uint8_t subscriber_count_{0};
   bool has_anonymous_subscriber_{false};

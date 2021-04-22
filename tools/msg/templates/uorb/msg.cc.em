@@ -68,7 +68,8 @@ topic_fields = ["%s %s" % (convert_type(field.type), field.name) for field in so
 
 @# join all msg files in one line e.g: "float[3] position;float[3] velocity;bool armed"
 @# This is used for the logger
-static constexpr char orb_@(topic_name)_fields[] = "@( ";".join(topic_fields) );";
+static constexpr char orb_@(topic_name)_fields[] =
+  "@( ";".join(topic_fields) );";
 
 @[for multi_topic in topics]@
 ORB_DEFINE(@multi_topic, struct @uorb_struct, @(struct_size-padding_end_size), orb_@(topic_name)_fields);

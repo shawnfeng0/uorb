@@ -363,9 +363,9 @@ def print_field_def(field):
 
     comment = ''
     if field.name.startswith('_padding'):
-        comment = ' // required for logger'
+        comment = '  // required for logger'
 
-    print(('\t%s%s%s %s%s;%s' % (type_prefix, type_px4, type_appendix, field.name,
+    print(('  %s%s%s %s%s;%s' % (type_prefix, type_px4, type_appendix, field.name,
                                 array_size, comment)))
 
 

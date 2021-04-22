@@ -31,7 +31,7 @@
  *
  ****************************************************************************/
 
-#include "device_node.h"
+#include "src/device_node.h"
 
 #include <cerrno>
 #include <cstring>
@@ -75,10 +75,12 @@ uorb::DeviceNode::DeviceNode(const struct orb_metadata &meta, uint8_t instance,
 
 uorb::DeviceNode::~DeviceNode() { delete[] data_; }
 
-bool uorb::DeviceNode::Copy(void *dst, unsigned &sub_generation) const {
-  if ((dst == nullptr) || (data_ == nullptr)) {
+bool uorb::DeviceNode::Copy(void *dst, unsigned *sub_generation_ptr) const {
+  if (!dst || !sub_generation_ptr || !data_) {
     return false;
   }
+
+  auto &sub_generation = *sub_generation_ptr;
 
   base::ReaderLockGuard lg(lock_);
 

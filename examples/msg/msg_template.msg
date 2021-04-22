@@ -17,7 +17,7 @@ float64 f64_value
 
 # Array
 uint32[10] uint32_array # Can be of any type
-int8[50] string
+int8[50] str
 
 # Constant
 # Will generate a macro (For C) and a constant in the structure (For C++)

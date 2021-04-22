@@ -1,7 +1,6 @@
 //
-// Created by fs on 2/28/21.
+// Copyright (c) 2021 shawnfeng. All rights reserved.
 //
-
 #pragma once
 
 namespace uorb {

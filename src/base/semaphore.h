@@ -1,9 +1,6 @@
-/**
- * @file orb_sem.hpp
- *
- * Synchronization primitive: Semaphore
- */
-
+//
+// Copyright (c) 2021 shawnfeng. All rights reserved.
+//
 #pragma once
 
 //---------------------------------------------------------
@@ -37,8 +34,8 @@ class Semaphore {
   void acquire() {
     // http://stackoverflow.com/questions/2013181/gdb-causes-sem-wait-to-fail-with-eintr-error
 #if defined(__unix__)
-    while (-1 == sem_wait(&m_sema) && errno == EINTR)
-      ;
+    while (-1 == sem_wait(&m_sema) && errno == EINTR) {
+    }
 #else
     sem_wait(&m_sema);
 #endif
@@ -64,9 +61,10 @@ class Semaphore {
   }
 
   // Increase time_ms time based on the current clockid time
-  static inline void GenerateFutureTime(clockid_t clockid,
-                                        unsigned long time_ms,
-                                        struct timespec &out) {
+  static inline void GenerateFutureTime(clockid_t clockid, uint32_t time_ms,
+                                        struct timespec *out_ptr) {
+    if (!out_ptr) return;
+    auto &out = *out_ptr;
     // Calculate an absolute time in the future
     const decltype(out.tv_nsec) kSec2Nsec = 1000 * 1000 * 1000;
     clock_gettime(clockid, &out);

@@ -73,7 +73,7 @@ configure_file(
 )
 
 # uorb library
-include_directories(src include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR} include)
 aux_source_directory(src UORB_SOURCE)
 aux_source_directory(src/base UORB_SOURCE)
 add_library(uorb ${UORB_SOURCE} ${CMAKE_CURRENT_BINARY_DIR}/src/git_version.cc)

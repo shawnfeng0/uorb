@@ -14,8 +14,8 @@ void *thread_publisher(void *arg) {
       orb_create_publication(ORB_ID(example_string), 3);
 
   for (int i = 0; i < 10; i++) {
-    snprintf((char *)example_string.string, EXAMPLE_STRING_STRING_LENGTH,
-             "%d: %s", i, "This is a string message.");
+    snprintf((char *)example_string.str, EXAMPLE_STRING_STRING_LENGTH, "%d: %s",
+             i, "This is a string message.");
 
     if (!orb_publish(pub_example_string, &example_string)) {
       LOGGER_ERROR("Publish error");
@@ -37,15 +37,14 @@ void *thread_subscriber(void *unused) {
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 #endif
 
-  struct orb_pollfd pollfds[] = {
-      {.fd = sub_example_string, .events = POLLIN}};
+  struct orb_pollfd pollfds[] = {{.fd = sub_example_string, .events = POLLIN}};
   int timeout = 2000;
 
   while (true) {
     if (0 < orb_poll(pollfds, ARRAY_SIZE(pollfds), timeout)) {
       struct example_string_s example_string;
       orb_copy(sub_example_string, &example_string);
-      LOGGER_INFO("Receive msg: \"%s\"", example_string.string);
+      LOGGER_INFO("Receive msg: \"%s\"", example_string.str);
     } else {
       LOGGER_WARN("Got no data within %d milliseconds", timeout);
       break;

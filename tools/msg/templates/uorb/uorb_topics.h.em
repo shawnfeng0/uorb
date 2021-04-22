@@ -64,4 +64,4 @@ static constexpr size_t orb_topics_count() { return ORB_TOPICS_COUNT; }
 /*
  * Returns array of topics metadata
  */
-extern const struct orb_metadata *const *orb_get_topics() __EXPORT;
+const struct orb_metadata *const *orb_get_topics() __EXPORT;

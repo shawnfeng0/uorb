@@ -1,9 +1,7 @@
 //
-// Created by fs on 2020-01-20.
+// Copyright (c) 2021 shawnfeng. All rights reserved.
 //
-
-#ifndef UORB_ORB_ERRNO_H
-#define UORB_ORB_ERRNO_H
+#pragma once
 
 #if defined(__unix__)
 #include <errno.h>
@@ -85,5 +83,3 @@ extern int *__orb_errno_location();
 
 #define orb_errno (*__orb_errno_location())
 #endif
-
-#endif  // UORB_ORB_ERRNO_H

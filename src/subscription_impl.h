@@ -1,10 +1,9 @@
 //
-// Created by fs on 2020-09-07.
+// Copyright (c) 2021 shawnfeng. All rights reserved.
 //
-
 #pragma once
 
-#include "device_node.h"
+#include "src/device_node.h"
 
 namespace uorb {
 
@@ -16,7 +15,7 @@ struct SubscriptionImpl {
 
   ~SubscriptionImpl() { dev_.remove_subscriber(); }
 
-  bool Copy(void *buffer) { return dev_.Copy(buffer, last_generation_); }
+  bool Copy(void *buffer) { return dev_.Copy(buffer, &last_generation_); }
   unsigned updates_available() const {
     return dev_.updates_available(last_generation_);
   }

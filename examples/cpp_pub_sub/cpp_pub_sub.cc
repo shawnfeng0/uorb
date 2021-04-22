@@ -1,11 +1,11 @@
 //
-// Created by fs on 9/7/20.
+// Copyright (c) 2021 shawnfeng. All rights reserved.
 //
 
 #include <pthread.h>
 #include <unistd.h>
 
-#include "slog.h"
+#include "examples/slog.h"
 #include "uorb/abs_time.h"
 #include "uorb/publication.h"
 #include "uorb/publication_multi.h"
@@ -19,7 +19,8 @@ void *thread_publisher(void *arg) {
     auto &data = pub_example_string.get();
 
     data.timestamp = orb_absolute_time_us();
-    snprintf((char *)data.string, example_string_s::STRING_LENGTH, "%d: %s", i,
+    snprintf(reinterpret_cast<char *>(data.str),
+             example_string_s::STRING_LENGTH, "%d: %s", i,
              "This is a string message.");
 
     if (!pub_example_string.Publish()) {
@@ -50,7 +51,7 @@ void *thread_subscriber(void *unused) {
       if (sub_example_string.Update()) {
         auto data = sub_example_string.get();
         LOGGER_INFO("timestamp: %" PRIu64 "[us], Receive msg: \"%s\"",
-                    data.timestamp, data.string);
+                    data.timestamp, data.str);
       }
     } else {
       LOGGER_WARN("Got no data within %d milliseconds", 2000);

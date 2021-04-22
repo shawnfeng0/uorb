@@ -33,19 +33,15 @@
 
 #pragma once
 
+#include <gtest/gtest.h>
+#include <src/device_master.h>
+#include <src/device_node.h>
+#include <unistd.h>
 #include <uorb/abs_time.h>
 #include <uorb/topics/orb_test.h>
 #include <uorb/topics/orb_test_large.h>
 #include <uorb/topics/orb_test_medium.h>
 #include <uorb/uorb.h>
-
-#include "device_master.h"
-#include "device_node.h"
-
-typedef const orb_metadata *orb_id_t;
-
-#include <gtest/gtest.h>
-#include <unistd.h>
 
 #include <cerrno>
 #include <cmath>
@@ -63,14 +59,13 @@ class UnitTest;
 
 class uORBTest::UnitTest : public testing::Test {
  public:
-
   // Assist in testing the wrap-around situation
   static void set_generation(uorb::DeviceNode &node, unsigned generation) {
     node.generation_ = generation;
   }
 
   template <typename S>
-  void latency_test(orb_id_t T);
+  void latency_test(const orb_metadata *T);
 
   // Disallow copy
   UnitTest(const uORBTest::UnitTest & /*unused*/) = delete;
@@ -81,7 +76,7 @@ class uORBTest::UnitTest : public testing::Test {
 };
 
 template <typename S>
-void uORBTest::UnitTest::latency_test(orb_id_t T) {
+void uORBTest::UnitTest::latency_test(const orb_metadata *T) {
   S pub_data{};
   pub_data.val = 308;
   pub_data.timestamp = orb_absolute_time_us();
