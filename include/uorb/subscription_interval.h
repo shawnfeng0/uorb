@@ -73,7 +73,7 @@ class SubscriptionInterval : public Subscription<T> {
    * */
   bool Updated() override {
     return Subscription<T>::Updated() &&
-           (orb_elapsed_time_us(&last_update_) >= interval_us_);
+           (orb_elapsed_time_us(last_update_) >= interval_us_);
   }
 
   /**
