@@ -78,7 +78,7 @@ class Subscription {
     if (handle_) {
       return true;
     }
-    return handle_ = orb_create_subscription_multi(&meta, instance_);
+    return (handle_ = orb_create_subscription_multi(&meta, instance_));
   }
 
   decltype(handle_) handle() { return Subscribed() ? handle_ : nullptr; }

@@ -4,11 +4,13 @@
 
 #include <pthread.h>
 #include <unistd.h>
+#include <uorb/abs_time.h>
 
 #include "slog.h"
 #include "uorb/topics/example_string.h"
 
 void *thread_publisher(void *arg) {
+  (void)arg;
   struct example_string_s example_string;
   orb_publication_t *pub_example_string =
       orb_create_publication(ORB_ID(example_string), 3);
@@ -30,6 +32,7 @@ void *thread_publisher(void *arg) {
 }
 
 void *thread_subscriber(void *unused) {
+  (void)unused;
   orb_subscription_t *sub_example_string =
       orb_create_subscription(ORB_ID(example_string));
 
@@ -57,7 +60,7 @@ void *thread_subscriber(void *unused) {
   return NULL;
 }
 
-int main(int argc, char *argv[]) {
+int main() {
   LOGGER_INFO("uORB version: %s", orb_version());
 
   // One publishing thread, three subscription threads

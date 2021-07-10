@@ -241,7 +241,7 @@ TEST_F(UnitTest, multi_topic2_queue_simulation) {
     orb_publication_t *orb_pub[num_instances]{};
     orb_test_medium_s data_topic{};
 
-    for (int i = 0; i < num_instances; ++i) {
+    for (unsigned i = 0; i < num_instances; ++i) {
       orb_publication_t *&pub = orb_pub[i];
       unsigned idx = i;
       pub =

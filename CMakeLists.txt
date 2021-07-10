@@ -72,6 +72,8 @@ configure_file(
         "src/git_version.cc"
 )
 
+add_compile_options(-Wextra -Wall)
+
 # uorb library
 aux_source_directory(src UORB_SOURCE)
 aux_source_directory(src/base UORB_SOURCE)

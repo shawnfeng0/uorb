@@ -49,7 +49,7 @@
 
 #include "slog.h"
 
-#define ORB_DEBUG(...) ((void *)0)
+#define ORB_DEBUG LOGGER_INFO
 #define ORB_INFO LOGGER_INFO
 #define ORB_ERROR LOGGER_ERROR
 

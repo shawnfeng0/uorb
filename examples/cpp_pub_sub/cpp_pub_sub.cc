@@ -12,7 +12,8 @@
 #include "uorb/subscription.h"
 #include "uorb/topics/example_string.h"
 
-void *thread_publisher(void *arg) {
+void *thread_publisher(void *unused) {
+  (void)unused;
   uorb::PublicationData<uorb::msg::example_string> pub_example_string;
 
   for (int i = 0; i < 10; i++) {
@@ -35,6 +36,7 @@ void *thread_publisher(void *arg) {
 }
 
 void *thread_subscriber(void *unused) {
+  (void)unused;
   uorb::SubscriptionData<uorb::msg::example_string> sub_example_string;
 
 #ifndef ARRAY_SIZE
@@ -44,7 +46,7 @@ void *thread_subscriber(void *unused) {
   int timeout_ms = 2000;
 
   struct orb_pollfd poll_fds[] = {
-      {.fd = sub_example_string.handle(), .events = POLLIN}};
+      {.fd = sub_example_string.handle(), .events = POLLIN, .revents = 0}};
 
   while (true) {
     if (0 < orb_poll(poll_fds, ARRAY_SIZE(poll_fds), timeout_ms)) {
