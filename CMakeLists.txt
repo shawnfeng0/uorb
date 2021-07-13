@@ -84,9 +84,7 @@ target_include_directories(uorb PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 # install uorb
 install(TARGETS uorb
         ARCHIVE DESTINATION lib)
-
-file(GLOB UORB_HEADERS include/uorb/*)
-install(FILES ${UORB_HEADERS} DESTINATION include/uorb)
+install(DIRECTORY include/uorb DESTINATION include)
 
 if (UORB_BUILD_EXAMPLES)
     add_subdirectory(examples)
