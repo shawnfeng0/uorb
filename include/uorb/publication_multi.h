@@ -52,6 +52,7 @@ class PublicationMulti {
   using Type = typename msg::TypeMap<meta>::type;
 
  public:
+  PublicationMulti() noexcept = default;
   ~PublicationMulti() { handle_ &&orb_destroy_publication(&handle_); }
 
   /**
@@ -79,7 +80,7 @@ class PublicationMultiData : public PublicationMulti<T> {
   using Type = typename msg::TypeMap<T>::type;
 
  public:
-  PublicationMultiData() = default;
+  PublicationMultiData() noexcept = default;
 
   Type &get() { return data_; }
   auto set(const Type &data) -> decltype(*this) {

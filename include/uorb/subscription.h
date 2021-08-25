@@ -63,7 +63,7 @@ class Subscription {
    * topic.
    * @param instance The instance for multi sub.
    */
-  explicit Subscription(uint8_t instance = 0) : instance_(instance) {}
+  explicit Subscription(uint8_t instance = 0) noexcept : instance_(instance) {}
 
   // no copy, assignment, move, move assignment
   Subscription(const Subscription &) = delete;
@@ -104,7 +104,8 @@ class SubscriptionData : public Subscription<T> {
   using Type = typename msg::TypeMap<T>::type;
 
  public:
-  explicit SubscriptionData(uint8_t instance = 0) : Subscription<T>(instance) {}
+  explicit SubscriptionData(uint8_t instance = 0) noexcept
+      : Subscription<T>(instance) {}
 
   ~SubscriptionData() = default;
 

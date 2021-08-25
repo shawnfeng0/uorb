@@ -69,6 +69,7 @@ class Publication {
   using Type = typename msg::TypeMap<meta>::type;
 
  public:
+  Publication() noexcept = default;
   ~Publication() { handle_ &&orb_destroy_publication(&handle_); }
 
   /**
@@ -95,7 +96,7 @@ class PublicationData : public Publication<T> {
   using Type = typename msg::TypeMap<T>::type;
 
  public:
-  PublicationData() = default;
+  PublicationData() noexcept = default;
 
   Type &get() { return data_; }
   auto set(const Type &data) -> decltype(*this) {

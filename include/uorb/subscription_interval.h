@@ -63,7 +63,8 @@ class SubscriptionInterval : public Subscription<T> {
    * @param interval The requested maximum update interval in microseconds.
    * @param instance The instance for multi sub.
    */
-  explicit SubscriptionInterval(uint32_t interval_us = 0, uint8_t instance = 0)
+  explicit SubscriptionInterval(uint32_t interval_us = 0,
+                                uint8_t instance = 0) noexcept
       : Subscription<T>(instance), interval_us_(interval_us) {}
 
   ~SubscriptionInterval() = default;
