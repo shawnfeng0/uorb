@@ -94,15 +94,23 @@ TEST_F(UnitTest, single_topic) {
   ASSERT_TRUE(orb_publish(ptopic, &t)) << "publish failed";
 
   ASSERT_TRUE(orb_check_update(sfd)) << "missing updated flag";
-
   ASSERT_TRUE(orb_copy(sfd, &u)) << "copy(2) failed: " << errno;
 
   ASSERT_EQ(u.val, t.val) << "copy(2) mismatch";
 
+  // Publish twice
+  ASSERT_TRUE(orb_publish(ptopic, &t)) << "publish failed";
+  ASSERT_TRUE(orb_publish(ptopic, &t)) << "publish failed";
+
+  ASSERT_TRUE(orb_check_update(sfd)) << "missing updated flag";
+  ASSERT_TRUE(orb_copy(sfd, &u)) << "copy failed";
+
+  ASSERT_FALSE(orb_check_update(sfd)) << "need to fail this time";
+  ASSERT_TRUE(orb_copy(sfd, &u)) << "copy failed";
+
   ASSERT_TRUE(orb_destroy_subscription(&sfd));
 
-  ASSERT_TRUE(orb_destroy_publication(&ptopic))
-      << "orb_destroy_publication failed";
+  ASSERT_TRUE(orb_destroy_publication(&ptopic));
 }
 
 TEST_F(UnitTest, anonymous_pub_sub) {

@@ -37,9 +37,15 @@
 #include <cstring>
 
 static inline bool IsInRange(unsigned left, unsigned value, unsigned right) {
-  if (right > left) {
+  if (right == left) {
+    // When the two limits are equal, the interval is considered to have only
+    // one data.
+    return value == left;
+  } else if (right > left) {
+    // Normal
     return (left <= value) && (value <= right);
-  } else {  // Maybe the data overflowed and a wraparound occurred
+  } else {
+    // Maybe the data overflowed and a wraparound occurred
     return (left <= value) || (value <= right);
   }
 }
