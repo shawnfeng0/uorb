@@ -301,8 +301,6 @@ TEST_F(UnitTest, multi_topic2_queue_simulation) {
       }
       last_time = msg.timestamp;
 
-      ORB_DEBUG("got message (val=%i, idx=%i, t=%" PRIu64 ")", msg.val,
-                orb_data_next, msg.timestamp);
       orb_data_next = (orb_data_next + 1) % num_instances;
     }
   }
