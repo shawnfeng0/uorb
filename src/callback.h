@@ -4,8 +4,6 @@
 #pragma once
 
 #include "base/condition_variable.h"
-#include "base/mutex.h"
-#include "base/semaphore.h"
 
 namespace uorb {
 
