@@ -157,6 +157,25 @@ unsigned int orb_group_count(const struct orb_metadata *meta) {
   return instance;
 }
 
+bool orb_require_status(const struct orb_metadata *meta, unsigned int instance,
+                        struct orb_status *status) {
+  ORB_CHECK_TRUE(meta, EINVAL, return false);
+
+  auto &master = DeviceMaster::get_instance();
+  auto *dev = master.GetDeviceNode(*meta, instance);
+
+  if (!dev) return false;
+
+  if (status) {
+    status->queue_size = dev->queue_size();
+    status->subscriber_count = dev->subscriber_count();
+    status->has_anonymous_subscriber = dev->has_anonymous_subscriber();
+    status->publisher_count = dev->publisher_count();
+    status->has_anonymous_publisher = dev->has_anonymous_publisher();
+  }
+  return true;
+}
+
 int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
   ORB_CHECK_TRUE(fds && nfds, EINVAL, return -1);
 

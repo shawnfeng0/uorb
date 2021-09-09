@@ -33,11 +33,13 @@ class DeviceNode : public ListNode<DeviceNode *>,
   void add_subscriber();
   void remove_subscriber();
   uint8_t subscriber_count() const { return subscriber_count_; }
+  bool has_anonymous_subscriber() const { return has_anonymous_subscriber_; }
   void mark_anonymous_subscriber() { has_anonymous_subscriber_ = true; }
 
   void add_publisher();
   void remove_publisher();
   uint8_t publisher_count() const { return publisher_count_; }
+  bool has_anonymous_publisher() const { return has_anonymous_publisher_; }
   void mark_anonymous_publisher() { has_anonymous_publisher_ = true; }
 
   // Whether meta and instance are the same as the current one

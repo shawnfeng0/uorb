@@ -34,6 +34,19 @@ struct orb_metadata {
   const char *o_fields;  /**< semicolon separated list of fields (with type) */
 };
 
+/**
+ * The status of a topic
+ */
+struct orb_status {
+  uint16_t queue_size;            // Queue size
+  uint8_t subscriber_count;       // Number of subscribers
+  bool has_anonymous_subscriber;  // Whether there are anonymous subscribers
+                                  // (orb_anonymous_copy() is called)
+  uint8_t publisher_count;        // Number of publishers
+  bool has_anonymous_publisher;   // Whether there are anonymous publisher
+                                  // (orb_anonymous_publish() is called)
+};
+
 #ifdef __cplusplus
 namespace uorb {
 namespace msg {
@@ -383,6 +396,17 @@ bool orb_exists(const struct orb_metadata *meta,
  * @return    The number of published instances of this topic
  */
 unsigned int orb_group_count(const struct orb_metadata *meta) __EXPORT;
+
+/**
+ * Get the status of a topic (number of publishers, subscribers, etc.)
+ *
+ * @param meta    ORB topic metadata
+ * @param instance  ORB instance
+ * @param status [out] The topic status.
+ * @return
+ */
+bool orb_require_status(const struct orb_metadata *meta, unsigned int instance,
+                        struct orb_status *status);
 
 /**
  * Similar to the poll() function of POSIX.
