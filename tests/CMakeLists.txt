@@ -53,7 +53,6 @@ link_libraries(uorb_unittests_msgs)
 # uorb test source
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR} TEST_SOURCE)
 add_executable(unit_tests ${TEST_SOURCE})
-target_include_directories(unit_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
-target_include_directories(unit_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(unit_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
 add_test(uorb_unit_test ${CMAKE_CURRENT_BINARY_DIR}/unit_tests)

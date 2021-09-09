@@ -34,8 +34,6 @@
 #pragma once
 
 #include <gtest/gtest.h>
-#include <src/device_master.h>
-#include <src/device_node.h>
 #include <unistd.h>
 #include <uorb/abs_time.h>
 #include <uorb/topics/orb_test.h>
@@ -47,6 +45,8 @@
 #include <cmath>
 #include <thread>
 
+#include "device_master.h"
+#include "device_node.h"
 #include "slog.h"
 
 #define ORB_DEBUG LOGGER_INFO

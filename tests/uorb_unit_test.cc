@@ -31,7 +31,7 @@
  *
  ****************************************************************************/
 
-#include "tests/uorb_unit_test.h"
+#include "uorb_unit_test.h"
 
 #include <gtest/gtest.h>
 #include <uorb/abs_time.h>

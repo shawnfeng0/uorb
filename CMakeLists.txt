@@ -79,7 +79,7 @@ aux_source_directory(src UORB_SOURCE)
 aux_source_directory(src/base UORB_SOURCE)
 add_library(uorb ${UORB_SOURCE} ${CMAKE_CURRENT_BINARY_DIR}/src/git_version.cc)
 target_include_directories(uorb PUBLIC include)
-target_include_directories(uorb PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(uorb PRIVATE src)
 
 # install uorb
 install(TARGETS uorb

@@ -3,7 +3,7 @@
 //
 #pragma once
 
-#include "src/device_node.h"
+#include "device_node.h"
 
 namespace uorb {
 

@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include <time.h>
 
-#include "src/base/mutex.h"
+#include "base/mutex.h"
 
 namespace uorb {
 namespace base {
