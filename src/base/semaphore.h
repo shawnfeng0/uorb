@@ -47,7 +47,7 @@ class Semaphore {
   // tries to decrement the internal counter, blocking for up to a duration time
   bool try_acquire_for(int time_ms) {
     struct timespec abs_time {};
-    GenerateFutureTime(CLOCK_REALTIME, time_ms, abs_time);
+    GenerateFutureTime(CLOCK_REALTIME, time_ms, &abs_time);
     return try_acquire_until(abs_time);
   }
 
