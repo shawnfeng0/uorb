@@ -149,10 +149,11 @@ unsigned int orb_group_count(const struct orb_metadata *meta) {
 
   unsigned int instance = 0;
 
-  while (orb_exists(meta, instance)) {
-    ++instance;
+  for (unsigned int i = 0; i < ORB_MULTI_MAX_INSTANCES; ++i) {
+    if (orb_exists(meta, i)) {
+      ++instance;
+    }
   }
-
   return instance;
 }
 
