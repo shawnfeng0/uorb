@@ -157,8 +157,8 @@ unsigned int orb_group_count(const struct orb_metadata *meta) {
   return instance;
 }
 
-bool orb_require_status(const struct orb_metadata *meta, unsigned int instance,
-                        struct orb_status *status) {
+bool orb_get_topic_status(const struct orb_metadata *meta,
+                          unsigned int instance, struct orb_status *status) {
   ORB_CHECK_TRUE(meta, EINVAL, return false);
 
   auto &master = DeviceMaster::get_instance();

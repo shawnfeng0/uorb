@@ -405,7 +405,7 @@ unsigned int orb_group_count(const struct orb_metadata *meta) __EXPORT;
  * @param status [out] The topic status.
  * @return
  */
-bool orb_require_status(const struct orb_metadata *meta, unsigned int instance,
+bool orb_get_topic_status(const struct orb_metadata *meta, unsigned int instance,
                         struct orb_status *status);
 
 /**
