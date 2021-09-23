@@ -29,17 +29,8 @@ else ()
             ${CMAKE_CURRENT_BINARY_DIR}/googletest-build
             EXCLUDE_FROM_ALL)
 
-    # The gtest/gtest_main targets carry header search path
-    # dependencies automatically when using CMake 2.8.11 or
-    # later. Otherwise we have to add them here ourselves.
-    if (CMAKE_VERSION VERSION_LESS 2.8.11)
-        include_directories("${gtest_SOURCE_DIR}/include")
-    endif ()
     link_libraries(gtest gtest_main)
 endif ()
-
-# uorb
-link_libraries(uorb)
 
 # pthread
 find_package(Threads REQUIRED)
@@ -47,7 +38,6 @@ link_libraries(Threads::Threads)
 
 # Generate orb message
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/msg)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/msg)
 link_libraries(uorb_unittests_msgs)
 
 # uorb test source

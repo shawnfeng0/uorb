@@ -1,4 +1,4 @@
-project(uorb_msg LANGUAGES NONE)
+project(uorb_unittests_msgs LANGUAGES NONE)
 cmake_minimum_required(VERSION 3.5)
 
 # Support IN_LIST if() operator
@@ -48,7 +48,6 @@ add_custom_command(OUTPUT ${uorb_headers}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         VERBATIM
         )
-add_custom_target(uorb_unittests_target_msg_headers DEPENDS ${uorb_headers})
 
 # Generate uORB sources
 add_custom_command(OUTPUT ${uorb_sources}
@@ -69,8 +68,7 @@ add_custom_command(OUTPUT ${uorb_sources}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         VERBATIM
         )
-add_custom_target(uorb_unittests_target_msg_sources DEPENDS ${uorb_sources})
 
-add_library(uorb_unittests_msgs ${uorb_sources})
-target_include_directories(uorb_unittests_msgs PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-add_dependencies(uorb_unittests_msgs uorb_unittests_target_msg_headers)
+add_library(${PROJECT_NAME} ${uorb_sources} ${uorb_headers})
+target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(${PROJECT_NAME} PUBLIC uorb)
