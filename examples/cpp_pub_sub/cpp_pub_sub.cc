@@ -5,7 +5,7 @@
 #include <pthread.h>
 #include <unistd.h>
 
-#include "examples/slog.h"
+#include "slog.h"
 #include "uorb/abs_time.h"
 #include "uorb/publication.h"
 #include "uorb/publication_multi.h"
