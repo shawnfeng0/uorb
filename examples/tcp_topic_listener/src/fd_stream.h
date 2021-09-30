@@ -4,11 +4,16 @@
 
 #pragma once
 
-namespace uorb {
-
+#include <fcntl.h>
 #include <poll.h>
+#include <unistd.h>
 
 #include <cassert>
+#include <cstdio>
+#include <cstdlib>
+
+namespace uorb {
+
 class Fd {
  public:
   explicit Fd(int fd) : fd_(fd) { mark_non_block(fd_); }
@@ -35,6 +40,9 @@ class Fd {
 
   int get_fd() const { return fd_; }
 
+  Fd(const Fd &) = delete;
+  Fd &operator=(const Fd &) = delete;
+
  private:
   static void mark_non_block(int fd) {
     assert(-1 != fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK));
@@ -42,4 +50,5 @@ class Fd {
 
   int fd_;
 };
+
 }  // namespace uorb
