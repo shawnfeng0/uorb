@@ -172,6 +172,7 @@ bool orb_get_topic_status(const struct orb_metadata *meta,
     status->has_anonymous_subscriber = dev->has_anonymous_subscriber();
     status->publisher_count = dev->publisher_count();
     status->has_anonymous_publisher = dev->has_anonymous_publisher();
+    status->latest_data_index = dev->updates_available(0);
   }
   return true;
 }

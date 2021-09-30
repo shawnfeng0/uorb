@@ -45,6 +45,7 @@ struct orb_status {
   uint8_t publisher_count;        // Number of publishers
   bool has_anonymous_publisher;   // Whether there are anonymous publisher
                                   // (orb_anonymous_publish() is called)
+  unsigned latest_data_index;     // The latest data index
 };
 
 #ifdef __cplusplus
@@ -405,8 +406,8 @@ unsigned int orb_group_count(const struct orb_metadata *meta) __EXPORT;
  * @param status [out] The topic status.
  * @return
  */
-bool orb_get_topic_status(const struct orb_metadata *meta, unsigned int instance,
-                        struct orb_status *status);
+bool orb_get_topic_status(const struct orb_metadata *meta,
+                          unsigned int instance, struct orb_status *status);
 
 /**
  * Similar to the poll() function of POSIX.
