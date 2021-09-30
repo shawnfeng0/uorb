@@ -56,7 +56,7 @@ msgs_count_all = len(msg_names_all)
 
 #include <stddef.h>
 
-#include <uORB/uORB.h>
+#include <uorb/uorb.h>
 
 static constexpr size_t ORB_TOPICS_COUNT{@(msgs_count_all)};
 static constexpr size_t orb_topics_count() { return ORB_TOPICS_COUNT; }
