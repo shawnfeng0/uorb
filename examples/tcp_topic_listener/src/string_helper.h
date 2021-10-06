@@ -77,17 +77,20 @@ inline std::string strip(StrType &&s,
 inline std::vector<std::string> split_string(
     const std::string &str, const std::string &delimiter = " \t") {
   std::vector<std::string> result;
-  auto str_raw = str;
 
+  std::string::size_type start;
+  std::string::size_type end = -1;
   while (true) {
-    auto start = str_raw.find_first_not_of(delimiter);
+    start = str.find_first_not_of(delimiter, end + 1);
     if (start == std::string::npos) break;  // over
 
-    auto end = str_raw.find_first_of(delimiter, start + 1);
+    end = str.find_first_of(delimiter, start + 1);
 
-    // If end is npos, it is okay.
-    result.push_back(str_raw.substr(start, end - start));
-    str_raw.erase(0, end);
+    if (end == std::string::npos) {
+      result.push_back(str.substr(start));
+      break;
+    }
+    result.push_back(str.substr(start, end - start));
   }
   return result;
 }

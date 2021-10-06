@@ -4,22 +4,99 @@
 
 #include "uorb_tcp_listener.h"
 
+#include <uorb/topics/example_string.h>
+#include <uorb/topics/msg_template.h>
+
 #include <thread>
+#include <utility>
 
 #include "command_manager.h"
+#include "data_printer.h"
 #include "fd_stream.h"
-#include "string_helper.h"
 #include "tcp_server.h"
-#include "uorb/abs_time.h"
-#include "uorb/publication.h"
-#include "uorb/publication_multi.h"
-#include "uorb/subscription.h"
-#include "uorb/subscription_interval.h"
 #include "uorb/topics/uorb_topics.h"
+
+class FunctionMarker {
+ public:
+  explicit FunctionMarker(std::string note) : note_(std::move(note)) {
+    printf("%s %s\n", note_.c_str(), "start.");
+  }
+  ~FunctionMarker() { printf("%s %s\n", note_.c_str(), "over."); }
+
+ private:
+  const std::string note_;
+};
 
 static void CmdGetVersion(uorb::Fd &fd, const std::vector<std::string> &) {
   fd.write(orb_version());
   fd.write("\n");
+}
+
+static void CmdTest(uorb::Fd &fd, const std::vector<std::string> &) {
+  msg_template_s msg_template{1,
+                              2,
+                              3,
+                              4,
+                              5,
+                              6,
+                              7,
+                              {8, 9, 10, 11},
+                              18,
+                              19,
+                              20,
+                              true,
+                              22,
+                              23,
+                              {1, 2, 3, 4, 5},
+                              {24, 25, 26, 27, 28, 29, 30}};
+  DataPrinter data_printer(uorb::msg::msg_template);
+  fd.write(data_printer.Convert2String(&msg_template, sizeof(msg_template)));
+}
+
+static const orb_metadata *find_meta(const std::string &topic_name) {
+  auto topics = orb_get_topics();
+  for (size_t i = 0; i < ORB_TOPICS_COUNT; ++i)
+    if (topic_name == topics[i]->o_name) return topics[i];
+  return nullptr;
+}
+
+static void CmdListener(uorb::Fd &fd, const std::vector<std::string> &argv) {
+  //  FunctionMarker marker(__FUNCTION__);
+
+  if (argv.empty()) {
+    fd.write("Need topic name.\n");
+  }
+  auto topic_name = argv[0];
+
+  auto meta = find_meta(topic_name);
+  if (!meta) {
+    fd.write("Can't find topic: " + topic_name + "\n");
+    return;
+  }
+
+  auto sub = orb_create_subscription(meta);
+  std::vector<uint8_t> data(meta->o_size);
+
+  orb_pollfd fds{.fd = sub, .events = POLLIN, .revents = 0};
+
+  do {
+    if (orb_poll(&fds, 1, 100) > 0) {
+      if (orb_check_and_copy(sub, data.data())) {
+        fd.write(DataPrinter(*meta).Convert2String(data.data(), data.size()));
+      }
+    }
+    char c;
+    auto ret = fd.read(&c, 1);
+    // == 0 means socket is closed; > 0 means need quit the function.
+    if (ret >= 0) {
+      break;
+    }
+    if (ret == -1 && errno == EAGAIN) {
+      continue;
+    }
+  } while (true);
+
+  orb_destroy_subscription(&sub);
 }
 
 static void CmdStatus(uorb::Fd &fd, const std::vector<std::string> &) {
@@ -69,7 +146,7 @@ static void TcpSocketSendThread(int socket_fd,
     auto line = uorb::get_line(&read_buffer);
     if (line.empty()) continue;
 
-    auto args = uorb::split_string(line);
+    auto args = uorb::split_string(line, " \t\n");
     std::string command;
     if (!args.empty()) {
       command = *args.begin();
@@ -90,6 +167,9 @@ static void TcpServerThread(uint16_t port) {
   uorb::CommandManager command_manager;
   command_manager.AddCommand("version", CmdGetVersion, "Print uorb version");
   command_manager.AddCommand("status", CmdStatus, "Print uorb status");
+  command_manager.AddCommand("test", CmdTest, "Test");
+  command_manager.AddCommand("listener", CmdListener,
+                             "topic listener, example: listener topic_name");
 
   TcpServer tcp_server(port);
 

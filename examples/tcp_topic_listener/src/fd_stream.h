@@ -17,7 +17,7 @@ namespace uorb {
 class Fd {
  public:
   explicit Fd(int fd) : fd_(fd) { mark_non_block(fd_); }
-  ~Fd() { close(fd_); }
+  ~Fd() { ::close(fd_); }
 
   ssize_t read(void *buf, size_t nbytes) const {
     return ::read(fd_, buf, nbytes);
