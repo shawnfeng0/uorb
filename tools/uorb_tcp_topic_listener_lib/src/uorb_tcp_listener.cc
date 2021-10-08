@@ -78,7 +78,8 @@ static void CmdListener(uorb::Fd &fd, const std::vector<std::string> &argv) {
   //  FunctionMarker marker(__FUNCTION__);
 
   if (argv.empty()) {
-    fd.write("Need topic name.\n");
+    fd.write("Need topic name, example: listener <topic_name>\n");
+    return;
   }
   auto topic_name = argv[0];
 
