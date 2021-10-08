@@ -6,6 +6,7 @@
 
 #include <uorb/uorb.h>
 
+#include <csignal>
 #include <thread>
 #include <utility>
 
@@ -187,6 +188,13 @@ static void TcpServerThread(uint16_t port) {
   //  command_manager.AddCommand("test", CmdTest, "Test");
   command_manager.AddCommand("listener", CmdListener,
                              "topic listener, example: listener topic_name");
+
+  // Prevent process shutdown due to SIGPIPE signal:
+  // https://stackoverflow.com/questions/54871085/is-it-a-good-practice-to-call-pthread-sigmask-in-a-thread-created-by-stdthread
+  sigset_t mask;
+  sigemptyset(&mask);
+  sigaddset(&mask, SIGPIPE);
+  pthread_sigmask(SIG_BLOCK, &mask, nullptr);
 
   TcpServer tcp_server(port);
 
