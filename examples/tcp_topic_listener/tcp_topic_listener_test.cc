@@ -38,6 +38,29 @@ template <const orb_metadata &T>
   LOGGER_WARN("Publication over.");
 }
 
+[[noreturn]] static void thread_publisher_sensor_accel() {
+  uorb::PublicationData<uorb::msg::sensor_accel> publication_data;
+
+  while (true) {
+    auto &data = publication_data.get();
+
+    data.timestamp = orb_absolute_time_us();
+    data.timestamp_sample = data.timestamp;
+    data.device_id = 10;
+    data.x += 1;
+    data.y += 2;
+    data.z += 3;
+    data.temperature += 4;
+
+    if (!publication_data.Publish()) {
+      LOGGER_ERROR("Publish error");
+    }
+
+    usleep(1 * 1000);
+  }
+  LOGGER_WARN("Publication over.");
+}
+
 template <const orb_metadata &T>
 [[noreturn]] static void thread_subscriber() {
   uorb::SubscriptionData<T> subscription_data;
@@ -63,6 +86,8 @@ template <const orb_metadata &T>
 
 int main(int, char *[]) {
   LOGGER_INFO("uORB version: %s", orb_version());
+
+  std::thread{thread_publisher_sensor_accel}.detach();
 
   for (int i = 0; i < 3; ++i)
     std::thread{thread_publisher<uorb::msg::example_string>}.detach();
