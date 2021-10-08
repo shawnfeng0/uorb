@@ -45,6 +45,7 @@
  ****************************************************************************/
 
 #include <uorb/uorb.h>
+#include <uorb/topics/uorb_topics.h>
 @{
 msg_names = [mn.replace(".msg", "") for mn in msgs]
 msgs_count = len(msg_names)
@@ -61,6 +62,7 @@ const constexpr struct orb_metadata *const uorb_topics_list[] = {
   &uorb::msg::@(msg_name)@[if idx != msgs_count_all],@[end if]
 @[end for]};
 
-const struct orb_metadata *const *orb_get_topics() {
+const struct orb_metadata *const *orb_get_topics(size_t *size) {
+  if (size) *size = sizeof(uorb_topics_list)/sizeof(uorb_topics_list[0]);
   return uorb_topics_list;
 }

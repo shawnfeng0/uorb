@@ -80,6 +80,9 @@ aux_source_directory(src/base UORB_SOURCE)
 add_library(uorb ${UORB_SOURCE} ${CMAKE_CURRENT_BINARY_DIR}/src/git_version.cc)
 target_include_directories(uorb PUBLIC include)
 target_include_directories(uorb PRIVATE src)
+target_link_libraries(uorb PRIVATE pthread)
+
+add_subdirectory(tools/uorb_tcp_topic_listener_lib EXCLUDE_FROM_ALL)
 
 # install uorb
 install(TARGETS uorb

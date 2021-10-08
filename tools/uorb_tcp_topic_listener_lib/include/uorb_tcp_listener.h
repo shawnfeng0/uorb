@@ -4,6 +4,14 @@
 
 #pragma once
 
+#include <stddef.h>
+
+/**
+ * @brief Callback function to return theme metadata
+ */
+typedef const struct orb_metadata *const *(*orb_get_topics_callback)(
+    size_t *size);
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -16,7 +24,7 @@ extern "C" {
  * Use the following script to connect:
  *   stty -echo -icanon && nc localhost 10924
  */
-void orb_tcp_listener_init();
+void orb_tcp_listener_init(orb_get_topics_callback callback);
 
 #ifdef __cplusplus
 }

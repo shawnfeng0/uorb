@@ -17,6 +17,7 @@
 #include "uorb/topics/msg_template.h"
 #include "uorb/topics/sensor_accel.h"
 #include "uorb/topics/sensor_gyro.h"
+#include "uorb/topics/uorb_topics.h"
 #include "uorb_tcp_listener.h"
 
 template <const orb_metadata &T>
@@ -82,7 +83,7 @@ int main(int, char *[]) {
   orb_publish_anonymous(&uorb::msg::example_string, &example);
   orb_copy_anonymous(&uorb::msg::example_string, &example);
 
-  orb_tcp_listener_init();
+  orb_tcp_listener_init(orb_get_topics);
 
   // Wait for all threads to finish
   pthread_exit(nullptr);

@@ -2,16 +2,12 @@ project(uorb_examples)
 
 cmake_minimum_required(VERSION 3.5)
 
-# pthread
-find_package(Threads REQUIRED)
-link_libraries(Threads::Threads)
+# Common header: slog.h
+add_library(slog INTERFACE)
+target_include_directories(slog INTERFACE common)
 
 # Generate orb message
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/msg)
-link_libraries(uorb_examples_msgs)
-
-# Common header: slog.h
-include_directories(PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+add_subdirectory(msg)
 
 # Examples
 add_subdirectory(c_pub_sub)

@@ -64,6 +64,7 @@ add_custom_command(OUTPUT ${uorb_sources}
         DEPENDS
         ${msg_files}
         ${tools_root}/templates/uorb/msg.cc.em
+        ${tools_root}/templates/uorb/uorb_topics.cc.em
         ${tools_root}/tools/px_generate_uorb_topic_files.py
         COMMENT "Generating uORB topic sources"
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}

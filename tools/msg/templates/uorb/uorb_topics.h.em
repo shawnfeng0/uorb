@@ -61,7 +61,15 @@ msgs_count_all = len(msg_names_all)
 static constexpr size_t ORB_TOPICS_COUNT{@(msgs_count_all)};
 static constexpr size_t orb_topics_count() { return ORB_TOPICS_COUNT; }
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * Returns array of topics metadata
  */
-const struct orb_metadata *const *orb_get_topics() __EXPORT;
+const struct orb_metadata *const *orb_get_topics(size_t *size) __EXPORT;
+
+#ifdef __cplusplus
+}
+#endif

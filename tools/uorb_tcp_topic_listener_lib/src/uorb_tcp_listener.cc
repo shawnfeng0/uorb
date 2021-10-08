@@ -4,8 +4,7 @@
 
 #include "uorb_tcp_listener.h"
 
-#include <uorb/topics/example_string.h>
-#include <uorb/topics/msg_template.h>
+#include <uorb/uorb.h>
 
 #include <thread>
 #include <utility>
@@ -14,7 +13,20 @@
 #include "data_printer.h"
 #include "fd_stream.h"
 #include "tcp_server.h"
-#include "uorb/topics/uorb_topics.h"
+
+static orb_get_topics_callback global_topics_callback_ = nullptr;
+
+/*
+ * Returns array of topics metadata
+ */
+static const struct orb_metadata *const *orb_get_topics(size_t *size) {
+  if (global_topics_callback_ != nullptr) {
+    return global_topics_callback_(size);
+  } else {
+    if (size) *size = 0;
+    return nullptr;
+  }
+}
 
 class FunctionMarker {
  public:
@@ -32,30 +44,32 @@ static void CmdGetVersion(uorb::Fd &fd, const std::vector<std::string> &) {
   fd.write("\n");
 }
 
-static void CmdTest(uorb::Fd &fd, const std::vector<std::string> &) {
-  msg_template_s msg_template{1,
-                              2,
-                              3,
-                              4,
-                              5,
-                              6,
-                              7,
-                              {8, 9, 10, 11},
-                              18,
-                              19,
-                              20,
-                              true,
-                              22,
-                              23,
-                              {1, 2, 3, 4, 5},
-                              {24, 25, 26, 27, 28, 29, 30}};
-  DataPrinter data_printer(uorb::msg::msg_template);
-  fd.write(data_printer.Convert2String(&msg_template, sizeof(msg_template)));
-}
+//
+// static void CmdTest(uorb::Fd &fd, const std::vector<std::string> &) {
+//  msg_template_s msg_template{1,
+//                              2,
+//                              3,
+//                              4,
+//                              5,
+//                              6,
+//                              7,
+//                              {8, 9, 10, 11},
+//                              18,
+//                              19,
+//                              20,
+//                              true,
+//                              22,
+//                              23,
+//                              {1, 2, 3, 4, 5},
+//                              {24, 25, 26, 27, 28, 29, 30}};
+//  DataPrinter data_printer(uorb::msg::msg_template);
+//  fd.write(data_printer.Convert2String(&msg_template, sizeof(msg_template)));
+//}
 
 static const orb_metadata *find_meta(const std::string &topic_name) {
-  auto topics = orb_get_topics();
-  for (size_t i = 0; i < ORB_TOPICS_COUNT; ++i)
+  size_t orb_topics_count = 0;
+  auto topics = orb_get_topics(&orb_topics_count);
+  for (size_t i = 0; i < orb_topics_count; ++i)
     if (topic_name == topics[i]->o_name) return topics[i];
   return nullptr;
 }
@@ -105,8 +119,10 @@ static void CmdStatus(uorb::Fd &fd, const std::vector<std::string> &) {
            "%-20s %-10s %-10s %-10s %-10s %-10s\n", "topic", "instance",
            "queue", "sub", "pub", "index");
   fd.write(send_buffer);
-  auto topics = orb_get_topics();
-  for (size_t i = 0; i < ORB_TOPICS_COUNT; ++i) {
+
+  size_t orb_topics_count = 0;
+  auto topics = orb_get_topics(&orb_topics_count);
+  for (size_t i = 0; i < orb_topics_count; ++i) {
     for (size_t instance = 0; instance < ORB_MULTI_MAX_INSTANCES; ++instance) {
       orb_status status{};
       if (orb_get_topic_status(topics[i], instance, &status)) {
@@ -167,7 +183,7 @@ static void TcpServerThread(uint16_t port) {
   uorb::CommandManager command_manager;
   command_manager.AddCommand("version", CmdGetVersion, "Print uorb version");
   command_manager.AddCommand("status", CmdStatus, "Print uorb status");
-  command_manager.AddCommand("test", CmdTest, "Test");
+  //  command_manager.AddCommand("test", CmdTest, "Test");
   command_manager.AddCommand("listener", CmdListener,
                              "topic listener, example: listener topic_name");
 
@@ -180,4 +196,7 @@ static void TcpServerThread(uint16_t port) {
   printf("TCP server finished");
 }
 
-void orb_tcp_listener_init() { std::thread{TcpServerThread, 10924}.detach(); }
+void orb_tcp_listener_init(orb_get_topics_callback callback) {
+  global_topics_callback_ = callback;
+  std::thread{TcpServerThread, 10924}.detach();
+}
