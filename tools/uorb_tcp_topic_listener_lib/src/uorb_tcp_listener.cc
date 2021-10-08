@@ -95,10 +95,11 @@ static void CmdListener(uorb::Fd &fd, const std::vector<std::string> &argv) {
 
   orb_pollfd fds{.fd = sub, .events = POLLIN, .revents = 0};
 
+  DataPrinter data_printer(*meta);
   do {
     if (orb_poll(&fds, 1, 100) > 0) {
       if (orb_check_and_copy(sub, data.data())) {
-        fd.write(DataPrinter(*meta).Convert2String(data.data(), data.size()));
+        fd.write(data_printer.Convert2String(data.data(), data.size()));
       }
     }
     char c;
