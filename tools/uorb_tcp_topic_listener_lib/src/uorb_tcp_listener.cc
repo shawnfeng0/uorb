@@ -4,6 +4,7 @@
 
 #include "uorb_tcp_listener.h"
 
+#include <uorb/abs_time.h>
 #include <uorb/uorb.h>
 
 #include <csignal>
@@ -96,10 +97,15 @@ static void CmdListener(uorb::Fd &fd, const std::vector<std::string> &argv) {
   orb_pollfd fds{.fd = sub, .events = POLLIN, .revents = 0};
 
   DataPrinter data_printer(*meta);
+  orb_abstime_us last_write_timestamp{};
   do {
     if (orb_poll(&fds, 1, 100) > 0) {
       if (orb_check_and_copy(sub, data.data())) {
-        fd.write(data_printer.Convert2String(data.data(), data.size()));
+        using namespace uorb::time_literals;
+        if (orb_elapsed_time_us(last_write_timestamp) > 100_ms) {
+          last_write_timestamp = orb_absolute_time_us();
+          fd.write(data_printer.Convert2String(data.data(), data.size()));
+        }
       }
     }
     char c;
