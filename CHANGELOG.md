@@ -7,7 +7,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-[Unreleased]: https://github.com/ShawnFeng0/uorb/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/ShawnFeng0/uorb/compare/v0.2.3...HEAD
+
+## [0.2.3] - 2021-10-10
+[0.2.3]: https://github.com/ShawnFeng0/uorb/compare/v0.2.2...v0.2.3
+
+### Added
+
+- Add `orb_get_topic_status()` interface to get topics status, such as the number of publish subscribers, publish index, etc.
+- [optional] Add topics tcp listener library. The tcp client (such as `netcat`) can be used outside the application to connect to the topics listener server to obtain the status of uorb's topics, especially the topic data (10HZ) can be obtained in real time.
 
 ## [0.2.2] - 2021-09-09
 
