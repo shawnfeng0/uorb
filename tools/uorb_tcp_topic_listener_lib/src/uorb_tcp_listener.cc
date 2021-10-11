@@ -30,44 +30,11 @@ static const struct orb_metadata *const *orb_get_topics(size_t *size) {
   }
 }
 
-class FunctionMarker {
- public:
-  explicit FunctionMarker(std::string note) : note_(std::move(note)) {
-    printf("%s %s\n", note_.c_str(), "start.");
-  }
-  ~FunctionMarker() { printf("%s %s\n", note_.c_str(), "over."); }
-
- private:
-  const std::string note_;
-};
-
 static void CmdGetVersion(uorb::listener::Fd &fd,
                           const std::vector<std::string> &) {
   fd.write(orb_version());
   fd.write("\n");
 }
-
-//
-// static void CmdTest(uorb::Fd &fd, const std::vector<std::string> &) {
-//  msg_template_s msg_template{1,
-//                              2,
-//                              3,
-//                              4,
-//                              5,
-//                              6,
-//                              7,
-//                              {8, 9, 10, 11},
-//                              18,
-//                              19,
-//                              20,
-//                              true,
-//                              22,
-//                              23,
-//                              {1, 2, 3, 4, 5},
-//                              {24, 25, 26, 27, 28, 29, 30}};
-//  DataPrinter data_printer(uorb::msg::msg_template);
-//  fd.write(data_printer.Convert2String(&msg_template, sizeof(msg_template)));
-//}
 
 static const orb_metadata *find_meta(const std::string &topic_name) {
   size_t orb_topics_count = 0;
@@ -79,8 +46,6 @@ static const orb_metadata *find_meta(const std::string &topic_name) {
 
 static void CmdListener(uorb::listener::Fd &fd,
                         const std::vector<std::string> &argv) {
-  //  FunctionMarker marker(__FUNCTION__);
-
   if (argv.empty()) {
     fd.write("Need topic name, example: listener <topic_name>\n");
     return;
@@ -195,7 +160,6 @@ static void TcpServerThread(uint16_t port) {
   uorb::listener::CommandManager command_manager;
   command_manager.AddCommand("version", CmdGetVersion, "Print uorb version");
   command_manager.AddCommand("status", CmdStatus, "Print uorb status");
-  //  command_manager.AddCommand("test", CmdTest, "Test");
   command_manager.AddCommand("listener", CmdListener,
                              "topic listener, example: listener topic_name");
 
