@@ -6,6 +6,9 @@
 
 #include <netinet/in.h>
 
+namespace uorb {
+namespace listener {
+
 class TcpServer {
  public:
   explicit TcpServer(uint16_t port) {
@@ -50,3 +53,6 @@ class TcpServer {
   struct sockaddr_in address_ {};
   int server_fd_;
 };
+
+}  // namespace listener
+}  // namespace uorb

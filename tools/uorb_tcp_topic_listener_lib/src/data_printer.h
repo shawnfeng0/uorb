@@ -10,6 +10,9 @@
 
 #include "var_attr.h"
 
+namespace uorb {
+namespace listener {
+
 class DataPrinter {
  public:
   explicit DataPrinter(const orb_metadata &meta)
@@ -37,3 +40,6 @@ class DataPrinter {
   const std::vector<uorb::listener::VarAttr> vars;
   size_t size_;
 };
+
+}  // namespace listener
+}  // namespace uorb

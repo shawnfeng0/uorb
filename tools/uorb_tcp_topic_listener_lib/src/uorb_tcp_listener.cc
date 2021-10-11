@@ -41,7 +41,8 @@ class FunctionMarker {
   const std::string note_;
 };
 
-static void CmdGetVersion(uorb::Fd &fd, const std::vector<std::string> &) {
+static void CmdGetVersion(uorb::listener::Fd &fd,
+                          const std::vector<std::string> &) {
   fd.write(orb_version());
   fd.write("\n");
 }
@@ -76,7 +77,8 @@ static const orb_metadata *find_meta(const std::string &topic_name) {
   return nullptr;
 }
 
-static void CmdListener(uorb::Fd &fd, const std::vector<std::string> &argv) {
+static void CmdListener(uorb::listener::Fd &fd,
+                        const std::vector<std::string> &argv) {
   //  FunctionMarker marker(__FUNCTION__);
 
   if (argv.empty()) {
@@ -96,7 +98,7 @@ static void CmdListener(uorb::Fd &fd, const std::vector<std::string> &argv) {
 
   orb_pollfd fds{.fd = sub, .events = POLLIN, .revents = 0};
 
-  DataPrinter data_printer(*meta);
+  uorb::listener::DataPrinter data_printer(*meta);
   orb_abstime_us last_write_timestamp{};
   do {
     if (orb_poll(&fds, 1, 100) > 0) {
@@ -122,7 +124,8 @@ static void CmdListener(uorb::Fd &fd, const std::vector<std::string> &argv) {
   orb_destroy_subscription(&sub);
 }
 
-static void CmdStatus(uorb::Fd &fd, const std::vector<std::string> &) {
+static void CmdStatus(uorb::listener::Fd &fd,
+                      const std::vector<std::string> &) {
   char send_buffer[256];
   snprintf(send_buffer, sizeof(send_buffer),
            "%-20s %-10s %-10s %-10s %-10s %-10s\n", "topic", "instance",
@@ -151,9 +154,9 @@ static void CmdStatus(uorb::Fd &fd, const std::vector<std::string> &) {
   }
 }
 
-static void TcpSocketSendThread(int socket_fd,
-                                const uorb::CommandManager &command_manager) {
-  uorb::Fd socket(socket_fd);
+static void TcpSocketSendThread(
+    int socket_fd, const uorb::listener::CommandManager &command_manager) {
+  uorb::listener::Fd socket(socket_fd);
 
   std::string read_buffer;
 
@@ -168,16 +171,16 @@ static void TcpSocketSendThread(int socket_fd,
     if (n < 0) continue;
 
     read_buffer.append(buffer, buffer + n);
-    auto line = uorb::get_line(&read_buffer);
+    auto line = uorb::listener::get_line(&read_buffer);
     if (line.empty()) continue;
 
-    auto args = uorb::split_string(line, " \t\n");
+    auto args = uorb::listener::split_string(line, " \t\n");
     std::string command;
     if (!args.empty()) {
       command = *args.begin();
       args.erase(args.begin());
     }
-    uorb::strip(command);
+    uorb::listener::strip(command);
     if (!command.empty()) {
       if (!command_manager.ExecuteCommand(command, socket, args)) {
         socket.write("Command not found: " + command + "\n");
@@ -189,7 +192,7 @@ static void TcpSocketSendThread(int socket_fd,
 }
 
 static void TcpServerThread(uint16_t port) {
-  uorb::CommandManager command_manager;
+  uorb::listener::CommandManager command_manager;
   command_manager.AddCommand("version", CmdGetVersion, "Print uorb version");
   command_manager.AddCommand("status", CmdStatus, "Print uorb status");
   //  command_manager.AddCommand("test", CmdTest, "Test");
@@ -203,7 +206,7 @@ static void TcpServerThread(uint16_t port) {
   sigaddset(&mask, SIGPIPE);
   pthread_sigmask(SIG_BLOCK, &mask, nullptr);
 
-  TcpServer tcp_server(port);
+  uorb::listener::TcpServer tcp_server(port);
 
   int new_socket;
   while ((new_socket = tcp_server.accept()) >= 0) {

@@ -13,18 +13,19 @@
 #include "fd_stream.h"
 
 namespace uorb {
+namespace listener {
 
 class CommandManager {
  public:
   CommandManager() {
-    command_map_["help"].entry = [&](uorb::Fd& fd,
+    command_map_["help"].entry = [&](uorb::listener::Fd& fd,
                                      const std::vector<std::string>& args) {
       ExecuteHelp(fd, args);
     };
     command_map_["help"].comment = "Print command list";
   }
-  using CommandFunction =
-      std::function<void(uorb::Fd& fd, const std::vector<std::string>& args)>;
+  using CommandFunction = std::function<void(
+      uorb::listener::Fd& fd, const std::vector<std::string>& args)>;
 
   auto AddCommand(const std::string& command, CommandFunction function,
                   const std::string& comment = "") -> decltype(*this) {
@@ -33,14 +34,15 @@ class CommandManager {
     return *this;
   }
 
-  void ExecuteHelp(uorb::Fd& fd, const std::vector<std::string>&) const {
+  void ExecuteHelp(uorb::listener::Fd& fd,
+                   const std::vector<std::string>&) const {
     fd.write("Command list: \n");
     for (const auto& i : command_map_) {
       fd.write("\t" + i.first + ": " + i.second.comment + "\n");
     }
   }
 
-  bool ExecuteCommand(const std::string& command, uorb::Fd& fd,
+  bool ExecuteCommand(const std::string& command, uorb::listener::Fd& fd,
                       const std::vector<std::string>& args) const {
     if (!command_map_.count(command)) {
       return false;
@@ -52,10 +54,12 @@ class CommandManager {
  private:
   struct CommandInfo {
     std::string comment;
-    std::function<void(uorb::Fd& fd, const std::vector<std::string>& args)>
+    std::function<void(uorb::listener::Fd& fd,
+                       const std::vector<std::string>& args)>
         entry;
   };
   std::map<std::string, CommandInfo> command_map_;
 };
 
+}  // namespace listener
 }  // namespace uorb

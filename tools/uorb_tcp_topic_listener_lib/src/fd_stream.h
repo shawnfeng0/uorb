@@ -13,6 +13,7 @@
 #include <cstdlib>
 
 namespace uorb {
+namespace listener {
 
 class Fd {
  public:
@@ -51,4 +52,5 @@ class Fd {
   int fd_;
 };
 
+}  // namespace listener
 }  // namespace uorb

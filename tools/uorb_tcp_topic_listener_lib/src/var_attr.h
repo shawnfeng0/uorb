@@ -119,7 +119,7 @@ class VarAttr {
 static std::vector<uorb::listener::VarAttr> ParseMetaFields(
     const orb_metadata &meta) {
   std::vector<uorb::listener::VarAttr> result;
-  auto vars = uorb::split_string(meta.o_fields, ";");
+  auto vars = uorb::listener::split_string(meta.o_fields, ";");
   result.reserve(vars.size());
   for (const auto &var : vars) {
     result.emplace_back(var);

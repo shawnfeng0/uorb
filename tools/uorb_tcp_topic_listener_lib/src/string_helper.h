@@ -8,6 +8,7 @@
 #include <vector>
 
 namespace uorb {
+namespace listener {
 
 static constexpr char kDefaultStripChars[] = " \t\r\n";
 
@@ -131,4 +132,5 @@ std::string get_line(std::string *str) {
   return line;
 }
 
+}  // namespace listener
 }  // namespace uorb
