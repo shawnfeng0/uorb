@@ -1,3 +1,5 @@
+project(uorb_test)
+
 # gtest
 find_package(GTest)
 if (GTest_FOUND)
@@ -38,11 +40,11 @@ link_libraries(Threads::Threads)
 
 # Generate orb message
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/msg)
-link_libraries(uorb_unittests_msgs)
 
 # uorb test source
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR} TEST_SOURCE)
-add_executable(unit_tests ${TEST_SOURCE})
-target_include_directories(unit_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+add_executable(${PROJECT_NAME} ${TEST_SOURCE})
+target_link_libraries(${PROJECT_NAME} PRIVATE uorb_unittests_msgs)
+target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
-add_test(uorb_unit_test ${CMAKE_CURRENT_BINARY_DIR}/unit_tests)
+add_test(${PROJECT_NAME} ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME})
