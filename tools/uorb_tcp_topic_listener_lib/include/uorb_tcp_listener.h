@@ -6,6 +6,8 @@
 
 #include <stddef.h>
 
+#include <cstdint>
+
 /**
  * @brief Callback function to return theme metadata
  */
@@ -19,12 +21,13 @@ extern "C" {
 /**
  * Start a tcp shell for the uorb topic
  *
- * port: 10924
+ * @param callback @see orb_get_topics_callback
+ * @param port tcp listener port
  *
  * Use the following script to connect:
  *   stty -echo -icanon && nc localhost 10924
  */
-void orb_tcp_listener_init(orb_get_topics_callback callback);
+void orb_tcp_listener_init(orb_get_topics_callback callback, uint16_t port);
 
 #ifdef __cplusplus
 }

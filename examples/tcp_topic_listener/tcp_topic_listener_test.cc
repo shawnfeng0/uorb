@@ -108,7 +108,7 @@ int main(int, char *[]) {
   orb_publish_anonymous(&uorb::msg::example_string, &example);
   orb_copy_anonymous(&uorb::msg::example_string, &example);
 
-  orb_tcp_listener_init(orb_get_topics);
+  orb_tcp_listener_init(orb_get_topics, 10924);
 
   // Wait for all threads to finish
   pthread_exit(nullptr);

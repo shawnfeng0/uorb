@@ -179,7 +179,7 @@ static void TcpServerThread(uint16_t port) {
   printf("TCP server finished");
 }
 
-void orb_tcp_listener_init(orb_get_topics_callback callback) {
+void orb_tcp_listener_init(orb_get_topics_callback callback, uint16_t port) {
   global_topics_callback_ = callback;
-  std::thread{TcpServerThread, 10924}.detach();
+  std::thread{TcpServerThread, port}.detach();
 }
