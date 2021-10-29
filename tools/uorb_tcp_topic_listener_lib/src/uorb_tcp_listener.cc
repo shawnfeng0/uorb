@@ -65,15 +65,21 @@ static void CmdListener(uorb::listener::Fd &fd,
 
   uorb::listener::DataPrinter data_printer(*meta);
   orb_abstime_us last_write_timestamp{};
+  const int timeout_ms = 1000;
   do {
-    if (orb_poll(&fds, 1, 100) > 0) {
+    if (orb_poll(&fds, 1, timeout_ms) > 0) {
       if (orb_check_and_copy(sub, data.data())) {
         using namespace uorb::time_literals;
         if (orb_elapsed_time_us(last_write_timestamp) > 100_ms) {
           last_write_timestamp = orb_absolute_time_us();
           fd.write(data_printer.Convert2String(data.data(), data.size()));
         }
+      } else {
+        fd.write("Error: Polling was successful but no data was read.");
       }
+    } else {
+      fd.write(std::to_string(timeout_ms) + "ms" +
+               std::string{" timeout for polling data"});
     }
     char c;
     auto ret = fd.read(&c, 1);
