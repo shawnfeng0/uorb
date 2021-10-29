@@ -5,8 +5,7 @@
 #pragma once
 
 #include <stddef.h>
-
-#include <cstdint>
+#include <stdint.h>
 
 /**
  * @brief Callback function to return theme metadata
