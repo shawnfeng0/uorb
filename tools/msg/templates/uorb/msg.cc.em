@@ -62,6 +62,12 @@ topic_name = spec.short_name
 sorted_fields = sorted(spec.parsed_fields(), key=sizeof_field_type, reverse=True)
 struct_size, padding_end_size = add_padding_bytes(sorted_fields, search_path)
 topic_fields = ["%s %s" % (convert_type(field.type), field.name) for field in sorted_fields]
+
+topic_queue_size = 1
+for constant in spec.constants:
+  if constant.name == "ORB_QUEUE_SIZE":
+    topic_queue_size =  constant.val
+    break
 }@
 
 #include <uorb/topics/@(topic_name).h>
@@ -72,5 +78,5 @@ static constexpr char orb_@(topic_name)_fields[] =
   "@( ";".join(topic_fields) );";
 
 @[for multi_topic in topics]@
-ORB_DEFINE(@multi_topic, struct @uorb_struct, @(struct_size-padding_end_size), orb_@(topic_name)_fields);
+ORB_DEFINE(@multi_topic, struct @uorb_struct, @(struct_size-padding_end_size), orb_@(topic_name)_fields, @topic_queue_size);
 @[end for]

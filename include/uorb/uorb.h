@@ -32,6 +32,7 @@ struct orb_metadata {
   const uint16_t
       o_size_no_padding; /**< object size w/o padding at the end (for logger) */
   const char *o_fields;  /**< semicolon separated list of fields (with type) */
+  uint16_t o_queue_size; /**< semicolon separated list of fields (with type) */
 };
 
 /**
@@ -110,16 +111,16 @@ struct TypeMap;
  * @param _fields	All fields in a semicolon separated list
  *                      e.g: "float[3] position;bool armed"
  */
-#define ORB_DEFINE(_name, _struct, _size_no_padding, _fields)               \
-  const struct orb_metadata uorb::msg::_name = {#_name, sizeof(_struct),    \
-                                                _size_no_padding, _fields}; \
-  const struct orb_metadata *__orb_##_name = &uorb::msg::_name;             \
+#define ORB_DEFINE(_name, _struct, _size_no_padding, _fields, _queue_size) \
+  const struct orb_metadata uorb::msg::_name = {                           \
+      #_name, sizeof(_struct), _size_no_padding, _fields, _queue_size};    \
+  const struct orb_metadata *__orb_##_name = &uorb::msg::_name;            \
   struct hack
 
 /**
  * Simple define ORB topics, ignore _size_no_padding and _fields
  */
-#define ORB_SIMPLE_DEFINE(_name, _struct) ORB_DEFINE(_name, _struct, 0, "")
+#define ORB_SIMPLE_DEFINE(_name, _struct) ORB_DEFINE(_name, _struct, 0, "", 1)
 
 #ifdef __cplusplus
 extern "C" {
