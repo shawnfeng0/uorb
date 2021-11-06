@@ -71,7 +71,7 @@ struct TypeMap;
  *
  * @param _name		The name of the topic.
  */
-#define ORB_ID(_name) __orb_##_name()
+#define ORB_ID(_name) __orb_##_name
 
 /**
  * Declare (prototype) the uORB metadata for a topic (used by code generators).
@@ -89,10 +89,10 @@ struct TypeMap;
   };                                      \
   }                                       \
   }                                       \
-  extern "C" const struct orb_metadata *__orb_##_name() __EXPORT
+  extern "C" const struct orb_metadata *__orb_##_name __EXPORT
 #else
 #define ORB_DECLARE(_name, _struct) \
-  extern const struct orb_metadata *__orb_##_name() __EXPORT
+  extern const struct orb_metadata *__orb_##_name __EXPORT
 #endif
 
 /**
@@ -113,7 +113,7 @@ struct TypeMap;
 #define ORB_DEFINE(_name, _struct, _size_no_padding, _fields)               \
   const struct orb_metadata uorb::msg::_name = {#_name, sizeof(_struct),    \
                                                 _size_no_padding, _fields}; \
-  const struct orb_metadata *__orb_##_name() { return &uorb::msg::_name; }  \
+  const struct orb_metadata *__orb_##_name = &uorb::msg::_name;             \
   struct hack
 
 /**
