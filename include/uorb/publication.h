@@ -5,33 +5,10 @@
 
 namespace uorb {
 
-namespace internal {
-
-template <typename U>
-class DefaultQueueSize {
- private:
-  template <typename T>
-  static constexpr uint8_t get_queue_size(decltype(T::ORB_QUEUE_LENGTH) *) {
-    return T::ORB_QUEUE_LENGTH;
-  }
-
-  template <typename T>
-  static constexpr uint8_t get_queue_size(...) {
-    return 1;
-  }
-
- public:
-  static constexpr unsigned value = get_queue_size<U>(nullptr);
-};
-
-}  // namespace internal
-
 /**
  * uORB publication wrapper class
  */
-template <const orb_metadata &meta,
-          uint16_t queue_size = internal::DefaultQueueSize<
-              typename msg::TypeMap<meta>::type>::value>
+template <const orb_metadata &meta>
 class Publication : internal::Noncopyable {
   using Type = typename msg::TypeMap<meta>::type;
 
@@ -45,7 +22,7 @@ class Publication : internal::Noncopyable {
    */
   bool Publish(const Type &data) {
     if (!handle_) {
-      handle_ = orb_create_publication(&meta, queue_size);
+      handle_ = orb_create_publication(&meta);
     }
 
     return handle_ && orb_publish(handle_, &data);

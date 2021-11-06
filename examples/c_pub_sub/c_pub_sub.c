@@ -13,7 +13,7 @@ void *thread_publisher(void *arg) {
   (void)arg;
   struct example_string_s example_string;
   orb_publication_t *pub_example_string =
-      orb_create_publication(ORB_ID(example_string), 3);
+      orb_create_publication(ORB_ID(example_string));
 
   for (int i = 0; i < 10; i++) {
     snprintf((char *)example_string.str, EXAMPLE_STRING_STRING_LENGTH, "%d: %s",

@@ -76,7 +76,6 @@ class DeviceNode : public ListNode<DeviceNode *>,
   unsigned initial_generation() const;
 
   unsigned queue_size() const { return queue_size_; }
-  bool set_queue_size(unsigned int queue_size);
 
   const char *name() const { return meta_.o_name; }
   uint8_t instance() const { return instance_; }
@@ -100,9 +99,9 @@ class DeviceNode : public ListNode<DeviceNode *>,
   const orb_metadata &meta_; /**< object metadata information */
   const uint8_t instance_;   /**< orb multi instance identifier */
 
-  uint8_t *data_{nullptr}; /**< allocated object buffer */
-  uint16_t queue_size_;    /**< maximum number of elements in the queue */
-  unsigned generation_{0}; /**< object generation count */
+  uint8_t *data_{nullptr};    /**< allocated object buffer */
+  const uint16_t queue_size_; /**< maximum number of elements in the queue */
+  unsigned generation_{0};    /**< object generation count */
 
   mutable base::RwMutex lock_{};
 
@@ -113,8 +112,7 @@ class DeviceNode : public ListNode<DeviceNode *>,
 
   std::set<detail::CallbackBase *> callbacks_;
 
-  DeviceNode(const struct orb_metadata &meta, uint8_t instance,
-             unsigned int queue_size = 1);
+  DeviceNode(const struct orb_metadata &meta, uint8_t instance);
   ~DeviceNode();
 };
 }  // namespace uorb

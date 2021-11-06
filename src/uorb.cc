@@ -24,18 +24,16 @@ using uorb::SubscriptionImpl;
     }                                                       \
   })
 
-orb_publication_t *orb_create_publication(const struct orb_metadata *meta,
-                                          unsigned int queue_size) {
-  return orb_create_publication_multi(meta, nullptr, queue_size);
+orb_publication_t *orb_create_publication(const struct orb_metadata *meta) {
+  return orb_create_publication_multi(meta, nullptr);
 }
 
 orb_publication_t *orb_create_publication_multi(const struct orb_metadata *meta,
-                                                unsigned int *instance,
-                                                unsigned int queue_size) {
+                                                unsigned int *instance) {
   ORB_CHECK_TRUE(meta, EINVAL, return nullptr);
   auto &meta_ = *meta;
   auto &device_master = DeviceMaster::get_instance();
-  auto *dev_ = device_master.CreateAdvertiser(meta_, instance, queue_size);
+  auto *dev_ = device_master.CreateAdvertiser(meta_, instance);
 
   ORB_CHECK_TRUE(dev_, ENOMEM, return nullptr);
 

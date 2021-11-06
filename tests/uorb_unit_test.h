@@ -39,6 +39,7 @@
 #include <uorb/topics/orb_test.h>
 #include <uorb/topics/orb_test_large.h>
 #include <uorb/topics/orb_test_medium.h>
+#include <uorb/topics/orb_test_queue_poll.h>
 #include <uorb/uorb.h>
 
 #include <cerrno>
@@ -81,7 +82,7 @@ void uORBTest::UnitTest::latency_test(const orb_metadata *T) {
   pub_data.val = 308;
   pub_data.timestamp = orb_absolute_time_us();
 
-  orb_publication_t *pfd0 = orb_create_publication(T, 1);
+  orb_publication_t *pfd0 = orb_create_publication(T);
   ASSERT_NE(pfd0, nullptr) << "orb_advertise failed: " << errno;
 
   orb_publish(pfd0, &pub_data);

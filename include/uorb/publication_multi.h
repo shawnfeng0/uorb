@@ -8,9 +8,7 @@ namespace uorb {
 /**
  * uORB publication wrapper class
  */
-template <const orb_metadata &meta,
-          uint16_t queue_size = internal::DefaultQueueSize<
-              typename msg::TypeMap<meta>::type>::value>
+template <const orb_metadata &meta>
 class PublicationMulti : internal::Noncopyable {
   using Type = typename msg::TypeMap<meta>::type;
 
@@ -25,7 +23,7 @@ class PublicationMulti : internal::Noncopyable {
   bool Publish(const Type &data) {
     if (!handle_) {
       unsigned instance;
-      handle_ = orb_create_publication_multi(&meta, &instance, queue_size);
+      handle_ = orb_create_publication_multi(&meta, &instance);
     }
 
     return handle_ && orb_publish(handle_, &data);

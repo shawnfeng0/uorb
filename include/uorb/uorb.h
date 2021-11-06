@@ -167,8 +167,8 @@ typedef struct orb_pollfd orb_pollfd_t;
  * return orb_create_publication_multi(meta, nullptr, queue_size);
  * @see orb_create_publication_multi()
  */
-orb_publication_t *orb_create_publication(const struct orb_metadata *meta,
-                                          unsigned int queue_size) __EXPORT;
+orb_publication_t *orb_create_publication(
+    const struct orb_metadata *meta) __EXPORT;
 
 /**
  * Advertise as the publisher of a topic.
@@ -196,15 +196,11 @@ orb_publication_t *orb_create_publication(const struct orb_metadata *meta,
  * there are other 0 instance publishers (by passing in NULL, or the first
  * instance), the data of multiple publishers will be sent to the same instance.
  *
- * @param queue_size  Maximum number of buffered elements. If queue_size < 2, no
- * queuing is used. Will round up to a power of 2 inside.
- *
  * @return NULL on error(No memory or too many instances), otherwise returns an
  * ORB topic advertiser handle that can be used to publish to the topic.
  */
 orb_publication_t *orb_create_publication_multi(
-    const struct orb_metadata *meta, unsigned int *instance,
-    unsigned int queue_size) __EXPORT;
+    const struct orb_metadata *meta, unsigned int *instance) __EXPORT;
 
 /**
  * Unadvertise a topic.
@@ -264,7 +260,7 @@ static inline bool orb_publish_auto(const struct orb_metadata *meta,
   }
 
   if (!*handle_ptr) {
-    *handle_ptr = orb_create_publication_multi(meta, instance, 1);
+    *handle_ptr = orb_create_publication_multi(meta, instance);
     if (!*handle_ptr) {
       return false;
     }

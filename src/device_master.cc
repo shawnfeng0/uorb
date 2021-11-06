@@ -4,8 +4,8 @@
 
 uorb::DeviceMaster uorb::DeviceMaster::instance_;
 
-uorb::DeviceNode *uorb::DeviceMaster::CreateAdvertiser(
-    const orb_metadata &meta, unsigned int *instance, unsigned int queue_size) {
+uorb::DeviceNode *uorb::DeviceMaster::CreateAdvertiser(const orb_metadata &meta,
+                                                       unsigned int *instance) {
   const bool is_single_instance = !instance;
   const unsigned max_group_tries =
       is_single_instance ? 1 : ORB_MULTI_MAX_INSTANCES;
@@ -23,13 +23,12 @@ uorb::DeviceNode *uorb::DeviceMaster::CreateAdvertiser(
     device_node = GetDeviceNodeLocked(meta, group_tries);
     if (device_node &&
         (!device_node->publisher_count() || is_single_instance)) {
-      device_node->set_queue_size(queue_size);
       device_node->add_publisher();
       break;  // Find a unadvertised device or single instance device
     }
 
     if (!device_node) {
-      device_node = new DeviceNode(meta, group_tries, queue_size);
+      device_node = new DeviceNode(meta, group_tries);
       if (!device_node) {
         errno = ENOMEM;
         return nullptr;

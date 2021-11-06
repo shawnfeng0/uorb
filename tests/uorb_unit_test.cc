@@ -54,8 +54,8 @@ TEST_F(UnitTest, unadvertise) {
   orb_test_s t{};
 
   for (int i = 0; i < 4; ++i) {
-    pfd[i] = orb_create_publication_multi(ORB_ID(orb_multitest),
-                                          &instance_test[i], 1);
+    pfd[i] =
+        orb_create_publication_multi(ORB_ID(orb_multitest), &instance_test[i]);
     EXPECT_EQ(instance_test[i], i) << "got wrong instance";
     orb_publish(pfd[i], &t);
   }
@@ -71,7 +71,7 @@ TEST_F(UnitTest, single_topic) {
   orb_publication_t *ptopic{};
 
   t.val = 0;
-  ptopic = orb_create_publication_multi(ORB_ID(orb_test), nullptr, 1);
+  ptopic = orb_create_publication_multi(ORB_ID(orb_test), nullptr);
 
   ASSERT_NE(ptopic, nullptr) << "advertise failed:" << errno;
 
@@ -146,10 +146,10 @@ TEST_F(UnitTest, multi_topic) {
     orb_test_s sub_data{};
 
     unsigned instance0;
-    pfd[0] = orb_create_publication_multi(ORB_ID(orb_multitest), &instance0, 1);
+    pfd[0] = orb_create_publication_multi(ORB_ID(orb_multitest), &instance0);
 
     unsigned instance1;
-    pfd[1] = orb_create_publication_multi(ORB_ID(orb_multitest), &instance1, 1);
+    pfd[1] = orb_create_publication_multi(ORB_ID(orb_multitest), &instance1);
 
     ASSERT_EQ(instance0, 0) << "mult. id0: " << instance0;
 
@@ -198,11 +198,11 @@ TEST_F(UnitTest, multi_topic) {
     pub_data.val = 0;
 
     unsigned int instance2;
-    pfd[2] = orb_create_publication_multi(ORB_ID(orb_multitest), &instance2, 1);
+    pfd[2] = orb_create_publication_multi(ORB_ID(orb_multitest), &instance2);
     ASSERT_EQ(instance2, 2) << "mult. id2: " << instance2;
 
     unsigned int instance3;
-    pfd[3] = orb_create_publication_multi(ORB_ID(orb_multitest), &instance3, 1);
+    pfd[3] = orb_create_publication_multi(ORB_ID(orb_multitest), &instance3);
     ASSERT_EQ(instance3, 3) << "mult. id3: " << instance3;
 
     pub_data.val = 204;
@@ -252,8 +252,7 @@ TEST_F(UnitTest, multi_topic2_queue_simulation) {
     for (unsigned i = 0; i < num_instances; ++i) {
       orb_publication_t *&pub = orb_pub[i];
       unsigned idx = i;
-      pub =
-          orb_create_publication_multi(ORB_ID(orb_test_medium_multi), &idx, 1);
+      pub = orb_create_publication_multi(ORB_ID(orb_test_medium_multi), &idx);
 
       if (idx != i) {
         thread_should_exit = true;
@@ -327,9 +326,9 @@ TEST_F(UnitTest, queue) {
 
   ASSERT_NE(sfd, nullptr) << "subscribe failed: " << errno;
 
-  const int queue_size = 16;
+  const int queue_size = ORB_ID(orb_test_medium_queue)->o_queue_size;
   pub_data.val = 0;
-  ptopic = orb_create_publication(ORB_ID(orb_test_medium_queue), queue_size);
+  ptopic = orb_create_publication(ORB_ID(orb_test_medium_queue));
   ASSERT_NE(ptopic, nullptr) << "advertise failed: " << errno;
 
   orb_publish(ptopic, &pub_data);
@@ -414,8 +413,7 @@ TEST_F(UnitTest, wrap_around) {
 
   const int queue_size = 16;
   pub_data.val = 0;
-  ptopic =
-      orb_create_publication(ORB_ID(orb_test_medium_wrap_around), queue_size);
+  ptopic = orb_create_publication(ORB_ID(orb_test_medium_wrap_around));
   ASSERT_NE(ptopic, nullptr) << "advertise failed: " << errno;
   orb_publish(ptopic, &pub_data);
 
@@ -512,16 +510,14 @@ TEST_F(UnitTest, queue_poll_notify) {
   volatile bool thread_should_exit = false;
 
   orb_subscription_t *sfd;
-  ASSERT_NE(sfd = orb_create_subscription(ORB_ID(orb_test_medium_queue_poll)),
-            nullptr)
+  ASSERT_NE(sfd = orb_create_subscription(ORB_ID(orb_test_queue_poll)), nullptr)
       << "subscribe failed: " << errno;
 
   std::thread test_queue_thread{[&]() {
     orb_test_medium_s pub_data{};
     orb_publication_t *ptopic{nullptr};
-    const int queue_size = 50;
-    ptopic =
-        orb_create_publication(ORB_ID(orb_test_medium_queue_poll), queue_size);
+    const int queue_size = ORB_ID(orb_test_queue_poll)->o_queue_size;
+    ptopic = orb_create_publication(ORB_ID(orb_test_queue_poll));
     if (ptopic == nullptr) {
       thread_should_exit = true;
     }

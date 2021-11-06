@@ -39,12 +39,10 @@ static inline uint16_t RoundPowOfTwo(uint16_t n) {
   return value + 1;
 }
 
-uorb::DeviceNode::DeviceNode(const struct orb_metadata &meta, uint8_t instance,
-                             unsigned int queue_size)
+uorb::DeviceNode::DeviceNode(const struct orb_metadata &meta, uint8_t instance)
     : meta_(meta),
       instance_(instance),
-      queue_size_(
-          RoundPowOfTwo(queue_size > UINT16_MAX ? UINT16_MAX : queue_size)) {}
+      queue_size_(RoundPowOfTwo(meta.o_queue_size)) {}
 
 uorb::DeviceNode::~DeviceNode() { delete[] data_; }
 
@@ -125,18 +123,6 @@ void uorb::DeviceNode::add_subscriber() {
 void uorb::DeviceNode::remove_subscriber() {
   base::WriterLockGuard lg(lock_);
   subscriber_count_--;
-}
-
-bool uorb::DeviceNode::set_queue_size(unsigned int queue_size) {
-  base::WriterLockGuard lg(lock_);
-
-  if (data_ || queue_size_ > queue_size) {
-    return false;
-  }
-
-  queue_size_ =
-      RoundPowOfTwo(queue_size > UINT16_MAX ? UINT16_MAX : queue_size);
-  return true;
 }
 
 unsigned uorb::DeviceNode::initial_generation() const {

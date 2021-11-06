@@ -32,13 +32,10 @@ class uorb::DeviceMaster {
    * (0-based) of the publication. This is an output parameter and will be set
    * to the newly created instance, ie. 0 for the first advertiser, 1 for the
    * next and so on. If it is nullptr, it will only be created at 0.
-   * @param queue_size Maximum number of buffered elements. If this is 1, no
-   * queuing is used.
    * @return nullptr on error, and set errno to orb_errno. Otherwise returns a
    * DeviceNode that can be used to publish to the topic.
    */
-  DeviceNode *CreateAdvertiser(const orb_metadata &meta, unsigned int *instance,
-                               unsigned int queue_size);
+  DeviceNode *CreateAdvertiser(const orb_metadata &meta, unsigned int *instance);
 
   DeviceNode *OpenDeviceNode(const orb_metadata &meta, unsigned int instance);
 
