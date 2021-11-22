@@ -46,7 +46,8 @@ class Fd {
 
  private:
   static void mark_non_block(int fd) {
-    assert(-1 != fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK));
+    auto ret = fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
+    assert(-1 != ret);
   }
 
   int fd_;
