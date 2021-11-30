@@ -66,6 +66,7 @@ static void CmdListener(uorb::listener::Fd &fd,
   uorb::listener::DataPrinter data_printer(*meta);
   orb_abstime_us last_write_timestamp{};
   const int timeout_ms = 1000;
+  uint32_t current_timeout_ms = 0;
   do {
     if (orb_poll(&fds, 1, timeout_ms) > 0) {
       if (orb_check_and_copy(sub, data.data())) {
@@ -75,11 +76,13 @@ static void CmdListener(uorb::listener::Fd &fd,
           fd.write(data_printer.Convert2String(data.data(), data.size()));
         }
       } else {
-        fd.write("Error: Polling was successful but no data was read.");
+        fd.write("Error: Polling was successful but no data was read.\n");
       }
+      current_timeout_ms = 0;  // Data has been obtained, clear the timeout
     } else {
-      fd.write(std::to_string(timeout_ms) + "ms" +
-               std::string{" timeout for polling data"});
+      current_timeout_ms += timeout_ms;
+      fd.write(std::to_string(current_timeout_ms) + "ms" +
+               std::string{" timeout for polling data\n"});
     }
     char c;
     auto ret = fd.read(&c, 1);
