@@ -39,8 +39,7 @@ git submodule add https://github.com/ShawnFeng0/uorb.git # If you don't use git,
 ```cmake
 # uORB library
 add_subdirectory(uorb)
-link_libraries(uorb)
-include_directories(uorb/include)
+target_link_libraries(${PROJECT_NAME} PRIVATE uorb) # Link the uorb library and add the include path of uorb
 ```
 
 这是使用此方法的一个示例（**推荐**）[uorb-examples](https://github.com/ShawnFeng0/uorb-examples.git).

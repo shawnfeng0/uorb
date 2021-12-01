@@ -40,8 +40,7 @@ Link the uORB library in the CMakeLists.txt of your own project.
 ```cmake
 # uORB library
 add_subdirectory(uorb)
-link_libraries(uorb)
-include_directories(uorb/include)
+target_link_libraries(${PROJECT_NAME} PRIVATE uorb) # Link the uorb library and add the include path of uorb
 ```
 
 This is an example of using this method (**recommended**): [uorb-examples](https://github.com/ShawnFeng0/uorb-examples.git).

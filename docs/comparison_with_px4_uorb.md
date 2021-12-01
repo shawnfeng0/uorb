@@ -8,13 +8,14 @@ The main difference lies in the implementation of the bottom layer, and the appl
 * Pass pointers when unpublishing and unsubscribing to avoid wild pointers(Reference from zmq)
 * Use ``bool`` type (include in ``<stdbool.h>``) to indicate whether the operation is successful
 * Add independent ``orb_poll`` function, instead of ``px4_poll`` in PX4 Autopilot
+* Configure the topic's queue size in the topic's metadata, not at the time of publishing, which is good for a single topic with multiple publishers.
 
 | PX4 uORB                                                     | Current uORB                                                 |
 | :----------------------------------------------------------- | :----------------------------------------------------------- |
 | ~~orb_advert_t orb_advertise(const struct orb_metadata \*meta, const void \*data)~~ |                                                              |
-| **orb_advert_t** orb_advertise_queue(const struct orb_metadata \*meta, const void \*data, unsigned int queue_size) | **orb_publication_t** \*orb_create_publication(const struct orb_metadata \*meta, unsigned int queue_size) |
+| **orb_advert_t** orb_advertise_queue(const struct orb_metadata \*meta, const void \*data~~, unsigned int queue_size~~) | **orb_publication_t** \*orb_create_publication(const struct orb_metadata \*meta) |
 | ~~orb_advert_t orb_advertise_multi(const struct orb_metadata \*meta, const void \*data, int \*instance)~~ |                                                              |
-| **orb_advert_t** orb_advertise_multi_queue(const struct orb_metadata \*meta, ~~const void \*data~~, int \*instance, unsigned queue_size) | **orb_publication_t** \*orb_create_publication_multi(const struct orb_metadata \*meta, unsigned int \*instance, unsigned int queue_size) |
+| **orb_advert_t** orb_advertise_multi_queue(const struct orb_metadata \*meta, ~~const void \*data~~, int \*instance~~, unsigned queue_size~~) | **orb_publication_t** \*orb_create_publication_multi(const struct orb_metadata \*meta, unsigned int \*instance) |
 | **int** orb_publish(~~const struct orb_metadata \*meta,~~ orb_advert_t handle, const void \*data) | **bool** orb_publish(**orb_publication_t \*handle**, const void *data) |
 | **int** orb_unadvertise(orb_advert_t **handle**)             | **bool** orb_destroy_publication(**orb_publication_t \*\*handle_ptr**) |
 | **int** orb_subscribe(const struct orb_metadata \*meta)      | **orb_subscription_t ***orb_create_subscription(const struct orb_metadata *meta) |
