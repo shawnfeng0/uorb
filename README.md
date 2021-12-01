@@ -39,7 +39,14 @@ pip3 install -r ${UORB_REPO_PATH}/tools/msg/tools/requirements.txt
 * API reference (TODO)
 * [Changelog](CHANGELOG.md)
 
-
 ## Examples
 
 [uorb-examples](https://github.com/ShawnFeng0/uorb-examples.git)
+
+## Tools
+
+### uorb topic listener
+
+uorb also has a [topic listener library](tools/uorb_tcp_topic_listener_lib). It is responsible for starting a tcp server, which is convenient for developers to monitor uorb topic data in real time outside the process.
+
+Here is an [example](examples/tcp_topic_listener) of using this listener.

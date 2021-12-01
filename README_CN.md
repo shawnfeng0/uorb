@@ -38,3 +38,11 @@ pip3 install -r ${UORB_REPO_PATH}/tools/msg/tools/requirements.txt
 ## 示例
 
 [uorb-examples](https://github.com/ShawnFeng0/uorb-examples.git)
+
+## 工具
+
+### uorb 主题监听器
+
+uorb 还有一个[话题监听器库](tools/uorb_tcp_topic_listener_lib)。 它负责启动一个tcp服务器，方便开发者在进程外实时监控uorb话题数据。
+
+这里有一个使用监听器的[示例](examples/tcp_topic_listener)。
