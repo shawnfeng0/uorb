@@ -67,6 +67,8 @@ class SubscriptionData : public Subscription<T> {
 
   ~SubscriptionData() = default;
 
+  using Subscription<T>::Update;
+
   // update the embedded struct.
   bool Update() { return Subscription<T>::Update(&data_); }
 
