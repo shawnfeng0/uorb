@@ -59,7 +59,7 @@ class ConditionVariable {
   // Return true if successful
   bool wait_for(Mutex &lock, unsigned long time_ms) {  // NOLINT
     struct timespec atime {};
-    GenerateFutureTime(clock_id, time_ms, atime);
+    GenerateFutureTime(clock_id, time_ms, &atime);
     return wait_until(lock, atime);
   }
 
