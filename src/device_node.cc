@@ -53,7 +53,7 @@ bool uorb::DeviceNode::Copy(void *dst, unsigned *sub_generation_ptr) const {
 
   auto &sub_generation = *sub_generation_ptr;
 
-  base::ReaderLockGuard lg(lock_);
+  base::LockGuard<base::Mutex> lg(lock_);
 
   /* The subscriber already read the latest message, but nothing new was
    * published yet. Return the previous message */
@@ -91,7 +91,7 @@ bool uorb::DeviceNode::Publish(const void *data) {
     return false;
   }
 
-  base::WriterLockGuard lg(lock_);
+  base::LockGuard<base::Mutex> lg(lock_);
 
   if (nullptr == data_) {
     data_ = new uint8_t[meta_.o_size * queue_size_];
@@ -116,28 +116,28 @@ bool uorb::DeviceNode::Publish(const void *data) {
 }
 
 void uorb::DeviceNode::add_subscriber() {
-  base::WriterLockGuard lg(lock_);
+  base::LockGuard<base::Mutex> lg(lock_);
   subscriber_count_++;
 }
 
 void uorb::DeviceNode::remove_subscriber() {
-  base::WriterLockGuard lg(lock_);
+  base::LockGuard<base::Mutex> lg(lock_);
   subscriber_count_--;
 }
 
 unsigned uorb::DeviceNode::initial_generation() const {
-  base::WriterLockGuard lg(lock_);
+  base::LockGuard<base::Mutex> lg(lock_);
 
   // If there any previous publications allow the subscriber to read them
   return generation_ - (data_ ? 1 : 0);
 }
 
 void uorb::DeviceNode::remove_publisher() {
-  base::WriterLockGuard lg(lock_);
+  base::LockGuard<base::Mutex> lg(lock_);
   publisher_count_--;
 }
 
 void uorb::DeviceNode::add_publisher() {
-  base::WriterLockGuard lg(lock_);
+  base::LockGuard<base::Mutex> lg(lock_);
   publisher_count_++;
 }

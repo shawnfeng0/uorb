@@ -37,7 +37,7 @@ class RwMutex {
   void lock() { SAFE_PTHREAD_MUTEX(pthread_rwlock_wrlock); }
   void unlock() { SAFE_PTHREAD_MUTEX(pthread_rwlock_unlock); }
 
-  bool tryLock() noexcept {
+  bool try_lock() noexcept {
     return !is_safe_ || 0 == pthread_rwlock_trywrlock(&mutex_);
   }
 

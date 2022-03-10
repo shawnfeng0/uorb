@@ -9,7 +9,6 @@
 #include "base/condition_variable.h"
 #include "base/intrusive_list.h"
 #include "base/mutex.h"
-#include "base/rw_mutex.h"
 #include "callback.h"
 
 namespace uORBTest {
@@ -59,7 +58,7 @@ class DeviceNode : public ListNode<DeviceNode *>,
       return false;
     }
 
-    uorb::base::WriterLockGuard lg(uorb::DeviceNode::lock_);
+    uorb::base::LockGuard<base::Mutex> lg(lock_);
     uorb::DeviceNode::callbacks_.emplace(callback);
     return true;
   }
@@ -67,7 +66,7 @@ class DeviceNode : public ListNode<DeviceNode *>,
   // remove item from list of work items
   template <typename Callback>
   bool UnregisterCallback(Callback *callback) {
-    uorb::base::WriterLockGuard lg(uorb::DeviceNode::lock_);
+    base::LockGuard<base::Mutex> lg(lock_);
     return uorb::DeviceNode::callbacks_.erase(callback) != 0;
   }
 
@@ -103,7 +102,7 @@ class DeviceNode : public ListNode<DeviceNode *>,
   const uint16_t queue_size_; /**< maximum number of elements in the queue */
   unsigned generation_{0};    /**< object generation count */
 
-  mutable base::RwMutex lock_{};
+  mutable base::Mutex lock_{};
 
   uint8_t subscriber_count_{0};
   bool has_anonymous_subscriber_{false};

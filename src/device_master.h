@@ -5,7 +5,6 @@
 
 #include "base/intrusive_list.h"
 #include "base/mutex.h"
-#include "base/rw_mutex.h"
 #include "uorb/uorb.h"
 
 namespace uorb {
@@ -35,7 +34,8 @@ class uorb::DeviceMaster {
    * @return nullptr on error, and set errno to orb_errno. Otherwise returns a
    * DeviceNode that can be used to publish to the topic.
    */
-  DeviceNode *CreateAdvertiser(const orb_metadata &meta, unsigned int *instance);
+  DeviceNode *CreateAdvertiser(const orb_metadata &meta,
+                               unsigned int *instance);
 
   DeviceNode *OpenDeviceNode(const orb_metadata &meta, unsigned int instance);
 
@@ -61,5 +61,5 @@ class uorb::DeviceMaster {
   static DeviceMaster instance_;
 
   List<DeviceNode *> node_list_{};
-  mutable base::RwMutex lock_{};
+  mutable base::Mutex lock_{};
 };

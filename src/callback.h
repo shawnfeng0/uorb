@@ -30,7 +30,7 @@ struct Callback<true> : detail::CallbackBase {
  private:
   void operator()() override = 0;
   void Notify() final {
-    base::MutexGuard lg(mutex);
+    base::LockGuard<base::Mutex> lg(mutex);
     operator()();
   }
   base::Mutex mutex{};

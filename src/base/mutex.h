@@ -37,7 +37,7 @@ class Mutex {
   void lock() { SAFE_PTHREAD_MUTEX(pthread_mutex_lock); }
   void unlock() { SAFE_PTHREAD_MUTEX(pthread_mutex_unlock); }
 
-  bool tryLock() noexcept {
+  bool try_lock() noexcept {
     return is_safe_ ? 0 == pthread_mutex_trylock(&mutex_) : true;
   }
 
@@ -64,7 +64,7 @@ class Mutex {
  * A LockGuard controls Mutex ownership within a scope, releasing
  * ownership in the destructor.
  */
-template <typename MutexType>
+template <typename MutexType = Mutex>
 class LockGuard {
  public:
   explicit LockGuard(MutexType &m) : mutex_(m) { mutex_.lock(); }
@@ -76,8 +76,6 @@ class LockGuard {
  private:
   MutexType &mutex_;
 };
-
-typedef LockGuard<Mutex> MutexGuard;
 
 }  // namespace base
 }  // namespace uorb
