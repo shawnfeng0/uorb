@@ -14,7 +14,7 @@ Support the help command, view all supported commands and a brief introduction.
 ### Command
 
 ```shell
-echo "help" nc 127.0.0.1 10924
+echo "help" | nc 127.0.0.1 10924
 ```
 
 ### Example
@@ -37,7 +37,7 @@ publishers/subscribers, and the latest data publication index.
 ### Command
 
 ```shell
-echo "status" nc 127.0.0.1 10924
+echo "status" | nc 127.0.0.1 10924
 ```
 
 After the output, the tcp connection will be automatically disconnected.
