@@ -12,28 +12,47 @@
 namespace uorb {
 namespace base {
 
-template <clockid_t clock_id>
+class ConditionVariableTest;
+
 class ConditionVariable {
- public:
-  ConditionVariable() noexcept {
-    pthread_condattr_t attr;
-    pthread_condattr_init(&attr);
-    pthread_condattr_setclock(&attr, (clock_id));
-    pthread_cond_init((&cond_), &attr);
-  }
-
-  ~ConditionVariable() noexcept { pthread_cond_destroy(&cond_); }
-
  public:
   ConditionVariable(const ConditionVariable &) = delete;
   ConditionVariable &operator=(const ConditionVariable &) = delete;
+
+  ConditionVariable() noexcept {
+#ifdef __APPLE__
+    pthread_cond_init(&cond_, nullptr);
+#else
+    pthread_condattr_t attr;
+    pthread_condattr_init(&attr);
+    pthread_condattr_setclock(&attr, kWhichClock);
+    pthread_cond_init(&cond_, &attr);
+#endif
+  }
+
+  ~ConditionVariable() noexcept {
+    // https://chromium.googlesource.com/v8/v8/+/refs/tags/11.5.129/src/base/platform/condition-variable.cc#42
+#ifdef __APPLE__
+    // This hack is necessary to avoid a fatal pthreads subsystem bug in the
+    // Darwin kernel. http://crbug.com/517681.
+    {
+      Mutex lock;
+      LockGuard<Mutex> l(lock);
+      struct timespec ts {};
+      ts.tv_sec = 0;
+      ts.tv_nsec = 1;
+      pthread_cond_timedwait_relative_np(&cond_, lock.native_handle(), &ts);
+    }
+#endif
+    pthread_cond_destroy(&cond_);
+  }
 
   void notify_one() noexcept { pthread_cond_signal(&cond_); }
 
   void notify_all() noexcept { pthread_cond_broadcast(&cond_); }
 
   void wait(Mutex &lock) noexcept {  // NOLINT
-    pthread_cond_wait(&cond_, lock.GetNativeHandle());
+    pthread_cond_wait(&cond_, lock.native_handle());
   }
 
   template <typename Predicate>
@@ -42,64 +61,65 @@ class ConditionVariable {
   }
 
   // Return true if successful
-  bool wait_until(Mutex &lock, const struct timespec &atime) {  // NOLINT
-    return pthread_cond_timedwait(&cond_, lock.GetNativeHandle(), &atime) == 0;
+  bool wait_for(Mutex &lock, uint32_t time_ms) {  // NOLINT
+#ifdef __APPLE__
+    struct timespec rel_ts = {.tv_sec = time_ms / 1000,
+                              .tv_nsec = (time_ms % 1000) * 1000000};
+    // OS X do support waiting on a condition variable with a relative timeout.
+    auto ret = pthread_cond_timedwait_relative_np(&cond_, lock.native_handle(),
+                                                  &rel_ts) == 0;
+    return ret;
+#else
+    struct timespec until_time = timespec_get_after(get_now_time(), time_ms);
+    auto ret =
+        pthread_cond_timedwait(&cond_, lock.native_handle(), &until_time) == 0;
+    return ret;
+#endif
   }
 
   // Return true if successful
   template <typename Predicate>
-  // NOLINTNEXTLINE
-  bool wait_until(Mutex &lock, const struct timespec &atime, Predicate p) {
+  bool wait_for(Mutex &lock, uint32_t time_ms, Predicate p) {  // NOLINT
     // Not returned until timeout or other error
     while (!p())
-      if (!wait_until(lock, atime)) return p();
-    return true;
-  }
-
-  // Return true if successful
-  bool wait_for(Mutex &lock, unsigned long time_ms) {  // NOLINT
-    struct timespec atime {};
-    GenerateFutureTime(clock_id, time_ms, &atime);
-    return wait_until(lock, atime);
-  }
-
-  // Return true if successful
-  template <typename Predicate>
-  bool wait_for(Mutex &lock, unsigned long time_ms, Predicate p) {  // NOLINT
-    struct timespec atime {};
-    GenerateFutureTime(clock_id, time_ms, &atime);
-
-    // Not returned until timeout or other error
-    while (!p())
-      if (!wait_until(lock, atime)) return p();
+      if (!wait_for(lock, time_ms)) return p();
     return true;
   }
 
   pthread_cond_t *native_handle() { return &cond_; }
 
  private:
-  // Increase time_ms time based on the current clockid time
-  inline void GenerateFutureTime(clockid_t clockid, uint32_t time_ms,
-                                 struct timespec *out_ptr) {
-    if (!out_ptr) return;
-    auto &out = *out_ptr;
-    // Calculate an absolute time in the future
-    const decltype(out.tv_nsec) kSec2Nsec = 1000 * 1000 * 1000;
-    clock_gettime(clockid, &out);
-    out.tv_sec += time_ms / 1000;
-    time_ms %= 1000;
-    uint64_t nano_secs = out.tv_nsec + ((uint64_t)time_ms * 1000 * 1000);
-    out.tv_nsec = nano_secs % kSec2Nsec;
-    out.tv_sec += nano_secs / kSec2Nsec;
+  friend class ConditionVariableTest;
+
+  static inline struct timespec get_now_time() {
+    struct timespec result {};
+    clock_gettime(kWhichClock, &result);
+    return result;
+  }
+  static inline struct timespec timespec_get_after(const struct timespec &now,
+                                                   uint32_t time_ms) {
+    static const auto kNSecPerS = 1000 * 1000 * 1000;
+
+    struct timespec result = now;
+
+    result.tv_sec += time_ms / 1000;
+    result.tv_nsec += (time_ms % 1000) * 1000 * 1000;
+
+    if (result.tv_nsec >= kNSecPerS) {
+      result.tv_sec += result.tv_nsec / kNSecPerS;
+      result.tv_nsec %= kNSecPerS;
+    }
+
+    return result;
   }
 
   pthread_cond_t cond_{};
+
+  // The C++ specification defines std::condition_variable::wait_for in terms of
+  // std::chrono::steady_clock, which is closest to CLOCK_MONOTONIC.
+  static const clockid_t kWhichClock = CLOCK_MONOTONIC;
 };
 
-typedef ConditionVariable<CLOCK_MONOTONIC> MonoClockCond;
-typedef ConditionVariable<CLOCK_REALTIME> RealClockCond;
-
-template <clockid_t clock_id>
 class SimpleSemaphore {
  public:
   explicit SimpleSemaphore(unsigned int count = 0) : count_(count) {}
@@ -132,7 +152,7 @@ class SimpleSemaphore {
   }
 
   // tries to decrement the internal counter, blocking for up to a duration time
-  bool try_acquire_for(int time_ms) {
+  bool try_acquire_for(uint32_t time_ms) {
     LockGuard<decltype(mutex_)> lock(mutex_);
     bool finished =
         condition_.wait_for(mutex_, time_ms, [&] { return count_ > 0; });
@@ -146,23 +166,10 @@ class SimpleSemaphore {
   }
 
  private:
-  // Hide this function in case the client is not sure which clockid to use
-  // tries to decrement the internal counter, blocking until a point in time
-  bool try_acquire_until(const struct timespec &atime) {
-    LockGuard<decltype(mutex_)> lock(mutex_);
-    bool finished =
-        condition_.wait_until(mutex_, atime, [&] { return count_ > 0; });
-    if (finished) --count_;
-    return finished;
-  }
-
   Mutex mutex_;
-  ConditionVariable<clock_id> condition_;
+  ConditionVariable condition_;
   unsigned int count_;
 };
-
-typedef SimpleSemaphore<CLOCK_REALTIME> RealClockSemaphore;
-typedef SimpleSemaphore<CLOCK_MONOTONIC> MonoClockSemaphore;
 
 }  // namespace base
 }  // namespace uorb

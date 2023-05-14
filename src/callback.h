@@ -36,8 +36,7 @@ struct Callback<true> : detail::CallbackBase {
   base::Mutex mutex{};
 };
 
-struct SemaphoreCallback : public Callback<>,
-                           public base::SimpleSemaphore<CLOCK_MONOTONIC> {
+struct SemaphoreCallback : public Callback<>, public base::SimpleSemaphore {
   void operator()() override { release(); }
 };
 

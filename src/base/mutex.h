@@ -41,7 +41,7 @@ class Mutex {
     return is_safe_ ? 0 == pthread_mutex_trylock(&mutex_) : true;
   }
 
-  pthread_mutex_t *GetNativeHandle() noexcept { return &mutex_; }
+  pthread_mutex_t *native_handle() noexcept { return &mutex_; }
 
  private:
 #ifdef PTHREAD_MUTEX_INITIALIZER

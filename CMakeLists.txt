@@ -24,9 +24,14 @@ configure_file(
 add_compile_options(-Wextra -Wall)
 
 # uorb library
-aux_source_directory(src UORB_SOURCE)
-aux_source_directory(src/base UORB_SOURCE)
-add_library(uorb ${UORB_SOURCE} ${CMAKE_CURRENT_BINARY_DIR}/src/git_version.cc)
+add_library(uorb)
+target_sources(uorb PRIVATE
+        src/base/orb_errno.cc
+        src/device_master.cc
+        src/device_node.cc
+        src/uorb.cc
+        ${CMAKE_CURRENT_BINARY_DIR}/src/git_version.cc
+        )
 target_include_directories(uorb PUBLIC include)
 target_include_directories(uorb PRIVATE src)
 target_link_libraries(uorb PRIVATE pthread)
@@ -45,5 +50,13 @@ endif ()
 if (UORB_BUILD_TESTS)
     include(cmake/googletest.cmake)
     enable_testing()
+
+    # For uorb internal unit test
+    add_executable(uorb_unittest src/base/condition_variable_test.cc)
+    target_link_libraries(uorb_unittest PRIVATE uorb GTest::gtest_main)
+    target_include_directories(uorb_unittest PRIVATE src)
+    add_test(uorb_unittest uorb_unittest)
+
+    # For uorb library interface test
     add_subdirectory(tests)
 endif ()
