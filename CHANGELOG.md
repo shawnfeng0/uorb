@@ -7,7 +7,35 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-[Unreleased]: https://github.com/ShawnFeng0/uorb/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/ShawnFeng0/uorb/compare/v0.3.0...HEAD
+
+## [0.3.0] - 2023-06-13
+[0.3.0]: https://github.com/ShawnFeng0/uorb/compare/v0.2.3...v0.3.0
+
+### Added
+
+- Support custom uorb listener port
+- Add ORB_QUEUE_SIZE to the orb_metadata structure
+- Automatically configures the queue according to the topic's metadata
+- Support macos platform
+  - Make ConditionVariable support macos platform
+  - Add unit test for ConditionVariable
+  - Remove the functional interface of the wait_until class in ConditionVariable, which is not actually a commonly used interface
+
+### Changed
+
+- Make the tcp listener library use the uorb::listener namespace
+- ORB_ID(name) uses a global pointer variable instead of a global function
+- msg_gen: Add dependent python libraries to reduce usage complexity
+- compile: Simplify cmake scripts
+  - Add cmake policy configuration file: cmake/policy.cmake 
+  - Add CMP0135 cmake strategy to prevent warning when downloading google test library 
+  - Add googletest download script: cmake/googletest.cmake
+  - Add a cmake macro to get the git version: cmake/git_version.cmake
+
+### Fixed
+
+- topic_listener: when NDEBUG is defined, the judgment in assert will be optimized away
 
 ## [0.2.3] - 2021-10-10
 [0.2.3]: https://github.com/ShawnFeng0/uorb/compare/v0.2.2...v0.2.3
