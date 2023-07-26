@@ -3,20 +3,6 @@
 #include <cerrno>
 #include <cstring>
 
-static inline bool IsInRange(unsigned left, unsigned value, unsigned right) {
-  if (right == left) {
-    // When the two limits are equal, the interval is considered to have only
-    // one data.
-    return value == left;
-  } else if (right > left) {
-    // Normal
-    return (left <= value) && (value <= right);
-  } else {
-    // Maybe the data overflowed and a wraparound occurred
-    return (left <= value) || (value <= right);
-  }
-}
-
 static inline uint16_t RoundPowOfTwo(uint16_t n) {
   if (n == 0) {
     return 1;
@@ -55,25 +41,19 @@ bool uorb::DeviceNode::Copy(void *dst, unsigned *sub_generation_ptr) const {
 
   base::LockGuard<base::Mutex> lg(lock_);
 
-  /* The subscriber already read the latest message, but nothing new was
-   * published yet. Return the previous message */
-  if (generation_ == sub_generation) {
-    --sub_generation;
-  }
-
-  // Before the queue is filled, if the incoming sub_generation points to
-  // unpublished data, invalid data will be obtained. Such incorrect usage
-  // should not be handled.
-  const unsigned queue_start = generation_ - queue_size_;
-
-  // If queue_size is 3 and cur_generation is 10, then 7, 8, 9 are in the
+  // If queue_size is 4 and cur_generation is 10, then 6, 7, 8, 9 are in the
   // range, and others are not.
-  if (!IsInRange(queue_start, sub_generation, generation_ - 1)) {
+
+  // The subscriber already read the latest message, but nothing new was
+  // published yet. Return the previous message */
+  if (generation_ == sub_generation) {
+    sub_generation = generation_ - 1;
+  } else if (generation_ - sub_generation > queue_size_) {
     // Reader is too far behind: some messages are lost
-    sub_generation = queue_start;
+    sub_generation = generation_ - queue_size_;
   }
 
-  memcpy(dst, data_ + (meta_.o_size * (sub_generation % queue_size_)),
+  memcpy(dst, data_ + (meta_.o_size * (sub_generation & (queue_size_ - 1))),
          meta_.o_size);
 
   ++sub_generation;
