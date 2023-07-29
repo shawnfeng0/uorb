@@ -10,11 +10,13 @@
 
 #include <pthread.h>
 
+#include "uorb/internal/noncopyable.h"
+
 namespace uorb {
 namespace base {
 
 /// The standard Mutex type.
-class Mutex {
+class Mutex : internal::Noncopyable {
 #define SAFE_PTHREAD_MUTEX(fncall)          \
   do { /* run fncall if is_safe_ is true */ \
     if (is_safe_) fncall(&mutex_);          \
