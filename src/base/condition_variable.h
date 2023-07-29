@@ -8,13 +8,14 @@
 #include <time.h>
 
 #include "base/mutex.h"
+#include "uorb/internal/noncopyable.h"
 
 namespace uorb {
 namespace base {
 
 class ConditionVariableTest;
 
-class ConditionVariable {
+class ConditionVariable : public internal::Noncopyable {
  public:
   ConditionVariable(const ConditionVariable &) = delete;
   ConditionVariable &operator=(const ConditionVariable &) = delete;

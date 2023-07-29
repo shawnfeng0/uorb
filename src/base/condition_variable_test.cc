@@ -10,10 +10,10 @@
 
 #include "uorb/abs_time.h"
 
-//#define DEBUG_MARK(mark)                                              \
-//  printf("%s:%d %" PRIu64 ".%03" PRIu64 "ms " #mark "\r\n", __FILE__, \
-//         __LINE__, orb_absolute_time_us() / 1000000,                  \
-//         (orb_absolute_time_us() / 1000) % 1000)
+#define DEBUG_MARK(mark)                                              \
+  printf("%s:%d %" PRIu64 ".%03" PRIu64 "ms " #mark "\r\n", __FILE__, \
+         __LINE__, orb_absolute_time_us() / 1000000,                  \
+         (orb_absolute_time_us() / 1000) % 1000)
 
 class Timer {
  public:
