@@ -1,6 +1,6 @@
 # uORB
 
-![Tests](https://github.com/ShawnFeng0/uorb/workflows/Tests/badge.svg)
+![Tests](https://github.com/ShawnFeng0/uorb/actions/workflows/tests.yml/badge.svg)
 
 English | [中文](README_CN.md)
 
@@ -30,7 +30,7 @@ Compiling the uorb library requires the support of c++11, and most compilations 
 We have a message generator that can easily generate message meta-data. These libraries are needed to make it work:
 
 ```shell
-pip3 install -r ${UORB_REPO_PATH}/tools/msg/tools/requirements.txt
+pip3 install -r tools/msg/tools/requirements.txt
 ```
 
 ## Documentation

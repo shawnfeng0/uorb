@@ -1,6 +1,6 @@
 # uORB
 
-![Tests](https://github.com/ShawnFeng0/uorb/workflows/Tests/badge.svg)
+![Tests](https://github.com/ShawnFeng0/uorb/actions/workflows/tests.yml/badge.svg)
 
 uORB是用于线程间通信的消息发布/订阅的库。"UORB"是Micro Object Request Broker的缩写。
 
@@ -26,7 +26,7 @@ uORB源自PX4开源飞控的消息中间件，运行在Nuttx rtos和Linux上：
 需要一个消息生成器用来生成消息元数据，需要这些python库才能工作：
 
 ```shell
-pip3 install -r ${UORB_REPO_PATH}/tools/msg/tools/requirements.txt
+pip3 install -r tools/msg/tools/requirements.txt
 ```
 
 ## 文档
