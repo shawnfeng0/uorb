@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.12...4.0)
 
 # Set cmake_policies
 include(cmake/policy.cmake)
