@@ -1,6 +1,6 @@
 project(uorb_examples)
 
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.12...4.0)
 
 # Common header: slog.h
 add_library(slog INTERFACE)
