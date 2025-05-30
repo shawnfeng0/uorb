@@ -197,8 +197,11 @@ int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
 
   // No new data, waiting for update
   if (updated_num == 0) {
-    semaphore_callback.try_acquire_for(timeout_ms);
-
+    if (timeout_ms > 0) {
+      semaphore_callback.try_acquire_for(timeout_ms);
+    } else if (timeout_ms < 0) {
+      semaphore_callback.acquire();
+    }
   } else {
     updated_num = 0;
   }
