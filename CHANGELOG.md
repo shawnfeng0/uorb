@@ -7,7 +7,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-[Unreleased]: https://github.com/ShawnFeng0/uorb/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/ShawnFeng0/uorb/compare/v0.3.1...HEAD
+
+## [0.3.1] - 2025-06-01
+[0.3.1]: https://github.com/ShawnFeng0/uorb/compare/v0.3.0...v0.3.1
+
+### Fixed
+
+- Improve semaphore acquisition logic based on timeout value
 
 ## [0.3.0] - 2023-06-13
 [0.3.0]: https://github.com/ShawnFeng0/uorb/compare/v0.2.3...v0.3.0
