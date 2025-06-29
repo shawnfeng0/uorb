@@ -89,7 +89,7 @@ bool uorb::DeviceNode::Publish(const void *data) {
   generation_++;
 
   for (auto callback : callbacks_) {
-    (*callback).Notify();
+    (*callback).notify_all();
   }
 
   return true;

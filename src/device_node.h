@@ -58,8 +58,8 @@ class DeviceNode : public ListNode<DeviceNode *>,
       return false;
     }
 
-    uorb::base::LockGuard<base::Mutex> lg(lock_);
-    uorb::DeviceNode::callbacks_.emplace(callback);
+    base::LockGuard<base::Mutex> lg(lock_);
+    callbacks_.emplace(callback);
     return true;
   }
 
@@ -67,7 +67,7 @@ class DeviceNode : public ListNode<DeviceNode *>,
   template <typename Callback>
   bool UnregisterCallback(Callback *callback) {
     base::LockGuard<base::Mutex> lg(lock_);
-    return uorb::DeviceNode::callbacks_.erase(callback) != 0;
+    return callbacks_.erase(callback) != 0;
   }
 
   // Returns the number of updated data relative to the parameter 'generation'

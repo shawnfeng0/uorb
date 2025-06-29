@@ -44,31 +44,3 @@ static inline orb_abstime_us orb_elapsed_time_us(const orb_abstime_us then) {
 #ifdef __cplusplus
 }
 #endif
-
-#ifdef __cplusplus
-
-namespace uorb {
-namespace time_literals {
-
-// User-defined integer literals for different time units.
-// The base unit is orb_abstime_us in microseconds
-
-// NOLINTNEXTLINE
-constexpr orb_abstime_us operator"" _s(unsigned long long time) {
-  return orb_abstime_us(time * 1000000ULL);
-}
-
-// NOLINTNEXTLINE
-constexpr orb_abstime_us operator"" _ms(unsigned long long time) {
-  return orb_abstime_us(time * 1000ULL);
-}
-
-// NOLINTNEXTLINE
-constexpr orb_abstime_us operator"" _us(unsigned long long time) {
-  return orb_abstime_us(time);
-}
-
-}  // namespace time_literals
-}  // namespace uorb
-
-#endif /* __cplusplus */
