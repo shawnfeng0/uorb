@@ -70,8 +70,7 @@ static void CmdListener(uorb::listener::Fd &fd,
   do {
     if (orb_poll(&fds, 1, timeout_ms) > 0) {
       if (orb_check_and_copy(sub, data.data())) {
-        using namespace uorb::time_literals;
-        if (orb_elapsed_time_us(last_write_timestamp) > 100_ms) {
+        if (orb_elapsed_time_us(last_write_timestamp) > 100 * 1000) {
           last_write_timestamp = orb_absolute_time_us();
           fd.write(data_printer.Convert2String(data.data(), data.size()));
         }

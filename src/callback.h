@@ -10,34 +10,28 @@ namespace uorb {
 namespace detail {
 
 struct CallbackBase {
-  virtual void Notify() = 0;
-
- private:
-  virtual void operator()() = 0;
+  virtual ~CallbackBase() = default;
+  virtual void notify_all() = 0;
 };
 
 }  // namespace detail
 
-template <bool needs_locking = false>
-struct Callback : detail::CallbackBase {
- private:
-  void operator()() override = 0;
-  void Notify() final { operator()(); }
-};
+class UpdateNotifyCallback final : public detail::CallbackBase {
+ public:
+  void notify_all() override { notifier_.notify_all(); }
 
-template <>
-struct Callback<true> : detail::CallbackBase {
- private:
-  void operator()() override = 0;
-  void Notify() final {
-    base::LockGuard<base::Mutex> lg(mutex);
-    operator()();
+  template <typename Predicate>
+  void wait(Predicate pred) {
+    notifier_.wait(pred);
   }
-  base::Mutex mutex{};
-};
 
-struct SemaphoreCallback : public Callback<>, public base::SimpleSemaphore {
-  void operator()() override { release(); }
+  template <typename Predicate>
+  bool wait_for(uint32_t time_ms, Predicate pred) {
+    return notifier_.wait_for(time_ms, pred);
+  }
+
+ private:
+  base::LiteNotifier notifier_;
 };
 
 }  // namespace uorb

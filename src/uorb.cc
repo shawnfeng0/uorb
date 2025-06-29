@@ -177,50 +177,43 @@ bool orb_get_topic_status(const struct orb_metadata *meta,
 
 int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
   ORB_CHECK_TRUE(fds && nfds, EINVAL, return -1);
+  for (unsigned i = 0; i < nfds; ++i) {
+    ORB_CHECK_TRUE(fds[i].fd != nullptr, EINVAL, return -1);
+  }
 
-  int updated_num = 0;  // Number of new messages
-  uorb::SemaphoreCallback semaphore_callback;
+  int number_of_new_data = 0;
+
+  auto CheckDataUpdate = [&] {
+    number_of_new_data = 0;
+    for (unsigned i = 0; i < nfds; ++i) {
+      fds[i].revents = 0;
+      auto &item_sub = *reinterpret_cast<SubscriptionImpl *>(fds[i].fd);
+      if (item_sub.updates_available()) {
+        fds[i].revents |= fds[i].events & POLLIN;
+        ++number_of_new_data;
+      }
+    }
+    return number_of_new_data > 0;
+  };
+
+  if (CheckDataUpdate()) return number_of_new_data;
+
+  uorb::UpdateNotifyCallback notifier_callback;
+  for (unsigned i = 0; i < nfds; ++i) {
+    auto &item_sub = *reinterpret_cast<SubscriptionImpl *>(fds[i].fd);
+    item_sub.RegisterCallback(&notifier_callback);
+  }
+
+  if (timeout_ms > 0) {
+    notifier_callback.wait_for(timeout_ms, CheckDataUpdate);
+  } else if (timeout_ms < 0) {
+    notifier_callback.wait(CheckDataUpdate);
+  }
 
   for (unsigned i = 0; i < nfds; ++i) {
-    auto &item = fds[i];
-    if (!item.fd) {
-      continue;
-    }
-
-    auto &item_sub = *reinterpret_cast<SubscriptionImpl *>(item.fd);
-    item_sub.RegisterCallback(&semaphore_callback);
-
-    if (item_sub.updates_available() > 0) {
-      ++updated_num;
-    }
+    auto &item_sub = *reinterpret_cast<SubscriptionImpl *>(fds[i].fd);
+    item_sub.UnregisterCallback(&notifier_callback);
   }
 
-  // No new data, waiting for update
-  if (updated_num == 0) {
-    if (timeout_ms > 0) {
-      semaphore_callback.try_acquire_for(timeout_ms);
-    } else if (timeout_ms < 0) {
-      semaphore_callback.acquire();
-    }
-  } else {
-    updated_num = 0;
-  }
-
-  for (unsigned i = 0; i < nfds; ++i) {
-    auto &item = fds[i];
-    if (!item.fd) {
-      continue;
-    }
-
-    auto &item_sub = *reinterpret_cast<SubscriptionImpl *>(item.fd);
-    item_sub.UnregisterCallback(&semaphore_callback);
-
-    item.revents = 0;
-    if (item_sub.updates_available()) {
-      item.revents |= item.events & POLLIN;
-      ++updated_num;
-    }
-  }
-
-  return updated_num;
+  return number_of_new_data;
 }

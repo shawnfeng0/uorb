@@ -7,6 +7,9 @@
 #include <stdint.h>
 #include <time.h>
 
+#include <atomic>
+#include <chrono>
+
 #include "base/mutex.h"
 #include "uorb/internal/noncopyable.h"
 
@@ -39,7 +42,7 @@ class ConditionVariable : public internal::Noncopyable {
     {
       Mutex lock;
       LockGuard<Mutex> l(lock);
-      struct timespec ts {};
+      struct timespec ts{};
       ts.tv_sec = 0;
       ts.tv_nsec = 1;
       pthread_cond_timedwait_relative_np(&cond_, lock.native_handle(), &ts);
@@ -93,7 +96,7 @@ class ConditionVariable : public internal::Noncopyable {
   friend class ConditionVariableTest;
 
   static inline struct timespec get_now_time() {
-    struct timespec result {};
+    struct timespec result{};
     clock_gettime(kWhichClock, &result);
     return result;
   }
@@ -121,55 +124,55 @@ class ConditionVariable : public internal::Noncopyable {
   static const clockid_t kWhichClock = CLOCK_MONOTONIC;
 };
 
-class SimpleSemaphore {
+/**
+ * @brief In conjunction with a lock-free queue, this notifier should be used
+ * when the queue is full or empty, as retries can affect performance.
+ */
+class LiteNotifier {
  public:
-  explicit SimpleSemaphore(unsigned int count = 0) : count_(count) {}
-  SimpleSemaphore(const SimpleSemaphore &) = delete;
-  SimpleSemaphore &operator=(const SimpleSemaphore &) = delete;
+  LiteNotifier() : waiters_(0) {}
+  LiteNotifier(const LiteNotifier &) = delete;
+  LiteNotifier &operator=(const LiteNotifier &) = delete;
 
-  // increments the internal counter and unblocks acquirers
-  void release() {
+  template <typename Predicate>
+  void wait(Predicate pred) {
+    if (pred()) return;
+
     LockGuard<decltype(mutex_)> lock(mutex_);
-    ++count_;
-    // The previous semaphore was 0, and there may be waiting tasks
-    if (count_ == 1) condition_.notify_one();
+    waiters_.fetch_add(1, std::memory_order_release);
+    cv_.wait(mutex_, pred);
+    waiters_.fetch_sub(1, std::memory_order_release);
   }
 
-  // decrements the internal counter or blocks until it can
-  void acquire() {
+  template <typename Predicate>
+  bool wait_for(uint32_t time_ms, Predicate pred) {
+    if (pred()) return true;
+
     LockGuard<decltype(mutex_)> lock(mutex_);
-    condition_.wait(mutex_, [&] { return count_ > 0; });
-    --count_;
+    waiters_.fetch_add(1, std::memory_order_release);
+    const bool result = cv_.wait_for(mutex_, time_ms, pred);
+    waiters_.fetch_sub(1, std::memory_order_release);
+    return result;
   }
 
-  // tries to decrement the internal counter without blocking
-  bool try_acquire() {
-    LockGuard<decltype(mutex_)> lock(mutex_);
-    if (count_) {
-      --count_;
-      return true;
+  void notify_all() {
+    if (waiters_.load(std::memory_order_acquire) > 0) {
+      LockGuard<decltype(mutex_)> lock(mutex_);
+      cv_.notify_all();
     }
-    return false;
   }
 
-  // tries to decrement the internal counter, blocking for up to a duration time
-  bool try_acquire_for(uint32_t time_ms) {
-    LockGuard<decltype(mutex_)> lock(mutex_);
-    bool finished =
-        condition_.wait_for(mutex_, time_ms, [&] { return count_ > 0; });
-    if (finished) --count_;
-    return finished;
-  }
-
-  unsigned int get_value() {
-    LockGuard<decltype(mutex_)> lock(mutex_);
-    return count_;
+  void notify_one() {
+    if (waiters_.load(std::memory_order_acquire) > 0) {
+      LockGuard<decltype(mutex_)> lock(mutex_);
+      cv_.notify_one();
+    }
   }
 
  private:
+  std::atomic<int> waiters_;
   Mutex mutex_;
-  ConditionVariable condition_;
-  unsigned int count_;
+  ConditionVariable cv_;
 };
 
 }  // namespace base
