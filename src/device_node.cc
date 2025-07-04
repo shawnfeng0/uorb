@@ -26,9 +26,7 @@ static inline uint16_t RoundPowOfTwo(uint16_t n) {
 }
 
 uorb::DeviceNode::DeviceNode(const struct orb_metadata &meta, uint8_t instance)
-    : meta_(meta),
-      instance_(instance),
-      queue_size_(RoundPowOfTwo(meta.o_queue_size)) {}
+    : meta_(meta), instance_(instance), queue_size_(RoundPowOfTwo(meta.o_queue_size)) {}
 
 uorb::DeviceNode::~DeviceNode() { delete[] data_; }
 
@@ -53,17 +51,14 @@ bool uorb::DeviceNode::Copy(void *dst, unsigned *sub_generation_ptr) const {
     sub_generation = generation_ - queue_size_;
   }
 
-  memcpy(dst, data_ + (meta_.o_size * (sub_generation & (queue_size_ - 1))),
-         meta_.o_size);
+  memcpy(dst, data_ + (meta_.o_size * (sub_generation & (queue_size_ - 1))), meta_.o_size);
 
   ++sub_generation;
 
   return true;
 }
 
-unsigned uorb::DeviceNode::updates_available(unsigned generation) const {
-  return generation_ - generation;
-}
+unsigned uorb::DeviceNode::updates_available(unsigned generation) const { return generation_ - generation; }
 
 bool uorb::DeviceNode::Publish(const void *data) {
   if (data == nullptr) {
@@ -83,13 +78,12 @@ bool uorb::DeviceNode::Publish(const void *data) {
     }
   }
 
-  memcpy(data_ + (meta_.o_size * (generation_ % queue_size_)),
-         (const char *)data, meta_.o_size);
+  memcpy(data_ + (meta_.o_size * (generation_ % queue_size_)), (const char *)data, meta_.o_size);
 
   generation_++;
 
-  for (auto callback : callbacks_) {
-    (*callback).notify_all();
+  for (auto &receiver : receiver_list_) {
+    receiver.notify_all();
   }
 
   return true;

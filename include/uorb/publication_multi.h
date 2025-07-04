@@ -9,10 +9,11 @@ namespace uorb {
  * uORB publication wrapper class
  */
 template <const orb_metadata &meta>
-class PublicationMulti : internal::Noncopyable {
+class PublicationMulti {
   using Type = typename msg::TypeMap<meta>::type;
 
  public:
+  UORB_NONCOPYABLE(PublicationMulti);
   PublicationMulti() noexcept = default;
   ~PublicationMulti() { handle_ &&orb_destroy_publication(&handle_); }
 
