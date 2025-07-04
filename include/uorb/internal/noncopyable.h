@@ -4,17 +4,8 @@
 
 #pragma once
 
-namespace uorb {
-namespace internal {
-
-class Noncopyable {
- public:
-  Noncopyable() = default;
-  ~Noncopyable() = default;
-
-  Noncopyable(const Noncopyable&) = delete;
-  Noncopyable& operator=(const Noncopyable&) = delete;
-};
-
-}  // namespace internal
-}  // namespace uorb
+#define UORB_NONCOPYABLE(Class)                  \
+  Class(const Class&) = delete;                  \
+  Class(Class&&) = delete;                       \
+  const Class& operator=(const Class&) = delete; \
+  void operator=(Class&&) = delete;

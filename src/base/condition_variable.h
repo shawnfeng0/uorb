@@ -18,11 +18,9 @@ namespace base {
 
 class ConditionVariableTest;
 
-class ConditionVariable : public internal::Noncopyable {
+class ConditionVariable {
  public:
-  ConditionVariable(const ConditionVariable &) = delete;
-  ConditionVariable &operator=(const ConditionVariable &) = delete;
-
+  UORB_NONCOPYABLE(ConditionVariable);
   ConditionVariable() noexcept {
 #ifdef __APPLE__
     pthread_cond_init(&cond_, nullptr);

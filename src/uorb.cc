@@ -7,14 +7,14 @@
 
 #include <cerrno>
 
-#include "callback.h"
 #include "device_master.h"
 #include "device_node.h"
-#include "subscription_impl.h"
+#include "receiver_base.h"
+#include "receiver_local.h"
 
 using uorb::DeviceMaster;
 using uorb::DeviceNode;
-using uorb::SubscriptionImpl;
+using uorb::ReceiverLocal;
 
 #define ORB_CHECK_TRUE(condition, error_code, error_action) \
   ({                                                        \
@@ -28,8 +28,7 @@ orb_publication_t *orb_create_publication(const struct orb_metadata *meta) {
   return orb_create_publication_multi(meta, nullptr);
 }
 
-orb_publication_t *orb_create_publication_multi(const struct orb_metadata *meta,
-                                                unsigned int *instance) {
+orb_publication_t *orb_create_publication_multi(const struct orb_metadata *meta, unsigned int *instance) {
   ORB_CHECK_TRUE(meta, EINVAL, return nullptr);
   auto &meta_ = *meta;
   auto &device_master = DeviceMaster::get_instance();
@@ -76,8 +75,7 @@ orb_subscription_t *orb_create_subscription(const struct orb_metadata *meta) {
   return orb_create_subscription_multi(meta, 0);
 }
 
-orb_subscription_t *orb_create_subscription_multi(
-    const struct orb_metadata *meta, unsigned instance) {
+orb_subscription_t *orb_create_subscription_multi(const struct orb_metadata *meta, unsigned instance) {
   ORB_CHECK_TRUE(meta, EINVAL, return nullptr);
 
   DeviceMaster &device_master = uorb::DeviceMaster::get_instance();
@@ -87,7 +85,7 @@ orb_subscription_t *orb_create_subscription_multi(
 
   // Create a subscriber, if it fails, we don't have to release device_node (it
   // only increases but not decreases)
-  auto *subscriber = new SubscriptionImpl(*dev);
+  auto *subscriber = new ReceiverLocal(*dev);
   ORB_CHECK_TRUE(subscriber, ENOMEM, return nullptr);
 
   return reinterpret_cast<orb_subscription_t *>(subscriber);
@@ -98,7 +96,7 @@ bool orb_destroy_subscription(orb_subscription_t **handle_ptr) {
 
   auto &subscription_handle = *handle_ptr;
 
-  delete reinterpret_cast<SubscriptionImpl *>(subscription_handle);
+  delete reinterpret_cast<ReceiverLocal *>(subscription_handle);
   subscription_handle = nullptr;  // Set the original pointer to null
 
   return true;
@@ -107,7 +105,7 @@ bool orb_destroy_subscription(orb_subscription_t **handle_ptr) {
 bool orb_copy(orb_subscription_t *handle, void *buffer) {
   ORB_CHECK_TRUE(handle && buffer, EINVAL, return false);
 
-  auto &sub = *reinterpret_cast<SubscriptionImpl *>(handle);
+  auto &sub = *reinterpret_cast<ReceiverLocal *>(handle);
 
   return sub.Copy(buffer);
 }
@@ -128,7 +126,7 @@ bool orb_copy_anonymous(const struct orb_metadata *meta, void *buffer) {
 bool orb_check_update(orb_subscription_t *handle) {
   ORB_CHECK_TRUE(handle, EINVAL, return false);
 
-  auto &sub = *reinterpret_cast<SubscriptionImpl *>(handle);
+  auto &sub = *reinterpret_cast<ReceiverLocal *>(handle);
 
   return sub.updates_available();
 }
@@ -155,8 +153,7 @@ unsigned int orb_group_count(const struct orb_metadata *meta) {
   return instance;
 }
 
-bool orb_get_topic_status(const struct orb_metadata *meta,
-                          unsigned int instance, struct orb_status *status) {
+bool orb_get_topic_status(const struct orb_metadata *meta, unsigned int instance, struct orb_status *status) {
   ORB_CHECK_TRUE(meta, EINVAL, return false);
 
   auto &master = DeviceMaster::get_instance();
@@ -187,7 +184,7 @@ int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
     number_of_new_data = 0;
     for (unsigned i = 0; i < nfds; ++i) {
       fds[i].revents = 0;
-      auto &item_sub = *reinterpret_cast<SubscriptionImpl *>(fds[i].fd);
+      auto &item_sub = *reinterpret_cast<ReceiverLocal *>(fds[i].fd);
       if (item_sub.updates_available()) {
         fds[i].revents |= fds[i].events & POLLIN;
         ++number_of_new_data;
@@ -198,21 +195,21 @@ int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
 
   if (CheckDataUpdate()) return number_of_new_data;
 
-  uorb::UpdateNotifyCallback notifier_callback;
+  uorb::base::LiteNotifier notifier;
   for (unsigned i = 0; i < nfds; ++i) {
-    auto &item_sub = *reinterpret_cast<SubscriptionImpl *>(fds[i].fd);
-    item_sub.RegisterCallback(&notifier_callback);
+    auto &item_sub = *reinterpret_cast<ReceiverLocal *>(fds[i].fd);
+    item_sub.SetNotifier(&notifier);
   }
 
   if (timeout_ms > 0) {
-    notifier_callback.wait_for(timeout_ms, CheckDataUpdate);
+    notifier.wait_for(timeout_ms, CheckDataUpdate);
   } else if (timeout_ms < 0) {
-    notifier_callback.wait(CheckDataUpdate);
+    notifier.wait(CheckDataUpdate);
   }
 
   for (unsigned i = 0; i < nfds; ++i) {
-    auto &item_sub = *reinterpret_cast<SubscriptionImpl *>(fds[i].fd);
-    item_sub.UnregisterCallback(&notifier_callback);
+    auto &item_sub = *reinterpret_cast<ReceiverLocal *>(fds[i].fd);
+    item_sub.RemoveNotifier();
   }
 
   return number_of_new_data;

@@ -29,7 +29,7 @@ class SubscriptionInterval : public Subscription<T> {
                                 uint8_t instance = 0) noexcept
       : Subscription<T>(instance), interval_us_(interval_us) {}
 
-  ~SubscriptionInterval() = default;
+  ~SubscriptionInterval() override = default;
 
   /**
    * Check if there is a new update.
