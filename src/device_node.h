@@ -6,7 +6,6 @@
 #include <cerrno>
 
 #include "base/condition_variable.h"
-#include "base/intrusive_list.h"
 #include "base/intrusive_list/forward_list.h"
 #include "base/mutex.h"
 #include "receiver_base.h"
@@ -21,7 +20,7 @@ class DeviceMaster;
 /**
  * Per-object device instance.
  */
-class DeviceNode final : public ListNode<DeviceNode *> {
+class DeviceNode {
   friend DeviceMaster;
 
  public:
@@ -106,6 +105,7 @@ class DeviceNode final : public ListNode<DeviceNode *> {
   bool has_anonymous_publisher_{false};
 
   intrusive_list::forward_list<detail::ReceiverBase, &detail::ReceiverBase::receiver_node> receiver_list_;
+  intrusive_list::forward_list_node device_list_node_{};
 
   DeviceNode(const struct orb_metadata &meta, uint8_t instance);
   ~DeviceNode();
