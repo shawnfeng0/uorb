@@ -9,12 +9,10 @@
 
 #include "device_master.h"
 #include "device_node.h"
-#include "receiver_base.h"
+#include "event_poll.h"
 #include "receiver_local.h"
 
-using uorb::DeviceMaster;
-using uorb::DeviceNode;
-using uorb::ReceiverLocal;
+using namespace uorb;
 
 #define ORB_CHECK_TRUE(condition, error_code, error_action) \
   ({                                                        \
@@ -213,4 +211,40 @@ int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
   }
 
   return number_of_new_data;
+}
+
+
+orb_event_poll_t *orb_event_poll_create(void) {
+  auto *cpp_poll = new (std::nothrow) uorb::EventPoll();
+  return reinterpret_cast<orb_event_poll_t *>(cpp_poll);
+}
+
+bool orb_event_poll_destroy(orb_event_poll_t **handle_ptr) {
+  ORB_CHECK_TRUE(handle_ptr && *handle_ptr, EINVAL, return false);
+  auto *cpp_poll = reinterpret_cast<uorb::EventPoll *>(*handle_ptr);
+  delete cpp_poll;
+  *handle_ptr = nullptr;
+  return true;
+}
+
+bool orb_event_poll_add(orb_event_poll_t *poll, orb_subscription_t *sub) {
+  ORB_CHECK_TRUE(poll && sub, EINVAL, return false);
+  auto *cpp_poll = reinterpret_cast<uorb::EventPoll *>(poll);
+  auto *receiver = reinterpret_cast<uorb::ReceiverLocal *>(sub);
+  cpp_poll->AddReceiver(*receiver);
+  return true;
+}
+
+bool orb_event_poll_remove(orb_event_poll_t *poll, orb_subscription_t *sub) {
+  ORB_CHECK_TRUE(poll && sub, EINVAL, return false);
+  auto *cpp_poll = reinterpret_cast<uorb::EventPoll *>(poll);
+  auto *receiver = reinterpret_cast<uorb::ReceiverLocal *>(sub);
+  cpp_poll->RemoveReceiver(*receiver);
+  return true;
+}
+
+int orb_event_poll_wait(orb_event_poll_t *poll, orb_subscription_t *subs[], int max_subs, int timeout_ms) {
+  ORB_CHECK_TRUE(poll && subs && max_subs > 0, EINVAL, return -1);
+  auto *cpp_poll = reinterpret_cast<uorb::EventPoll *>(poll);
+  return cpp_poll->Wait(reinterpret_cast<uorb::ReceiverLocal **>(subs), max_subs, timeout_ms);
 }

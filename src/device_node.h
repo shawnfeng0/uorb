@@ -95,7 +95,7 @@ class DeviceNode {
 
   uint8_t *data_{nullptr};    /**< allocated object buffer */
   const uint16_t queue_size_; /**< maximum number of elements in the queue */
-  unsigned generation_{0};    /**< object generation count */
+  std::atomic_uint32_t generation_{0};    /**< object generation count */
 
   mutable base::Mutex lock_{};
 
