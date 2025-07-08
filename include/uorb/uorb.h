@@ -27,12 +27,11 @@
  * Object metadata.
  */
 struct orb_metadata {
-  const char *o_name;    /**< unique object name */
-  const uint16_t o_size; /**< object size */
-  const uint16_t
-      o_size_no_padding; /**< object size w/o padding at the end (for logger) */
-  const char *o_fields;  /**< semicolon separated list of fields (with type) */
-  uint16_t o_queue_size; /**< semicolon separated list of fields (with type) */
+  const char *o_name;               /**< unique object name */
+  const uint16_t o_size;            /**< object size */
+  const uint16_t o_size_no_padding; /**< object size w/o padding at the end (for logger) */
+  const char *o_fields;             /**< semicolon separated list of fields (with type) */
+  uint16_t o_queue_size;            /**< semicolon separated list of fields (with type) */
 };
 
 /**
@@ -92,8 +91,7 @@ struct TypeMap;
   }                                       \
   extern "C" const struct orb_metadata *__orb_##_name __EXPORT
 #else
-#define ORB_DECLARE(_name, _struct) \
-  extern const struct orb_metadata *__orb_##_name __EXPORT
+#define ORB_DECLARE(_name, _struct) extern const struct orb_metadata *__orb_##_name __EXPORT
 #endif
 
 /**
@@ -111,10 +109,9 @@ struct TypeMap;
  * @param _fields	All fields in a semicolon separated list
  *                      e.g: "float[3] position;bool armed"
  */
-#define ORB_DEFINE(_name, _struct, _size_no_padding, _fields, _queue_size) \
-  const struct orb_metadata uorb::msg::_name = {                           \
-      #_name, sizeof(_struct), _size_no_padding, _fields, _queue_size};    \
-  const struct orb_metadata *__orb_##_name = &uorb::msg::_name;            \
+#define ORB_DEFINE(_name, _struct, _size_no_padding, _fields, _queue_size)                                        \
+  const struct orb_metadata uorb::msg::_name = {#_name, sizeof(_struct), _size_no_padding, _fields, _queue_size}; \
+  const struct orb_metadata *__orb_##_name = &uorb::msg::_name;                                                   \
   struct hack
 
 /**
@@ -167,8 +164,7 @@ typedef struct orb_pollfd orb_pollfd_t;
  * return orb_create_publication_multi(meta, nullptr, queue_size);
  * @see orb_create_publication_multi()
  */
-orb_publication_t *orb_create_publication(
-    const struct orb_metadata *meta) __EXPORT;
+orb_publication_t *orb_create_publication(const struct orb_metadata *meta) __EXPORT;
 
 /**
  * Advertise as the publisher of a topic.
@@ -199,8 +195,7 @@ orb_publication_t *orb_create_publication(
  * @return NULL on error(No memory or too many instances), otherwise returns an
  * ORB topic advertiser handle that can be used to publish to the topic.
  */
-orb_publication_t *orb_create_publication_multi(
-    const struct orb_metadata *meta, unsigned int *instance) __EXPORT;
+orb_publication_t *orb_create_publication_multi(const struct orb_metadata *meta, unsigned int *instance) __EXPORT;
 
 /**
  * Unadvertise a topic.
@@ -240,8 +235,7 @@ bool orb_publish(orb_publication_t *handle, const void *data) __EXPORT;
  * @param data @see orb_publish()
  * @return @see orb_publish()
  */
-bool orb_publish_anonymous(const struct orb_metadata *meta,
-                           const void *data) __EXPORT;
+bool orb_publish_anonymous(const struct orb_metadata *meta, const void *data) __EXPORT;
 
 /**
  * Advertise as the publisher of a topic.
@@ -251,9 +245,8 @@ bool orb_publish_anonymous(const struct orb_metadata *meta,
  *
  * @see orb_advertise_multi() for meaning of the individual parameters
  */
-static inline bool orb_publish_auto(const struct orb_metadata *meta,
-                                    orb_publication_t **handle_ptr,
-                                    const void *data, unsigned int *instance) {
+static inline bool orb_publish_auto(const struct orb_metadata *meta, orb_publication_t **handle_ptr, const void *data,
+                                    unsigned int *instance) {
   if (!meta || !handle_ptr) {
     errno = EINVAL;
     return false;
@@ -272,8 +265,7 @@ static inline bool orb_publish_auto(const struct orb_metadata *meta,
  * return orb_create_subscription_multi(meta, 0);
  * @see orb_create_subscription_multi()
  */
-orb_subscription_t *orb_create_subscription(
-    const struct orb_metadata *meta) __EXPORT;
+orb_subscription_t *orb_create_subscription(const struct orb_metadata *meta) __EXPORT;
 
 /**
  * Subscribe to a multi-instance of a topic.
@@ -308,8 +300,7 @@ orb_subscription_t *orb_create_subscription(
  * @return    NULL on error, otherwise returns a subscriber handle
  *      that can be used to read and update the topic.
  */
-orb_subscription_t *orb_create_subscription_multi(
-    const struct orb_metadata *meta, unsigned instance) __EXPORT;
+orb_subscription_t *orb_create_subscription_multi(const struct orb_metadata *meta, unsigned instance) __EXPORT;
 
 /**
  * Unsubscribe from a topic.
@@ -372,8 +363,7 @@ bool orb_check_update(orb_subscription_t *handle) __EXPORT;
  * If the message is updated, copy the message.
  * See orb_check_update() and orb_copy().
  */
-static inline bool orb_check_and_copy(orb_subscription_t *handle,
-                                      void *buffer) {
+static inline bool orb_check_and_copy(orb_subscription_t *handle, void *buffer) {
   return orb_check_update(handle) && orb_copy(handle, buffer);
 }
 
@@ -384,8 +374,7 @@ static inline bool orb_check_and_copy(orb_subscription_t *handle,
  * @param instance  ORB instance
  * @return true if the topic exists, false otherwise.
  */
-bool orb_exists(const struct orb_metadata *meta,
-                unsigned int instance) __EXPORT;
+bool orb_exists(const struct orb_metadata *meta, unsigned int instance) __EXPORT;
 
 /**
  * Get the number of published instances of a topic group
@@ -403,8 +392,7 @@ unsigned int orb_group_count(const struct orb_metadata *meta) __EXPORT;
  * @param status [out] The topic status.
  * @return
  */
-bool orb_get_topic_status(const struct orb_metadata *meta,
-                          unsigned int instance, struct orb_status *status);
+bool orb_get_topic_status(const struct orb_metadata *meta, unsigned int instance, struct orb_status *status);
 
 /**
  * Similar to the poll() function of POSIX.
@@ -427,8 +415,51 @@ bool orb_get_topic_status(const struct orb_metadata *meta,
  * and no handle have been selected. Upon failure, poll() shall return
  * −1 and set orb_errno to indicate the error.
  */
-int orb_poll(struct orb_pollfd *fds, unsigned int nfds,
-             int timeout_ms) __EXPORT;
+int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) __EXPORT;
+
+/**
+ ** Event poll handle (opaque type for C API)
+ */
+typedef struct orb_event_poll orb_event_poll_t;
+
+/**
+ * Create an event poll object.
+ * @return event poll handle, or NULL on error
+ */
+orb_event_poll_t *orb_event_poll_create(void) __EXPORT;
+
+/**
+ * Destroy an event poll object.
+ * @param handle_ptr pointer to event poll handle, will be set to NULL
+ * @return true on success
+ */
+bool orb_event_poll_destroy(orb_event_poll_t **handle_ptr) __EXPORT;
+
+/**
+ * Add a subscription to the event poll.
+ * @param poll event poll handle
+ * @param sub subscription handle (orb_subscription_t*)
+ * @return true on success
+ */
+bool orb_event_poll_add(orb_event_poll_t *poll, orb_subscription_t *sub) __EXPORT;
+
+/**
+ * Remove a subscription from the event poll.
+ * @param poll event poll handle
+ * @param sub subscription handle (orb_subscription_t*)
+ * @return true on success
+ */
+bool orb_event_poll_remove(orb_event_poll_t *poll, orb_subscription_t *sub) __EXPORT;
+
+/**
+ * Wait for events on the event poll.
+ * @param poll event poll handle
+ * @param subs output array of subscription handles (orb_subscription_t*)
+ * @param max_subs max number of output handles
+ * @param timeout_ms timeout in ms (0: return immediately, <0: block)
+ * @return number of ready subscriptions, or -1 on error
+ */
+int orb_event_poll_wait(orb_event_poll_t *poll, orb_subscription_t *subs[], int max_subs, int timeout_ms) __EXPORT;
 
 /**
  * Get orb version string
