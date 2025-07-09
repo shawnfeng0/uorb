@@ -8,8 +8,6 @@ namespace uorb {
 
 template <const orb_metadata &T>
 class SubscriptionInterval : public Subscription<T> {
-  using Type = typename msg::TypeMap<T>::type;
-
  private:
   template <typename Tp>
   constexpr Tp constrain(Tp val, Tp min_val, Tp max_val) const {
@@ -17,6 +15,8 @@ class SubscriptionInterval : public Subscription<T> {
   }
 
  public:
+  using ValueType = typename msg::TypeMap<T>::type;
+
   /**
    * Constructor
    *
@@ -25,8 +25,7 @@ class SubscriptionInterval : public Subscription<T> {
    * @param interval The requested maximum update interval in microseconds.
    * @param instance The instance for multi sub.
    */
-  explicit SubscriptionInterval(uint32_t interval_us = 0,
-                                uint8_t instance = 0) noexcept
+  explicit SubscriptionInterval(uint32_t interval_us = 0, uint8_t instance = 0) noexcept
       : Subscription<T>(instance), interval_us_(interval_us) {}
 
   ~SubscriptionInterval() override = default;
@@ -34,17 +33,14 @@ class SubscriptionInterval : public Subscription<T> {
   /**
    * Check if there is a new update.
    * */
-  bool Updated() override {
-    return Subscription<T>::Updated() &&
-           (orb_elapsed_time_us(last_update_) >= interval_us_);
-  }
+  bool Updated() override { return Subscription<T>::Updated() && (orb_elapsed_time_us(last_update_) >= interval_us_); }
 
   /**
    * Copy the struct if updated.
    * @param dst The destination pointer where the struct will be copied.
    * @return true only if topic was updated and copied successfully.
    */
-  bool Update(Type *dst) override {
+  bool Update(ValueType *dst) override {
     if (Updated()) {
       return Copy(dst);
     }
@@ -57,13 +53,12 @@ class SubscriptionInterval : public Subscription<T> {
    * @param dst The destination pointer where the struct will be copied.
    * @return true only if topic was copied successfully.
    */
-  bool Copy(Type *dst) override {
+  bool Copy(ValueType *dst) override {
     if (Subscription<T>::Copy(dst)) {
       const orb_abstime_us now = orb_absolute_time_us();
       // shift last update time forward, but don't let it get further behind
       // than the interval
-      last_update_ =
-          constrain(last_update_ + interval_us_, now - interval_us_, now);
+      last_update_ = constrain(last_update_ + interval_us_, now - interval_us_, now);
       return true;
     }
 

@@ -38,7 +38,6 @@ class ReceiverLocal final : public detail::ReceiverBase {
     notifier_ = nullptr;
   }
 
- public:
   intrusive_list::forward_list_node event_poll_node{};
 
  private:

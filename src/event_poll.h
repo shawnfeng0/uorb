@@ -38,19 +38,26 @@ class EventPoll {
       return number_of_new_data > 0;
     };
 
-    if (CheckDataUpdate()) return number_of_new_data;
-
     if (timeout_ms > 0) {
-      notifier_.wait_for(timeout_ms, CheckDataUpdate);
+      notifier_.wait_for(timeout_ms, [&] { return stop_ || CheckDataUpdate(); });
     } else if (timeout_ms < 0) {
-      notifier_.wait(CheckDataUpdate);
+      notifier_.wait([&] { return stop_ || CheckDataUpdate(); });
     }
 
+    // need to quit the loop
+    if (stop_) return -1;
+
     return number_of_new_data;
+  }
+
+  void Stop() {
+    stop_ = true;
+    notifier_.notify_all();
   }
 
  private:
   base::LiteNotifier notifier_;
   intrusive_list::forward_list<ReceiverLocal, &ReceiverLocal::event_poll_node> event_poll_list_;
+  std::atomic_bool stop_{false};
 };
 }  // namespace uorb
