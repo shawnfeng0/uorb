@@ -8,8 +8,6 @@ namespace uorb {
 
 template <const orb_metadata &meta>
 class Subscription {
-  using Type = typename msg::TypeMap<meta>::type;
-
  protected:
   const uint8_t instance_{0};
   orb_subscription_t *handle_{nullptr};
@@ -20,6 +18,8 @@ class Subscription {
   virtual bool Updated() { return Subscribed() && orb_check_update(handle_); }
 
  public:
+  using ValueType = typename msg::TypeMap<meta>::type;
+
   UORB_NONCOPYABLE(Subscription);
 
   /**
@@ -47,25 +47,22 @@ class Subscription {
    * Update the struct
    * @param data The uORB message struct we are updating.
    */
-  virtual bool Update(Type *dst) { return Updated() && Copy(dst); }
+  virtual bool Update(ValueType *dst) { return Updated() && Copy(dst); }
 
   /**
    * Copy the struct
    * @param data The uORB message struct we are updating.
    */
-  virtual bool Copy(Type *dst) {
-    return Subscribed() && orb_copy(handle_, dst);
-  }
+  virtual bool Copy(ValueType *dst) { return Subscribed() && orb_copy(handle_, dst); }
 };
 
 // Subscription wrapper class with data
 template <const orb_metadata &T>
 class SubscriptionData : public Subscription<T> {
-  using Type = typename msg::TypeMap<T>::type;
-
  public:
-  explicit SubscriptionData(uint8_t instance = 0) noexcept
-      : Subscription<T>(instance) {}
+  using ValueType = typename msg::TypeMap<T>::type;
+
+  explicit SubscriptionData(uint8_t instance = 0) noexcept : Subscription<T>(instance) {}
 
   ~SubscriptionData() override = default;
 
@@ -74,10 +71,10 @@ class SubscriptionData : public Subscription<T> {
   // update the embedded struct.
   bool Update() { return Subscription<T>::Update(&data_); }
 
-  const Type &get() const { return data_; }
+  const ValueType &get() const { return data_; }
 
  private:
-  Type data_{};
+  ValueType data_{};
 };
 
 }  // namespace uorb

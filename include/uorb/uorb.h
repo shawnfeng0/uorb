@@ -462,6 +462,13 @@ bool orb_event_poll_remove(orb_event_poll_t *poll, orb_subscription_t *sub) __EX
 int orb_event_poll_wait(orb_event_poll_t *poll, orb_subscription_t *subs[], int max_subs, int timeout_ms) __EXPORT;
 
 /**
+ * Quit the event poll loop (for use with orb_event_poll_wait).
+ * @param poll event poll handle
+ * @return true on success, false if poll is NULL
+ */
+bool orb_event_poll_quit(orb_event_poll_t *poll) __EXPORT;
+
+/**
  * Get orb version string
  * @return version string
  */

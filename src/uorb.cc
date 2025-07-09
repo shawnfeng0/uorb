@@ -248,3 +248,10 @@ int orb_event_poll_wait(orb_event_poll_t *poll, orb_subscription_t *subs[], int 
   auto *cpp_poll = reinterpret_cast<uorb::EventPoll *>(poll);
   return cpp_poll->Wait(reinterpret_cast<uorb::ReceiverLocal **>(subs), max_subs, timeout_ms);
 }
+
+bool orb_event_poll_quit(orb_event_poll_t *poll) {
+  ORB_CHECK_TRUE(poll, EINVAL, return false);
+  auto *cpp_poll = reinterpret_cast<uorb::EventPoll *>(poll);
+  cpp_poll->Stop();
+  return true;
+}
