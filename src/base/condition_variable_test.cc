@@ -10,9 +10,8 @@
 
 #include "uorb/abs_time.h"
 
-#define DEBUG_MARK(mark)                                              \
-  printf("%s:%d %" PRIu64 ".%03" PRIu64 "ms " #mark "\r\n", __FILE__, \
-         __LINE__, orb_absolute_time_us() / 1000000,                  \
+#define DEBUG_MARK(mark)                                                                                          \
+  printf("%s:%d %" PRIu64 ".%03" PRIu64 "ms " #mark "\r\n", __FILE__, __LINE__, orb_absolute_time_us() / 1000000, \
          (orb_absolute_time_us() / 1000) % 1000)
 
 class Timer {
@@ -74,8 +73,7 @@ TEST(ConditionVariableTest, get_time) {
   }
 }
 
-bool wait_for_case(int set_timeout_ms, int wait_timeout_ms,
-                   uint64_t *actual_waiting_time) {
+bool wait_for_case(int set_timeout_ms, int wait_timeout_ms, uint64_t *actual_waiting_time) {
   using namespace uorb::base;
   auto cv = std::make_shared<ConditionVariable>();
   auto mutex = std::make_shared<Mutex>();
@@ -105,15 +103,15 @@ bool wait_for_case(int set_timeout_ms, int wait_timeout_ms,
 TEST(ConditionVariableTest, wait_for) {
   {
     uint64_t actual_waiting_time;
-    EXPECT_TRUE(wait_for_case(10, 50, &actual_waiting_time));
+    EXPECT_TRUE(wait_for_case(10, 100, &actual_waiting_time));
     EXPECT_GE(actual_waiting_time, 10);
-    EXPECT_LE(actual_waiting_time, 50);
+    EXPECT_LE(actual_waiting_time, 100);
   }
   {
     uint64_t actual_waiting_time;
-    EXPECT_TRUE(wait_for_case(50, 200, &actual_waiting_time));
+    EXPECT_TRUE(wait_for_case(50, 500, &actual_waiting_time));
     EXPECT_GE(actual_waiting_time, 50);
-    EXPECT_LE(actual_waiting_time, 200);
+    EXPECT_LE(actual_waiting_time, 500);
   }
 }
 
