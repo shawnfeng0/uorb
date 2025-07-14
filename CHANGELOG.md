@@ -9,6 +9,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 [Unreleased]: https://github.com/ShawnFeng0/uorb/compare/v0.3.1...HEAD
 
+### Changed
+
+- Add orb_event_poll interface to achieve high performance similar to linux epoll function
+- Add EventLoop class to implement the event processing paradigm of the topic + callback function
+- Use intrusive linked lists to replace data structures such as std::set to reduce dependence on the C++ standard library
+
 ## [0.3.1] - 2025-06-01
 [0.3.1]: https://github.com/ShawnFeng0/uorb/compare/v0.3.0...v0.3.1
 
