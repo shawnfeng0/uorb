@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdatomic.h>
 #include <uorb/internal/noncopyable.h>
 #include <uorb/uorb.h>
 
@@ -95,7 +96,7 @@ class DeviceNode {
 
   uint8_t *data_{nullptr};    /**< allocated object buffer */
   const uint16_t queue_size_; /**< maximum number of elements in the queue */
-  std::atomic_uint32_t generation_{0};    /**< object generation count */
+  atomic_int generation_ = 0;  /**< object generation count */
 
   mutable base::Mutex lock_{};
 

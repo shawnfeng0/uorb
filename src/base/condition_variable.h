@@ -7,9 +7,6 @@
 #include <stdint.h>
 #include <time.h>
 
-#include <atomic>
-#include <chrono>
-
 #include "base/mutex.h"
 #include "uorb/internal/noncopyable.h"
 
@@ -65,16 +62,13 @@ class ConditionVariable {
   // Return true if successful
   bool wait_for(Mutex &lock, uint32_t time_ms) {  // NOLINT
 #ifdef __APPLE__
-    struct timespec rel_ts = {.tv_sec = time_ms / 1000,
-                              .tv_nsec = (time_ms % 1000) * 1000000};
+    struct timespec rel_ts = {.tv_sec = time_ms / 1000, .tv_nsec = (time_ms % 1000) * 1000000};
     // OS X do support waiting on a condition variable with a relative timeout.
-    auto ret = pthread_cond_timedwait_relative_np(&cond_, lock.native_handle(),
-                                                  &rel_ts) == 0;
+    auto ret = pthread_cond_timedwait_relative_np(&cond_, lock.native_handle(), &rel_ts) == 0;
     return ret;
 #else
     struct timespec until_time = timespec_get_after(get_now_time(), time_ms);
-    auto ret =
-        pthread_cond_timedwait(&cond_, lock.native_handle(), &until_time) == 0;
+    auto ret = pthread_cond_timedwait(&cond_, lock.native_handle(), &until_time) == 0;
     return ret;
 #endif
   }
@@ -98,8 +92,7 @@ class ConditionVariable {
     clock_gettime(kWhichClock, &result);
     return result;
   }
-  static inline struct timespec timespec_get_after(const struct timespec &now,
-                                                   uint32_t time_ms) {
+  static inline struct timespec timespec_get_after(const struct timespec &now, uint32_t time_ms) {
     static const auto kNSecPerS = 1000 * 1000 * 1000;
 
     struct timespec result = now;
@@ -137,9 +130,9 @@ class LiteNotifier {
     if (pred()) return;
 
     LockGuard<decltype(mutex_)> lock(mutex_);
-    waiters_.fetch_add(1, std::memory_order_release);
+    atomic_fetch_add_explicit(&waiters_, 1, memory_order_release);
     cv_.wait(mutex_, pred);
-    waiters_.fetch_sub(1, std::memory_order_release);
+    atomic_fetch_sub_explicit(&waiters_, 1, memory_order_release);
   }
 
   template <typename Predicate>
@@ -147,28 +140,28 @@ class LiteNotifier {
     if (pred()) return true;
 
     LockGuard<decltype(mutex_)> lock(mutex_);
-    waiters_.fetch_add(1, std::memory_order_release);
+    atomic_fetch_add_explicit(&waiters_, 1, memory_order_release);
     const bool result = cv_.wait_for(mutex_, time_ms, pred);
-    waiters_.fetch_sub(1, std::memory_order_release);
+    atomic_fetch_sub_explicit(&waiters_, 1, memory_order_release);
     return result;
   }
 
   void notify_all() {
-    if (waiters_.load(std::memory_order_acquire) > 0) {
+    if (atomic_load_explicit(&waiters_, memory_order_acquire) > 0) {
       LockGuard<decltype(mutex_)> lock(mutex_);
       cv_.notify_all();
     }
   }
 
   void notify_one() {
-    if (waiters_.load(std::memory_order_acquire) > 0) {
+    if (atomic_load_explicit(&waiters_, memory_order_acquire) > 0) {
       LockGuard<decltype(mutex_)> lock(mutex_);
       cv_.notify_one();
     }
   }
 
  private:
-  std::atomic<int> waiters_;
+  atomic_int waiters_;
   Mutex mutex_;
   ConditionVariable cv_;
 };

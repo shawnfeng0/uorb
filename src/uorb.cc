@@ -213,9 +213,8 @@ int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
   return number_of_new_data;
 }
 
-
 orb_event_poll_t *orb_event_poll_create(void) {
-  auto *cpp_poll = new (std::nothrow) uorb::EventPoll();
+  auto *cpp_poll = new uorb::EventPoll();
   return reinterpret_cast<orb_event_poll_t *>(cpp_poll);
 }
 
