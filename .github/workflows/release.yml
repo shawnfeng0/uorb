@@ -1,0 +1,105 @@
+name: Release Build
+
+on:
+  push:
+    tags:
+      - 'v?[0-9]+.[0-9]+.[0-9]+*'
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform.name }}
+    runs-on: ${{ matrix.platform.os }}
+    strategy:
+      matrix:
+        platform:
+          - name: linux-x86_64
+            os: ubuntu-latest
+            arch: x86_64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang
+
+      - name: Configure CMake
+        run: |
+          cmake -B ${{github.workspace}}/build \
+            -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ 
+
+      - name: Build
+        run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} -j$(nproc)
+
+      - name: Install to staging area
+        run: |
+          mkdir -p ${{github.workspace}}/package
+          cmake --install ${{github.workspace}}/build --prefix ${{github.workspace}}/package
+
+      - name: Copy binaries
+        run: |
+          # No need to copy binaries, install step already handles this
+
+      - name: Create package archive
+        run: |
+          repo_name="${{ github.event.repository.name }}"
+          cd ${{github.workspace}}/package
+          tar -czf ../${repo_name}-${{ matrix.platform.name }}-${{ github.ref_name }}.tar.gz *
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.event.repository.name }}-${{ matrix.platform.name }}-${{ github.ref_name }}
+          path: ${{github.workspace}}/${{ github.event.repository.name }}-${{ matrix.platform.name }}-${{ github.ref_name }}.tar.gz
+          retention-days: 30
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Display structure of downloaded files
+        run: ls -la ./artifacts/
+
+      - name: Create release body from changelog
+        shell: bash
+        run: |
+          tag="${{ github.ref_name }}"
+          tag_no_v="${tag#v}"
+          tag_escaped=$(echo "$tag_no_v" | sed 's/\./\\./g')
+          awk "/## \\[(v)?$tag_escaped\]/ {flag=1; next} /^## \\[/ {flag=0} flag" CHANGELOG.md | sed '/^$/d' > release_body.md
+          repo_url="https://github.com/${{ github.repository }}"
+          echo -e "\nFor more release notes, see [CHANGELOG.md]($repo_url/blob/${{ github.ref_name }}/CHANGELOG.md)" >> release_body.md
+
+      - name: Create Release and Upload Assets
+        run: |
+          gh release create ${{ github.ref_name }} \
+            --title "Release ${{ github.ref_name }}" \
+            --notes-file release_body.md
+          for artifact_dir in ./artifacts/*/; do
+            artifact_file=$(find "$artifact_dir" -name "*.tar.gz" | head -1)
+            if [ -f "$artifact_file" ]; then
+              echo "Uploading $artifact_file"
+              gh release upload ${{ github.ref_name }} "$artifact_file"
+            fi
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
