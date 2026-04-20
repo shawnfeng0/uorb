@@ -2,8 +2,8 @@
 
 #include <uorb/uorb.h>
 
+#include <algorithm>
 #include <functional>
-#include <unordered_map>
 #include <vector>
 
 namespace uorb {
@@ -12,45 +12,47 @@ class EventLoop {
  public:
   EventLoop() : event_poll_(orb_event_poll_create()) {}
   ~EventLoop() {
-    for (const auto &pair : sub_callbacks_) {
-      auto sub = pair.first;
-      orb_event_poll_remove(event_poll_, sub);
-      orb_destroy_subscription(&sub);
-    }
-    for (const auto &pair : external_sub_callbacks_) {
-      const auto sub = pair.first;
-      orb_event_poll_remove(event_poll_, sub);
+    for (auto &entry : entries_) {
+      orb_event_poll_remove(event_poll_, entry.sub);
+      if (entry.owned) {
+        orb_destroy_subscription(&entry.sub);
+      }
     }
     orb_event_poll_destroy(&event_poll_);
   }
 
+  // Register a callback on an externally managed subscription.
   template <typename Sub>
   void RegisterCallback(Sub &sub_cpp, const std::function<void(const typename Sub::ValueType &)> &cb) {
-    RegisterCallback(external_sub_callbacks_, sub_cpp.handle(), cb);
+    AddEntry(sub_cpp.handle(), cb, false);
   }
 
+  // Unregister a callback previously registered with an external subscription.
   template <typename Sub>
   void UnRegisterCallback(Sub &sub_cpp) {
-    UnRegisterCallback(external_sub_callbacks_, sub_cpp.handle());
+    RemoveEntry(sub_cpp.handle());
   }
 
+  // Register a callback for a topic; the subscription is owned by EventLoop.
   template <const orb_metadata &meta>
   void RegisterCallback(const std::function<void(const typename msg::TypeMap<meta>::type &)> &cb) {
     orb_subscription_t *sub = orb_create_subscription(&meta);
     if (!sub) return;
-
-    RegisterCallback(sub_callbacks_, sub, cb);
+    AddEntry(sub, cb, true);
   }
 
   int PollOnce(const int timeout_ms = -1) {
-    std::vector<orb_subscription_t *> ready_subs(sub_callbacks_.size(), nullptr);
+    ready_buf_.resize(entries_.size());
     const int number_of_event =
-        orb_event_poll_wait(event_poll_, ready_subs.data(), static_cast<int>(ready_subs.size()), timeout_ms);
+        orb_event_poll_wait(event_poll_, ready_buf_.data(), static_cast<int>(ready_buf_.size()), timeout_ms);
 
     for (int i = 0; i < number_of_event; ++i) {
-      for (auto callbacks : {sub_callbacks_, external_sub_callbacks_}) {
-        if (auto it = callbacks.find(ready_subs[i]); it != callbacks.end()) {
-          it->second();
+      // Linear search is efficient for the small subscriber counts EventLoop
+      // is designed for, and avoids the hash-table overhead of a map lookup.
+      for (const auto &entry : entries_) {
+        if (entry.sub == ready_buf_[i]) {
+          entry.callback();
+          break;
         }
       }
     }
@@ -58,33 +60,46 @@ class EventLoop {
     return number_of_event;
   }
 
-  void Loop() { while (PollOnce(-1) >= 0); }
+  void Loop() {
+    while (PollOnce(-1) >= 0) {
+    }
+  }
 
   // Quit the event loop (thread-safe, can be called from another thread)
   void Quit() const { orb_event_poll_quit(event_poll_); }
 
  private:
+  struct Entry {
+    orb_subscription_t *sub;
+    std::function<void()> callback;
+    bool owned;  // true when EventLoop created and owns the subscription
+  };
+
   template <typename Msg>
-  void RegisterCallback(std::unordered_map<orb_subscription_t *, std::function<void()>> &callbacks,
-                        orb_subscription_t *sub, const std::function<void(const Msg &)> &cb) {
+  void AddEntry(orb_subscription_t *sub, const std::function<void(const Msg &)> &cb, bool owned) {
     orb_event_poll_add(event_poll_, sub);
-    callbacks[sub] = [sub, cb] {
-      Msg msg;
-      if (orb_copy(sub, &msg)) {
-        cb(msg);
-      }
-    };
+    entries_.push_back({sub,
+                        [sub, cb] {
+                          Msg msg;
+                          if (orb_copy(sub, &msg)) {
+                            cb(msg);
+                          }
+                        },
+                        owned});
   }
 
-  void UnRegisterCallback(std::unordered_map<orb_subscription_t *, std::function<void()>> &callbacks,
-                          orb_subscription_t *sub) const {
-    callbacks.erase(sub);
-    orb_event_poll_remove(event_poll_, sub);
+  void RemoveEntry(orb_subscription_t *sub) {
+    auto it = std::find_if(entries_.begin(), entries_.end(), [sub](const Entry &e) { return e.sub == sub; });
+    if (it != entries_.end()) {
+      orb_event_poll_remove(event_poll_, it->sub);
+      // External entries are not owned; do not destroy the subscription here.
+      entries_.erase(it);
+    }
   }
 
   orb_event_poll_t *event_poll_;
-  std::unordered_map<orb_subscription_t *, std::function<void()>> sub_callbacks_;
-  std::unordered_map<orb_subscription_t *, std::function<void()>> external_sub_callbacks_;
+  std::vector<Entry> entries_;
+  std::vector<orb_subscription_t *> ready_buf_;
 };
 
 }  // namespace uorb

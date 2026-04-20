@@ -3,30 +3,8 @@
 #include <cerrno>
 #include <cstring>
 
-static inline uint16_t RoundPowOfTwo(uint16_t n) {
-  if (n == 0) {
-    return 1;
-  }
-
-  // Avoid is already a power of 2
-  uint32_t value = n - 1;
-
-  // Fill 1
-  value |= value >> 1U;
-  value |= value >> 2U;
-  value |= value >> 4U;
-  value |= value >> 8U;
-
-  // Unable to round-up, take the value of round-down
-  if (value == UINT16_MAX) {
-    value >>= 1U;
-  }
-
-  return value + 1;
-}
-
 uorb::DeviceNode::DeviceNode(const struct orb_metadata &meta, uint8_t instance)
-    : meta_(meta), instance_(instance), queue_size_(RoundPowOfTwo(meta.o_queue_size)) {}
+    : meta_(meta), instance_(instance), queue_size_(meta.o_queue_size ? meta.o_queue_size : 1) {}
 
 uorb::DeviceNode::~DeviceNode() { delete[] data_; }
 
@@ -51,7 +29,10 @@ bool uorb::DeviceNode::Copy(void *dst, unsigned *sub_generation_ptr) const {
     sub_generation = generation_ - queue_size_;
   }
 
-  memcpy(dst, data_ + (meta_.o_size * (sub_generation & (queue_size_ - 1))), meta_.o_size);
+  // Modulo is used instead of bitwise-AND to support non-power-of-two queue
+  // sizes.  This trades a small per-copy CPU cost for exact memory allocation
+  // (no rounding-up waste).
+  memcpy(dst, data_ + (meta_.o_size * (sub_generation % queue_size_)), meta_.o_size);
 
   ++sub_generation;
 
