@@ -82,22 +82,9 @@ class ConditionVariable {
   // Return true if successful
   template <typename Predicate>
   bool wait_for(Mutex &lock, uint32_t time_ms, Predicate p) {  // NOLINT
-    if (p()) return true;
-    // Use a monotonic deadline so spurious wakeups don't reset the total
-    // timeout. pthread_cond_timedwait may return early (signal, spurious
-    // wake); without a deadline the caller would wait up to `time_ms` on
-    // each iteration.
-    const auto deadline =
-        std::chrono::steady_clock::now() + std::chrono::milliseconds(time_ms);
-    while (!p()) {
-      const auto now = std::chrono::steady_clock::now();
-      if (now >= deadline) return p();
-      const auto remaining_ms =
-          std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now)
-              .count();
-      // Clamp to uint32_t (time_ms was uint32_t, so remaining fits).
-      wait_for(lock, static_cast<uint32_t>(remaining_ms));
-    }
+    // Not returned until timeout or other error
+    while (!p())
+      if (!wait_for(lock, time_ms)) return p();
     return true;
   }
 

@@ -17,6 +17,13 @@
 
 namespace uORBTest {
 
+// Upper bound on how many pre-existing updates we try to drain from a freshly
+// created subscription before running a test. Other tests in the same binary
+// may have already published to the shared topics, so a new subscription can
+// see those as "updated" on first poll. The number of prior publications is
+// small and bounded, so a small fixed cap is plenty.
+static constexpr int kMaxDrainIterations = 4;
+
 // PollOnce() on an EventLoop that has no entries should return 0 immediately,
 // regardless of the timeout value.
 TEST(EventLoopTest, PollOnceEmptyReturnsZero) {
