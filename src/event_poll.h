@@ -27,6 +27,7 @@ class EventPoll {
     int number_of_new_data = 0;
 
     auto CheckDataUpdate = [&] {
+      number_of_new_data = 0;
       for (auto &item_sub : event_poll_list_) {
         if (item_sub.updates_available()) {
           receivers[number_of_new_data++] = &item_sub;
@@ -37,6 +38,11 @@ class EventPoll {
       }
       return number_of_new_data > 0;
     };
+
+    // Fast-path / non-blocking: always report currently-ready subscriptions,
+    // even when timeout_ms == 0 (matches orb_poll() semantics).
+    if (stop_) return -1;
+    if (CheckDataUpdate()) return number_of_new_data;
 
     if (timeout_ms > 0) {
       notifier_.wait_for(timeout_ms, [&] { return stop_ || CheckDataUpdate(); });
