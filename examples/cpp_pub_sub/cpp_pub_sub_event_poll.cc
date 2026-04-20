@@ -70,19 +70,19 @@ void *thread_subscriber(uorb::EventLoop *loop) {
   loop->RegisterCallback(sub_example_string, [](const example_string_s &msg) {
     LOGGER_INFO("sub [example_string] timestamp: %" PRIu64 ", msg: '%s'", msg.timestamp, msg.str);
   });
-  loop->RegisterCallback<uorb::msg::example_string>([](const example_string_s &msg) {
+  loop->Subscribe<uorb::msg::example_string>([](const example_string_s &msg) {
     LOGGER_INFO("[example_string] timestamp: %" PRIu64 ", msg: '%s'", msg.timestamp, msg.str);
   });
-  loop->RegisterCallback<uorb::msg::sensor_accel>([](const sensor_accel_s &msg) {
+  loop->Subscribe<uorb::msg::sensor_accel>([](const sensor_accel_s &msg) {
     LOGGER_INFO("[sensor_accel] timestamp: %" PRIu64 ", accel: (%.2f, %.2f, %.2f), temp: %.2f", msg.timestamp, msg.x,
                 msg.y, msg.z, msg.temperature);
   });
-  loop->RegisterCallback<uorb::msg::sensor_gyro>([](const sensor_gyro_s &msg) {
+  loop->Subscribe<uorb::msg::sensor_gyro>([](const sensor_gyro_s &msg) {
     LOGGER_INFO("[sensor_gyro] timestamp: %" PRIu64 ", gyro: (%.2f, %.2f, %.2f), temp: %.2f", msg.timestamp, msg.x,
                 msg.y, msg.z, msg.temperature);
   });
   loop->Loop();
-  loop->UnRegisterCallback(sub_example_string);
+  loop->UnregisterCallback(sub_example_string);
   return nullptr;
 }
 

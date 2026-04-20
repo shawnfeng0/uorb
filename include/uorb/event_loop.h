@@ -2,106 +2,147 @@
 
 #include <uorb/uorb.h>
 
-#include <algorithm>
 #include <functional>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace uorb {
 
+// EventLoop: register callbacks on subscriptions and dispatch them when new
+// data becomes available.
+//
+// Thread-safety:
+//  - Quit() is thread-safe and may be called from any thread.
+//  - All other member functions (RegisterCallback, UnregisterCallback,
+//    Subscribe, PollOnce, Loop) must be invoked from a single thread
+//    (typically the loop thread).
 class EventLoop {
  public:
   EventLoop() : event_poll_(orb_event_poll_create()) {}
   ~EventLoop() {
-    for (auto &entry : entries_) {
-      orb_event_poll_remove(event_poll_, entry.sub);
-      if (entry.owned) {
-        orb_destroy_subscription(&entry.sub);
+    if (!event_poll_) return;
+    for (auto &kv : entries_) {
+      orb_subscription_t *sub = kv.first;
+      orb_event_poll_remove(event_poll_, sub);
+      if (kv.second.owned) {
+        orb_destroy_subscription(&sub);
       }
     }
     orb_event_poll_destroy(&event_poll_);
   }
 
+  EventLoop(const EventLoop &) = delete;
+  EventLoop &operator=(const EventLoop &) = delete;
+  EventLoop(EventLoop &&) = delete;
+  EventLoop &operator=(EventLoop &&) = delete;
+
+  // Whether the loop was successfully constructed.
+  bool valid() const { return event_poll_ != nullptr; }
+  explicit operator bool() const { return valid(); }
+
   // Register a callback on an externally managed subscription.
-  template <typename Sub>
-  void RegisterCallback(Sub &sub_cpp, const std::function<void(const typename Sub::ValueType &)> &cb) {
-    AddEntry(sub_cpp.handle(), cb, false);
+  // Returns false if the loop is invalid, the subscription is null, or the
+  // subscription was already registered.
+  template <typename Sub, typename F>
+  bool RegisterCallback(Sub &sub_cpp, F &&cb) {
+    using Msg = typename Sub::ValueType;
+    return AddEntry<Msg>(sub_cpp.handle(), std::forward<F>(cb), /*owned=*/false);
   }
 
   // Unregister a callback previously registered with an external subscription.
+  // Returns false if the subscription was not registered.
   template <typename Sub>
-  void UnRegisterCallback(Sub &sub_cpp) {
-    RemoveEntry(sub_cpp.handle());
+  bool UnregisterCallback(Sub &sub_cpp) {
+    return RemoveEntry(sub_cpp.handle());
   }
 
-  // Register a callback for a topic; the subscription is owned by EventLoop.
-  template <const orb_metadata &meta>
-  void RegisterCallback(const std::function<void(const typename msg::TypeMap<meta>::type &)> &cb) {
+  // Subscribe to a topic; the subscription is owned by EventLoop.
+  // Returns false on failure (loop invalid, subscription allocation failure,
+  // or a subscription for this topic has already been added by this call).
+  template <const orb_metadata &meta, typename F>
+  bool Subscribe(F &&cb) {
+    if (!event_poll_) return false;
     orb_subscription_t *sub = orb_create_subscription(&meta);
-    if (!sub) return;
-    AddEntry(sub, cb, true);
+    if (!sub) return false;
+    using Msg = typename msg::TypeMap<meta>::type;
+    if (!AddEntry<Msg>(sub, std::forward<F>(cb), /*owned=*/true)) {
+      orb_destroy_subscription(&sub);
+      return false;
+    }
+    return true;
   }
 
-  int PollOnce(const int timeout_ms = -1) {
-    ready_buf_.resize(entries_.size());
-    const int number_of_event =
-        orb_event_poll_wait(event_poll_, ready_buf_.data(), static_cast<int>(ready_buf_.size()), timeout_ms);
+  [[nodiscard]] int PollOnce(const int timeout_ms = -1) {
+    if (!event_poll_) return -1;
+    if (entries_.empty()) return 0;
+
+    const int number_of_event = orb_event_poll_wait(
+        event_poll_, ready_buf_.data(), static_cast<int>(ready_buf_.size()), timeout_ms);
 
     for (int i = 0; i < number_of_event; ++i) {
-      // Linear search is efficient for the small subscriber counts EventLoop
-      // is designed for, and avoids the hash-table overhead of a map lookup.
-      for (const auto &entry : entries_) {
-        if (entry.sub == ready_buf_[i]) {
-          entry.callback();
-          break;
-        }
-      }
+      auto it = entries_.find(ready_buf_[i]);
+      if (it != entries_.end()) it->second.callback();
     }
 
     return number_of_event;
   }
 
   void Loop() {
-    while (PollOnce(-1) >= 0) {
+    // PollOnce(-1) blocks until either a subscription has data (returns > 0)
+    // or Quit() is requested (returns < 0); it never returns 0 with an
+    // infinite timeout.
+    while (PollOnce(-1) > 0) {
     }
   }
 
-  // Quit the event loop (thread-safe, can be called from another thread)
-  void Quit() const { orb_event_poll_quit(event_poll_); }
+  // Thread-safe: request the event loop to quit.
+  void Quit() {
+    if (event_poll_) orb_event_poll_quit(event_poll_);
+  }
 
  private:
   struct Entry {
-    orb_subscription_t *sub;
     std::function<void()> callback;
-    bool owned;  // true when EventLoop created and owns the subscription
-
-    Entry(orb_subscription_t *sub, std::function<void()> callback, bool owned)
-        : sub(sub), callback(std::move(callback)), owned(owned) {}
+    bool owned;  // EventLoop created and owns the subscription
   };
 
-  template <typename Msg>
-  void AddEntry(orb_subscription_t *sub, const std::function<void(const Msg &)> &cb, bool owned) {
-    orb_event_poll_add(event_poll_, sub);
-    entries_.emplace_back(sub,
-                          [sub, cb] {
-                            Msg msg;
-                            if (orb_copy(sub, &msg)) {
-                              cb(msg);
-                            }
-                          },
-                          owned);
+  template <typename Msg, typename F>
+  bool AddEntry(orb_subscription_t *sub, F &&cb, bool owned) {
+    if (!event_poll_ || !sub) return false;
+    if (entries_.find(sub) != entries_.end()) {
+      // Already registered; refuse to double-register.
+      return false;
+    }
+    if (!orb_event_poll_add(event_poll_, sub)) return false;
+
+    std::function<void(const Msg &)> user_cb(std::forward<F>(cb));
+    entries_.emplace(
+        sub,
+        Entry{[sub, cb = std::move(user_cb)] {
+                Msg msg;
+                if (orb_copy(sub, &msg)) cb(msg);
+              },
+              owned});
+    // Keep ready_buf_ sized to match entries_ so PollOnce does not have to
+    // resize on every call.
+    ready_buf_.resize(entries_.size());
+    return true;
   }
 
-  void RemoveEntry(orb_subscription_t *sub) {
-    auto it = std::find_if(entries_.begin(), entries_.end(), [sub](const Entry &e) { return e.sub == sub; });
-    if (it != entries_.end()) {
-      orb_event_poll_remove(event_poll_, it->sub);
-      // External entries are not owned; do not destroy the subscription here.
-      entries_.erase(it);
-    }
+  bool RemoveEntry(orb_subscription_t *sub) {
+    if (!event_poll_) return false;
+    auto it = entries_.find(sub);
+    if (it == entries_.end()) return false;
+    orb_event_poll_remove(event_poll_, sub);
+    // External entries are not owned; do not destroy the subscription here.
+    entries_.erase(it);
+    ready_buf_.resize(entries_.size());
+    return true;
   }
 
   orb_event_poll_t *event_poll_;
-  std::vector<Entry> entries_;
+  std::unordered_map<orb_subscription_t *, Entry> entries_;
   std::vector<orb_subscription_t *> ready_buf_;
 };
 
