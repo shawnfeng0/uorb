@@ -284,8 +284,6 @@ printf("timestamp: %" PRIu64 "[us], Receive msg: "%s"\n", data.timestamp,
 
 ### 完整示例
 
-最小示例：[examples/cpp_pub_sub/cpp_pub_sub_event_loop.cc](../examples/cpp_pub_sub/cpp_pub_sub_event_loop.cc)
-
-多线程 / 多话题综合示例：[examples/cpp_pub_sub/cpp_pub_sub_event_poll.cc](../examples/cpp_pub_sub/cpp_pub_sub_event_poll.cc)
+完整示例见 [examples/cpp_pub_sub/cpp_pub_sub_event_loop.cc](../examples/cpp_pub_sub/cpp_pub_sub_event_loop.cc)，演示了 loop 持有的 `Subscribe<>()`、调用方持有的 `RegisterCallback()`、多线程发布以及跨线程 `Quit()`。
 
 

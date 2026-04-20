@@ -285,6 +285,4 @@ Include the header:
 
 ### Full examples
 
-Minimal example: [examples/cpp_pub_sub/cpp_pub_sub_event_loop.cc](../examples/cpp_pub_sub/cpp_pub_sub_event_loop.cc)
-
-Multi-thread / multi-topic example: [examples/cpp_pub_sub/cpp_pub_sub_event_poll.cc](../examples/cpp_pub_sub/cpp_pub_sub_event_poll.cc)
+See [examples/cpp_pub_sub/cpp_pub_sub_event_loop.cc](../examples/cpp_pub_sub/cpp_pub_sub_event_loop.cc) for a runnable example covering both loop-owned `Subscribe<>()` and user-owned `RegisterCallback()`, multi-threaded publishers, and a cross-thread `Quit()`.
