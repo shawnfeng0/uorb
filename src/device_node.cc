@@ -3,20 +3,30 @@
 #include <cerrno>
 #include <cstring>
 
+static inline uint16_t RoundPowOfTwo(uint16_t n) {
+  if (n == 0) {
+    return 1;
+  }
+
+  // Avoid is already a power of 2
+  uint32_t value = n - 1;
+
+  // Fill 1
+  value |= value >> 1U;
+  value |= value >> 2U;
+  value |= value >> 4U;
+  value |= value >> 8U;
+
+  // Unable to round-up, take the value of round-down
+  if (value == UINT16_MAX) {
+    value >>= 1U;
+  }
+
+  return value + 1;
+}
+
 uorb::DeviceNode::DeviceNode(const struct orb_metadata &meta, uint8_t instance)
-    : meta_(meta), instance_(instance), queue_size_([](uint16_t n) -> uint16_t {
-        if (n == 0) return 1;
-        // Avoid is already a power of 2
-        uint32_t value = n - 1;
-        // Fill 1
-        value |= value >> 1U;
-        value |= value >> 2U;
-        value |= value >> 4U;
-        value |= value >> 8U;
-        // Unable to round-up, take the value of round-down
-        if (value == UINT16_MAX) value >>= 1U;
-        return static_cast<uint16_t>(value + 1);
-      }(meta.o_queue_size)) {}
+    : meta_(meta), instance_(instance), queue_size_(RoundPowOfTwo(meta.o_queue_size)) {}
 
 uorb::DeviceNode::~DeviceNode() { delete[] data_; }
 
