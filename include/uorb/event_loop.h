@@ -73,19 +73,22 @@ class EventLoop {
     orb_subscription_t *sub;
     std::function<void()> callback;
     bool owned;  // true when EventLoop created and owns the subscription
+
+    Entry(orb_subscription_t *sub, std::function<void()> callback, bool owned)
+        : sub(sub), callback(std::move(callback)), owned(owned) {}
   };
 
   template <typename Msg>
   void AddEntry(orb_subscription_t *sub, const std::function<void(const Msg &)> &cb, bool owned) {
     orb_event_poll_add(event_poll_, sub);
-    entries_.push_back({sub,
-                        [sub, cb] {
-                          Msg msg;
-                          if (orb_copy(sub, &msg)) {
-                            cb(msg);
-                          }
-                        },
-                        owned});
+    entries_.emplace_back(sub,
+                          [sub, cb] {
+                            Msg msg;
+                            if (orb_copy(sub, &msg)) {
+                              cb(msg);
+                            }
+                          },
+                          owned);
   }
 
   void RemoveEntry(orb_subscription_t *sub) {
