@@ -238,3 +238,54 @@ printf("timestamp: %" PRIu64 "[us], Receive msg: "%s"\n", data.timestamp,
 
 请参考完整的例程：[examples/cpp_pub_sub/cpp_pub_sub.cc](../examples/cpp_pub_sub/cpp_pub_sub.cc)
 
+## 使用 EventLoop 进行基于回调的订阅
+
+除了手动轮询 / `orb_poll()`，uORB 还提供了一个 C++ 事件循环 `uorb::EventLoop`。它把"等待多个订阅" + "对每个订阅执行回调"这两件事包装成一个简单的 API，非常适合用在专门跑订阅回调的工作线程里。
+
+包含头文件：
+
+```c++
+#include "uorb/event_loop.h"
+```
+
+### 两种注册回调的方式
+
+1. **由 `EventLoop` 拥有订阅**：使用 `Subscribe<Topic>(callback)`，`EventLoop` 内部创建并持有订阅，析构时自动释放。
+
+   ```c++
+   uorb::EventLoop loop;
+   loop.Subscribe<uorb::msg::example_string>(
+       [](const example_string_s &msg) {
+         // 处理消息
+       });
+   ```
+
+2. **由调用者拥有订阅**：自己定义 `uorb::SubscriptionData`，再用 `RegisterCallback(sub, cb)` 注册。调用者必须保证订阅对象的生命周期长于 `EventLoop`，或在 `EventLoop` 析构前调用 `UnregisterCallback(sub)`。
+
+   ```c++
+   uorb::SubscriptionData<uorb::msg::sensor_accel> sub_accel;
+   loop.RegisterCallback(sub_accel, [](const sensor_accel_s &msg) {
+     // 处理消息
+   });
+   // ... 稍后 ...
+   loop.UnregisterCallback(sub_accel);
+   ```
+
+### 驱动事件循环
+
+* `PollOnce(timeout_ms)`：阻塞至多 `timeout_ms` 毫秒，分发已就绪的回调一次；`timeout_ms = -1` 表示一直阻塞到有事件或 `Quit()` 被调用。返回本次分发的事件数；发生错误或 `Quit()` 被调用时返回 `-1`；如果当前没有任何已注册的订阅则返回 `0`。
+* `Loop()`：循环调用 `PollOnce(-1)`，直到 `Quit()` 被调用（返回 `true`）或出现错误 / 没有已注册的订阅（返回 `false`）。
+* `Quit()`：**线程安全**，可以在任意线程调用，用于请求事件循环退出。`Quit()` 是"粘性"的——一旦调用，后续 `PollOnce()` 会立即返回 `-1`，`EventLoop` 不能被重启。
+
+### 线程模型
+
+* `Quit()` 可以在任意线程调用。
+* 其它成员函数（`RegisterCallback` / `UnregisterCallback` / `Subscribe` / `PollOnce` / `Loop`）必须在同一个线程（通常是运行事件循环的线程）调用。
+
+### 完整示例
+
+最小示例：[examples/cpp_pub_sub/cpp_pub_sub_event_loop.cc](../examples/cpp_pub_sub/cpp_pub_sub_event_loop.cc)
+
+多线程 / 多话题综合示例：[examples/cpp_pub_sub/cpp_pub_sub_event_poll.cc](../examples/cpp_pub_sub/cpp_pub_sub_event_poll.cc)
+
+

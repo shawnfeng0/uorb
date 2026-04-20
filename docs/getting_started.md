@@ -239,3 +239,52 @@ printf("timestamp: %" PRIu64 "[us], Receive msg: "%s"\n", data.timestamp,
 
 Please refer to the complete routine: [examples/cpp_pub_sub/cpp_pub_sub.cc](../examples/cpp_pub_sub/cpp_pub_sub.cc)
 
+## Callback-based subscription with `EventLoop`
+
+In addition to manual polling / `orb_poll()`, uORB ships a small C++ event loop, `uorb::EventLoop`, that wraps "wait on many subscriptions" + "run a callback per subscription" behind a simple API. It fits well on a dedicated worker thread that only runs subscription callbacks.
+
+Include the header:
+
+```c++
+#include "uorb/event_loop.h"
+```
+
+### Two ways to register a callback
+
+1. **`EventLoop` owns the subscription** — use `Subscribe<Topic>(callback)`. The `EventLoop` creates and holds the subscription internally, and destroys it when the loop is destroyed.
+
+   ```c++
+   uorb::EventLoop loop;
+   loop.Subscribe<uorb::msg::example_string>(
+       [](const example_string_s &msg) {
+         // handle message
+       });
+   ```
+
+2. **Caller owns the subscription** — build your own `uorb::SubscriptionData` and register it with `RegisterCallback(sub, cb)`. The caller must keep the subscription alive at least as long as the `EventLoop`, or call `UnregisterCallback(sub)` before the loop is destroyed.
+
+   ```c++
+   uorb::SubscriptionData<uorb::msg::sensor_accel> sub_accel;
+   loop.RegisterCallback(sub_accel, [](const sensor_accel_s &msg) {
+     // handle message
+   });
+   // ... later ...
+   loop.UnregisterCallback(sub_accel);
+   ```
+
+### Driving the loop
+
+* `PollOnce(timeout_ms)` blocks for at most `timeout_ms` milliseconds and dispatches the ready callbacks once; `timeout_ms = -1` blocks until either an event arrives or `Quit()` is called. Returns the number of events dispatched; `-1` on error or when `Quit()` has been requested; `0` when there are no registered subscriptions.
+* `Loop()` calls `PollOnce(-1)` in a loop until `Quit()` is requested (returns `true`) or it sees an error / an empty loop (returns `false`).
+* `Quit()` is **thread-safe** and may be called from any thread to request loop shutdown. It is *sticky*: once called, subsequent `PollOnce()` calls return `-1` immediately and the `EventLoop` cannot be restarted.
+
+### Threading model
+
+* `Quit()` may be called from any thread.
+* All other member functions (`RegisterCallback` / `UnregisterCallback` / `Subscribe` / `PollOnce` / `Loop`) must be invoked from a single thread — typically the thread that runs the loop.
+
+### Full examples
+
+Minimal example: [examples/cpp_pub_sub/cpp_pub_sub_event_loop.cc](../examples/cpp_pub_sub/cpp_pub_sub_event_loop.cc)
+
+Multi-thread / multi-topic example: [examples/cpp_pub_sub/cpp_pub_sub_event_poll.cc](../examples/cpp_pub_sub/cpp_pub_sub_event_poll.cc)
