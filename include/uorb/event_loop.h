@@ -2,6 +2,7 @@
 
 #include <uorb/uorb.h>
 
+#include <atomic>
 #include <functional>
 #include <unordered_map>
 #include <utility>
@@ -17,11 +18,19 @@ namespace uorb {
 //  - All other member functions (RegisterCallback, UnregisterCallback,
 //    Subscribe, PollOnce, Loop) must be invoked from a single thread
 //    (typically the loop thread).
+//
+// Lifetime:
+//  - Quit() is sticky: once called, PollOnce() returns -1 immediately and
+//    Loop() exits. The EventLoop cannot be restarted after Quit().
 class EventLoop {
  public:
   EventLoop() : event_poll_(orb_event_poll_create()) {}
   ~EventLoop() {
     if (!event_poll_) return;
+    // orb_event_poll_destroy() also unbinds remaining notifiers, but we still
+    // remove each subscription here first: for owned subscriptions we need to
+    // detach them from the poll set before we call orb_destroy_subscription(),
+    // otherwise the subscription would be freed while still linked.
     for (auto &kv : entries_) {
       orb_subscription_t *sub = kv.first;
       orb_event_poll_remove(event_poll_, sub);
@@ -44,6 +53,10 @@ class EventLoop {
   // Register a callback on an externally managed subscription.
   // Returns false if the loop is invalid, the subscription is null, or the
   // subscription was already registered.
+  //
+  // The caller retains ownership of `sub_cpp`. It MUST remain alive until
+  // either UnregisterCallback() is called for it or the EventLoop is
+  // destroyed; otherwise the stored handle dangles and dispatch is UB.
   template <typename Sub, typename F>
   bool RegisterCallback(Sub &sub_cpp, F &&cb) {
     using Msg = typename Sub::ValueType;
@@ -58,8 +71,9 @@ class EventLoop {
   }
 
   // Subscribe to a topic; the subscription is owned by EventLoop.
-  // Returns false on failure (loop invalid, subscription allocation failure,
-  // or a subscription for this topic has already been added by this call).
+  // Returns false if the loop is invalid or a subscription/entry could not
+  // be allocated. (Each call creates a fresh subscription handle, so this
+  // path never rejects as a duplicate.)
   template <const orb_metadata &meta, typename F>
   bool Subscribe(F &&cb) {
     if (!event_poll_) return false;
@@ -88,16 +102,26 @@ class EventLoop {
     return number_of_event;
   }
 
-  void Loop() {
+  // Run the loop until Quit() is requested or a poll error occurs.
+  // Returns true if the loop exited because of Quit(), false on poll error
+  // or if it was invoked on an invalid / empty EventLoop.
+  bool Loop() {
     // PollOnce(-1) blocks until either a subscription has data (returns > 0)
-    // or Quit() is requested (returns < 0); it never returns 0 with an
-    // infinite timeout.
-    while (PollOnce(-1) > 0) {
+    // or Quit() is requested (returns < 0). It returns 0 only when there are
+    // no registered entries, in which case we exit as false (nothing to do).
+    for (;;) {
+      const int n = PollOnce(-1);
+      if (n < 0) return quit_requested_.load();
+      if (n == 0) return false;
     }
   }
 
   // Thread-safe: request the event loop to quit.
+  //
+  // This is sticky: after Quit() returns, subsequent PollOnce() calls return
+  // -1 immediately and the EventLoop cannot be restarted.
   void Quit() {
+    quit_requested_ = true;
     if (event_poll_) orb_event_poll_quit(event_poll_);
   }
 
@@ -116,17 +140,30 @@ class EventLoop {
     }
     if (!orb_event_poll_add(event_poll_, sub)) return false;
 
-    std::function<void(const Msg &)> user_cb(std::forward<F>(cb));
-    entries_.emplace(
-        sub,
-        Entry{[sub, cb = std::move(user_cb)] {
-                Msg msg;
-                if (orb_copy(sub, &msg)) cb(msg);
-              },
-              owned});
-    // Keep ready_buf_ sized to match entries_ so PollOnce does not have to
-    // resize on every call.
-    ready_buf_.resize(entries_.size());
+    // From here on, `sub` is registered on the poll set. If anything below
+    // throws we must detach it again to avoid leaving a dangling binding.
+    try {
+      std::function<void(const Msg &)> user_cb(std::forward<F>(cb));
+      entries_.emplace(
+          sub,
+          Entry{[sub, cb = std::move(user_cb)] {
+                  Msg msg;
+                  if (orb_copy(sub, &msg)) cb(msg);
+                },
+                owned});
+      // Keep ready_buf_ sized to match entries_ so PollOnce does not have to
+      // resize on every call. Only grow: shrinking on remove would churn the
+      // allocation under add/remove cycles.
+      if (ready_buf_.size() < entries_.size()) {
+        ready_buf_.resize(entries_.size());
+      }
+    } catch (...) {
+      orb_event_poll_remove(event_poll_, sub);
+      // If emplace partially succeeded, roll it back too.
+      auto it = entries_.find(sub);
+      if (it != entries_.end()) entries_.erase(it);
+      throw;
+    }
     return true;
   }
 
@@ -137,13 +174,15 @@ class EventLoop {
     orb_event_poll_remove(event_poll_, sub);
     // External entries are not owned; do not destroy the subscription here.
     entries_.erase(it);
-    ready_buf_.resize(entries_.size());
+    // Intentionally do not shrink ready_buf_; it is an upper-bound scratch
+    // buffer and shrinking would reallocate on churn.
     return true;
   }
 
   orb_event_poll_t *event_poll_;
   std::unordered_map<orb_subscription_t *, Entry> entries_;
   std::vector<orb_subscription_t *> ready_buf_;
+  std::atomic<bool> quit_requested_{false};
 };
 
 }  // namespace uorb
