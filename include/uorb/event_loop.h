@@ -3,7 +3,7 @@
 #include <uorb/uorb.h>
 
 #include <atomic>
-#include <functional>
+#include <memory>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -34,7 +34,7 @@ class EventLoop {
     for (auto &kv : entries_) {
       orb_subscription_t *sub = kv.first;
       orb_event_poll_remove(event_poll_, sub);
-      if (kv.second.owned) {
+      if (kv.second->owned) {
         orb_destroy_subscription(&sub);
       }
     }
@@ -96,7 +96,7 @@ class EventLoop {
 
     for (int i = 0; i < number_of_event; ++i) {
       auto it = entries_.find(ready_buf_[i]);
-      if (it != entries_.end()) it->second.callback();
+      if (it != entries_.end()) it->second->Dispatch();
     }
 
     return number_of_event;
@@ -126,9 +126,28 @@ class EventLoop {
   }
 
  private:
-  struct Entry {
-    std::function<void()> callback;
+  // Type-erased entry. Each subscription is paired with a derived TypedEntry
+  // that statically captures both the message type and the user callback's
+  // concrete type, so we don't need std::function (and therefore neither the
+  // <functional> header nor std::function's heap-allocation / SBO behavior).
+  struct EntryBase {
+    EntryBase(orb_subscription_t *s, bool o) : sub(s), owned(o) {}
+    virtual ~EntryBase() = default;
+    virtual void Dispatch() = 0;
+    orb_subscription_t *sub;
     bool owned;  // EventLoop created and owns the subscription
+  };
+
+  template <typename Msg, typename F>
+  struct TypedEntry final : EntryBase {
+    template <typename G>
+    TypedEntry(orb_subscription_t *s, bool o, G &&g)
+        : EntryBase(s, o), cb(std::forward<G>(g)) {}
+    void Dispatch() override {
+      Msg msg;
+      if (orb_copy(sub, &msg)) cb(msg);
+    }
+    F cb;
   };
 
   template <typename Msg, typename F>
@@ -143,14 +162,10 @@ class EventLoop {
     // From here on, `sub` is registered on the poll set. If anything below
     // throws we must detach it again to avoid leaving a dangling binding.
     try {
-      std::function<void(const Msg &)> user_cb(std::forward<F>(cb));
-      entries_.emplace(
-          sub,
-          Entry{[sub, cb = std::move(user_cb)] {
-                  Msg msg;
-                  if (orb_copy(sub, &msg)) cb(msg);
-                },
-                owned});
+      using Callable = typename std::decay<F>::type;
+      std::unique_ptr<EntryBase> entry(
+          new TypedEntry<Msg, Callable>(sub, owned, std::forward<F>(cb)));
+      entries_.emplace(sub, std::move(entry));
       // Keep ready_buf_ sized to match entries_ so PollOnce does not have to
       // resize on every call. Only grow: shrinking on remove would churn the
       // allocation under add/remove cycles.
@@ -180,7 +195,7 @@ class EventLoop {
   }
 
   orb_event_poll_t *event_poll_;
-  std::unordered_map<orb_subscription_t *, Entry> entries_;
+  std::unordered_map<orb_subscription_t *, std::unique_ptr<EntryBase>> entries_;
   std::vector<orb_subscription_t *> ready_buf_;
   std::atomic<bool> quit_requested_{false};
 };
