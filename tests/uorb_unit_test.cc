@@ -40,6 +40,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <thread>
+#include <vector>
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
@@ -573,6 +574,84 @@ TEST_F(UnitTest, queue_poll_notify) {
 
   ASSERT_EQ(num_messages_sent, next_expected_val)
       << "number of sent and received messages mismatch";
+}
+
+TEST_F(UnitTest, poll_timeout_semantics) {
+  auto sub = orb_create_subscription(ORB_ID(orb_test));
+  ASSERT_NE(sub, nullptr);
+
+  // Drain any pre-existing updates from other test cases.
+  orb_test_s drain{};
+  for (int i = 0; i < 8 && orb_check_update(sub); ++i) {
+    ASSERT_TRUE(orb_copy(sub, &drain));
+  }
+
+  orb_pollfd_t fds[1]{};
+  fds[0].fd = sub;
+  fds[0].events = POLLIN;
+
+  const auto zero_start = std::chrono::steady_clock::now();
+  EXPECT_EQ(orb_poll(fds, 1, 0), 0);
+  const auto zero_elapsed_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::steady_clock::now() - zero_start)
+          .count();
+  EXPECT_LT(zero_elapsed_ms, 20);
+
+  orb_publication_t *pub = orb_create_publication(ORB_ID(orb_test));
+  ASSERT_NE(pub, nullptr);
+
+  std::thread publisher([&]() {
+    std::this_thread::sleep_for(std::chrono::milliseconds(40));
+    orb_test_s msg{};
+    msg.val = 999;
+    EXPECT_TRUE(orb_publish(pub, &msg));
+  });
+
+  const auto neg_start = std::chrono::steady_clock::now();
+  EXPECT_EQ(orb_poll(fds, 1, -5), 1);
+  const auto neg_elapsed_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::steady_clock::now() - neg_start)
+          .count();
+  EXPECT_GE(neg_elapsed_ms, 25);
+  EXPECT_TRUE(fds[0].revents & POLLIN);
+
+  publisher.join();
+  EXPECT_TRUE(orb_destroy_publication(&pub));
+  EXPECT_TRUE(orb_destroy_subscription(&sub));
+}
+
+TEST_F(UnitTest, topic_status_counter_saturation) {
+  constexpr int kManyHandles = 300;
+
+  std::vector<orb_publication_t *> pubs;
+  pubs.reserve(kManyHandles);
+  for (int i = 0; i < kManyHandles; ++i) {
+    auto *pub = orb_create_publication(ORB_ID(orb_test));
+    ASSERT_NE(pub, nullptr);
+    pubs.push_back(pub);
+  }
+
+  std::vector<orb_subscription_t *> subs;
+  subs.reserve(kManyHandles);
+  for (int i = 0; i < kManyHandles; ++i) {
+    auto *sub = orb_create_subscription(ORB_ID(orb_test));
+    ASSERT_NE(sub, nullptr);
+    subs.push_back(sub);
+  }
+
+  orb_status status{};
+  ASSERT_TRUE(orb_get_topic_status(ORB_ID(orb_test), 0, &status));
+  EXPECT_GE(status.publisher_count, static_cast<uint16_t>(kManyHandles));
+  EXPECT_GE(status.subscriber_count, static_cast<uint16_t>(kManyHandles));
+
+  for (auto *sub : subs) {
+    EXPECT_TRUE(orb_destroy_subscription(&sub));
+  }
+  for (auto *pub : pubs) {
+    EXPECT_TRUE(orb_destroy_publication(&pub));
+  }
 }
 
 }  // namespace uORBTest
