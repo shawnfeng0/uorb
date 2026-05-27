@@ -23,15 +23,17 @@ class PublicationMulti {
    */
   bool Publish(const Type &data) {
     if (!handle_) {
-      unsigned instance;
-      handle_ = orb_create_publication_multi(&meta, &instance);
+      handle_ = orb_create_publication_multi(&meta, &instance_);
     }
 
     return handle_ && orb_publish(handle_, &data);
   }
 
+  unsigned instance() const { return instance_; }
+
  private:
   orb_publication_t *handle_{nullptr};
+  unsigned instance_{0};
 };
 
 /**
@@ -44,11 +46,10 @@ class PublicationMultiData : public PublicationMulti<T> {
  public:
   PublicationMultiData() noexcept = default;
 
-  Type &get() { return data_; }
-  auto set(const Type &data) -> decltype(*this) {
-    data_ = data;
-    return *this;
-  }
+  using PublicationMulti<T>::Publish;
+
+  Type &data() { return data_; }
+  const Type &data() const { return data_; }
 
   // Publishes the embedded struct.
   bool Publish() { return PublicationMulti<T>::Publish(data_); }

@@ -18,7 +18,7 @@ void *thread_publisher(void *unused) {
   uorb::PublicationData<uorb::msg::example_string> pub_example_string;
 
   for (int i = 0; i < 10; i++) {
-    auto &data = pub_example_string.get();
+    auto &data = pub_example_string.data();
 
     data.timestamp = orb_absolute_time_us();
     snprintf(reinterpret_cast<char *>(data.str),
@@ -52,7 +52,7 @@ void *thread_subscriber(void *unused) {
   while (true) {
     if (0 < orb_poll(poll_fds, ARRAY_SIZE(poll_fds), timeout_ms)) {
       if (sub_example_string.Update()) {
-        auto data = sub_example_string.get();
+        auto data = sub_example_string.data();
         LOGGER_INFO("timestamp: %" PRIu64 "[us], Receive msg: \"%s\"",
                     data.timestamp, data.str);
       }

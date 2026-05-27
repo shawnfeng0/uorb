@@ -33,7 +33,10 @@ class SubscriptionInterval : public Subscription<T> {
   /**
    * Check if there is a new update.
    * */
-  bool Updated() override { return Subscription<T>::Updated() && (orb_elapsed_time_us(last_update_) >= interval_us_); }
+  bool Updated() override {
+    return Subscription<T>::Updated() &&
+           (orb_elapsed_time_us(last_update_) >= interval_us_);
+  }
 
   /**
    * Copy the struct if updated.
@@ -47,6 +50,7 @@ class SubscriptionInterval : public Subscription<T> {
 
     return false;
   }
+  bool Update(ValueType &dst) override { return Update(&dst); }
 
   /**
    * Copy the struct
@@ -64,11 +68,12 @@ class SubscriptionInterval : public Subscription<T> {
 
     return false;
   }
+  bool Copy(ValueType &dst) override { return Copy(&dst); }
 
   uint32_t interval_us() const { return interval_us_; }
   uint32_t interval_ms() const { return interval_us_ / 1000; }
-  void set_interval_us(uint32_t interval) { interval_us_ = interval; }
-  void set_interval_ms(uint32_t interval) { interval_us_ = interval * 1000; }
+  void set_interval_us(uint32_t interval_us) { interval_us_ = interval_us; }
+  void set_interval_ms(uint32_t interval_ms) { interval_us_ = interval_ms * 1000; }
 
  protected:
   orb_abstime_us last_update_{0};  // last update in microseconds

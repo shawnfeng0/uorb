@@ -27,7 +27,7 @@
 void thread_publisher_example_string() {
   uorb::PublicationData<uorb::msg::example_string> pub_example_string;
   for (int i = 0; i < 5; i++) {
-    auto &data = pub_example_string.get();
+    auto &data = pub_example_string.data();
     data.timestamp = orb_absolute_time_us();
     snprintf(reinterpret_cast<char *>(data.str), example_string_s::STRING_LENGTH, "%d: %s", i,
              "This is a string message. ");
@@ -42,7 +42,7 @@ void thread_publisher_example_string() {
 void thread_publisher_sensor_accel() {
   uorb::PublicationData<uorb::msg::sensor_accel> pub_sensor_accel;
   for (int i = 0; i < 20; i++) {
-    auto &accel = pub_sensor_accel.get();
+    auto &accel = pub_sensor_accel.data();
     accel.timestamp = orb_absolute_time_us();
     accel.x = i * 0.1f;
     accel.y = i * 0.2f;
@@ -59,7 +59,7 @@ void thread_publisher_sensor_accel() {
 void thread_publisher_sensor_gyro() {
   uorb::PublicationData<uorb::msg::sensor_gyro> pub_sensor_gyro;
   for (int i = 0; i < 10; i++) {
-    auto &gyro = pub_sensor_gyro.get();
+    auto &gyro = pub_sensor_gyro.data();
     gyro.timestamp = orb_absolute_time_us();
     gyro.x = i * 1.1f;
     gyro.y = i * 1.2f;

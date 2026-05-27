@@ -31,14 +31,14 @@ class DeviceNode {
   void add_subscriber();
   void remove_subscriber();
   uint16_t subscriber_count() const { return subscriber_count_; }
-  bool has_anonymous_subscriber() const { return has_anonymous_subscriber_; }
-  void mark_anonymous_subscriber() { has_anonymous_subscriber_ = true; }
+  bool has_untracked_subscriber() const { return has_untracked_subscriber_; }
+  void mark_untracked_subscriber() { has_untracked_subscriber_ = true; }
 
   void add_publisher();
   void remove_publisher();
   uint16_t publisher_count() const { return publisher_count_; }
-  bool has_anonymous_publisher() const { return has_anonymous_publisher_; }
-  void mark_anonymous_publisher() { has_anonymous_publisher_ = true; }
+  bool has_untracked_publisher() const { return has_untracked_publisher_; }
+  void mark_untracked_publisher() { has_untracked_publisher_ = true; }
 
   // Whether meta and instance are the same as the current one
   inline bool IsSameWith(const orb_metadata &meta, uint8_t instance) const {
@@ -103,9 +103,9 @@ class DeviceNode {
   std::atomic_uint32_t generation_{0}; /**< object generation count */
   const uint16_t queue_size_;          /**< maximum number of elements in the queue */
   uint8_t subscriber_count_ : 7;
-  bool has_anonymous_subscriber_ : 1;
+  bool has_untracked_subscriber_ : 1;
   uint8_t publisher_count_ : 7;
-  bool has_anonymous_publisher_ : 1;
+  bool has_untracked_publisher_ : 1;
   const uint8_t instance_; /**< orb multi instance identifier */
 
   DeviceNode(const struct orb_metadata &meta, uint8_t instance);

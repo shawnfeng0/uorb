@@ -25,7 +25,7 @@ template <const orb_metadata &T>
   uorb::PublicationData<T> publication_data;
 
   while (true) {
-    auto &data = publication_data.get();
+    auto &data = publication_data.data();
 
     data.timestamp = orb_absolute_time_us();
 
@@ -42,7 +42,7 @@ template <const orb_metadata &T>
   uorb::PublicationData<uorb::msg::sensor_accel> publication_data;
 
   while (true) {
-    auto &data = publication_data.get();
+    auto &data = publication_data.data();
 
     data.timestamp = orb_absolute_time_us();
     data.timestamp_sample = data.timestamp;
@@ -77,7 +77,7 @@ template <const orb_metadata &T>
   while (true) {
     if (0 < orb_poll(poll_fds, ARRAY_SIZE(poll_fds), timeout_ms)) {
       if (subscription_data.Update()) {
-        //        auto data = sub_example_string.get();
+        //        auto data = sub_example_string.data();
         //        LOGGER_INFO("timestamp: %" PRIu64 "[us]", data.timestamp);
       }
     }
@@ -105,8 +105,8 @@ int main(int, char *[]) {
 
   example_string_s example{};
   example.timestamp = orb_absolute_time_us();
-  orb_publish_anonymous(&uorb::msg::example_string, &example);
-  orb_copy_anonymous(&uorb::msg::example_string, &example);
+  orb_publish_once(&uorb::msg::example_string, &example);
+  orb_copy_once(&uorb::msg::example_string, &example);
 
   orb_tcp_listener_init(orb_get_topics, 10924);
 

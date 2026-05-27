@@ -43,11 +43,10 @@ class PublicationData : public Publication<T> {
  public:
   PublicationData() noexcept = default;
 
-  Type &get() { return data_; }
-  auto set(const Type &data) -> decltype(*this) {
-    data_ = data;
-    return *this;
-  }
+  using Publication<T>::Publish;
+
+  Type &data() { return data_; }
+  const Type &data() const { return data_; }
 
   // Publishes the embedded struct.
   bool Publish() { return Publication<T>::Publish(data_); }

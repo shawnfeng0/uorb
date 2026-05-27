@@ -64,7 +64,7 @@ TEST(EventLoopTest, SubscribeReceivesPublishedData) {
   received_val = -1;
 
   uorb::PublicationData<uorb::msg::orb_test> pub;
-  pub.get().val = 42;
+  pub.data().val = 42;
   ASSERT_TRUE(pub.Publish());
 
   // One message is pending; RunOnce should deliver it.
@@ -97,7 +97,7 @@ TEST(EventLoopTest, AddAndRemoveExternalSubscription) {
       sub, [](const orb_test_medium_s &) {}));
 
   uorb::PublicationData<uorb::msg::orb_test_medium> pub;
-  pub.get().val = 123;
+  pub.data().val = 123;
   ASSERT_TRUE(pub.Publish());
 
   EXPECT_EQ(loop.RunOnce(1000), 1);
@@ -109,7 +109,7 @@ TEST(EventLoopTest, AddAndRemoveExternalSubscription) {
   EXPECT_FALSE(loop.RemoveSubscription(sub));
 
   received_val = -1;
-  pub.get().val = 456;
+  pub.data().val = 456;
   ASSERT_TRUE(pub.Publish());
 
   // No entries left; RunOnce returns 0 without waiting.
@@ -194,9 +194,9 @@ TEST(EventLoopTest, MultipleSubscriptionsDispatchIndependently) {
   uorb::PublicationData<uorb::msg::orb_test> pub_a;
   uorb::PublicationData<uorb::msg::orb_test_medium> pub_b;
 
-  pub_a.get().val = 1;
+  pub_a.data().val = 1;
   ASSERT_TRUE(pub_a.Publish());
-  pub_b.get().val = 2;
+  pub_b.data().val = 2;
   ASSERT_TRUE(pub_b.Publish());
 
   // Drain up to two events. A single RunOnce may return both, or we may need

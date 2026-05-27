@@ -8,15 +8,6 @@ namespace uorb {
 
 template <const orb_metadata &meta>
 class Subscription {
- protected:
-  const uint8_t instance_{0};
-  orb_subscription_t *handle_{nullptr};
-
-  /**
-   * Check if there is a new update.
-   */
-  virtual bool Updated() { return Subscribed() && orb_check_update(handle_); }
-
  public:
   using ValueType = typename msg::TypeMap<meta>::type;
 
@@ -33,27 +24,37 @@ class Subscription {
 
   virtual ~Subscription() { handle_ &&orb_destroy_subscription(&handle_); }
 
-  bool Subscribed() {
-    // check if already subscribed
+  bool Subscribe() {
     if (handle_) {
       return true;
     }
     return (handle_ = orb_create_subscription_multi(&meta, instance_));
   }
 
-  decltype(handle_) handle() { return Subscribed() ? handle_ : nullptr; }
+  orb_subscription_t *handle() { return Subscribe() ? handle_ : nullptr; }
+
+  /**
+   * Check if there is a new update.
+   */
+  virtual bool Updated() { return Subscribe() && orb_check_update(handle_); }
 
   /**
    * Update the struct
    * @param data The uORB message struct we are updating.
    */
   virtual bool Update(ValueType *dst) { return Updated() && Copy(dst); }
+  virtual bool Update(ValueType &dst) { return Update(&dst); }
 
   /**
    * Copy the struct
    * @param data The uORB message struct we are updating.
    */
-  virtual bool Copy(ValueType *dst) { return Subscribed() && orb_copy(handle_, dst); }
+  virtual bool Copy(ValueType *dst) { return Subscribe() && orb_copy(handle_, dst); }
+  virtual bool Copy(ValueType &dst) { return Copy(&dst); }
+
+ protected:
+  const uint8_t instance_{0};
+  orb_subscription_t *handle_{nullptr};
 };
 
 // Subscription wrapper class with data
@@ -71,7 +72,7 @@ class SubscriptionData : public Subscription<T> {
   // update the embedded struct.
   bool Update() { return Subscription<T>::Update(&data_); }
 
-  const ValueType &get() const { return data_; }
+  const ValueType &data() const { return data_; }
 
  private:
   ValueType data_{};

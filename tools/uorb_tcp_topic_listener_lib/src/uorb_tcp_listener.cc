@@ -112,10 +112,10 @@ static void CmdStatus(uorb::listener::Fd &fd,
       orb_status status{};
       if (orb_get_topic_status(topics[i], instance, &status)) {
         std::string sub_count_str = std::to_string(status.subscriber_count);
-        if (status.has_anonymous_subscriber) sub_count_str += "+";
+        if (status.has_untracked_subscriber) sub_count_str += "+";
 
         std::string pub_count_str = std::to_string(status.publisher_count);
-        if (status.has_anonymous_publisher) pub_count_str += "+";
+        if (status.has_untracked_publisher) pub_count_str += "+";
 
         snprintf(send_buffer, sizeof(send_buffer),
                  "%-20s %-10zu %-10d %-10s %-10s %-10d\n", topics[i]->o_name,

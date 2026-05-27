@@ -57,15 +57,15 @@ bool orb_publish(orb_publication_t *handle, const void *data) {
   return dev.Publish(data);
 }
 
-bool orb_publish_anonymous(const struct orb_metadata *meta, const void *data) {
+bool orb_publish_once(const struct orb_metadata *meta, const void *data) {
   ORB_CHECK_TRUE(meta, EINVAL, return false);
 
   auto &device_master = DeviceMaster::get_instance();
   auto *dev = device_master.OpenDeviceNode(*meta, 0);
   ORB_CHECK_TRUE(dev, ENOMEM, return false);
 
-  // Mark as an anonymous publisher, then copy the latest data
-  dev->mark_anonymous_publisher();
+  // Mark as an untracked publisher, then copy the latest data.
+  dev->mark_untracked_publisher();
   return dev->Publish(data);
 }
 
@@ -108,15 +108,15 @@ bool orb_copy(orb_subscription_t *handle, void *buffer) {
   return sub.Copy(buffer);
 }
 
-bool orb_copy_anonymous(const struct orb_metadata *meta, void *buffer) {
+bool orb_copy_once(const struct orb_metadata *meta, void *buffer) {
   ORB_CHECK_TRUE(meta, EINVAL, return false);
 
   auto &device_master = DeviceMaster::get_instance();
   auto *dev = device_master.OpenDeviceNode(*meta, 0);
   ORB_CHECK_TRUE(dev, ENOMEM, return false);
 
-  // Mark as anonymous subscription, then copy the latest data
-  dev->mark_anonymous_subscriber();
+  // Mark as an untracked subscriber, then copy the latest data.
+  dev->mark_untracked_subscriber();
   unsigned last_generation_ = dev->initial_generation();
   return dev->Copy(buffer, &last_generation_);
 }
@@ -162,9 +162,9 @@ bool orb_get_topic_status(const struct orb_metadata *meta, unsigned int instance
   if (status) {
     status->queue_size = dev->queue_size();
     status->subscriber_count = dev->subscriber_count();
-    status->has_anonymous_subscriber = dev->has_anonymous_subscriber();
+    status->has_untracked_subscriber = dev->has_untracked_subscriber();
     status->publisher_count = dev->publisher_count();
-    status->has_anonymous_publisher = dev->has_anonymous_publisher();
+    status->has_untracked_publisher = dev->has_untracked_publisher();
     status->latest_data_index = dev->updates_available(0);
   }
   return true;

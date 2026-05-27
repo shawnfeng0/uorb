@@ -83,7 +83,7 @@ void uORBTest::UnitTest::latency_test(const orb_metadata *T) {
   pub_data.timestamp = orb_absolute_time_us();
 
   orb_publication_t *pfd0 = orb_create_publication(T);
-  ASSERT_NE(pfd0, nullptr) << "orb_advertise failed: " << errno;
+  ASSERT_NE(pfd0, nullptr) << "orb_create_publication failed: " << errno;
 
   orb_publish(pfd0, &pub_data);
 

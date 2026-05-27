@@ -114,25 +114,25 @@ TEST_F(UnitTest, single_topic) {
   ASSERT_TRUE(orb_destroy_publication(&ptopic));
 }
 
-TEST_F(UnitTest, anonymous_pub_sub) {
+TEST_F(UnitTest, once_pub_sub) {
   orb_test_s pub_data{};
 
-  ASSERT_TRUE(orb_publish_anonymous(ORB_ID(orb_test), &pub_data))
+  ASSERT_TRUE(orb_publish_once(ORB_ID(orb_test), &pub_data))
       << "publish(1) failed: " << errno;
 
   orb_test_s sub_data{};
   sub_data.val = 1;
 
-  ASSERT_TRUE(orb_copy_anonymous(ORB_ID(orb_test), &sub_data))
+  ASSERT_TRUE(orb_copy_once(ORB_ID(orb_test), &sub_data))
       << "copy(1) failed: " << errno;
 
   ASSERT_EQ(sub_data.val, pub_data.val) << "copy(1) mismatch";
 
   pub_data.val = 2;
-  ASSERT_TRUE(orb_publish_anonymous(ORB_ID(orb_test), &pub_data))
+  ASSERT_TRUE(orb_publish_once(ORB_ID(orb_test), &pub_data))
       << "publish(2) failed" << errno;
 
-  ASSERT_TRUE(orb_copy_anonymous(ORB_ID(orb_test), &sub_data))
+  ASSERT_TRUE(orb_copy_once(ORB_ID(orb_test), &sub_data))
       << "copy(2) failed: " << errno;
 
   ASSERT_EQ(sub_data.val, pub_data.val) << "copy(2) mismatch";

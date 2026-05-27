@@ -29,9 +29,9 @@ uorb::DeviceNode::DeviceNode(const struct orb_metadata &meta, uint8_t instance)
     : meta_(meta),
       queue_size_(RoundPowOfTwo(meta.o_queue_size)),
       subscriber_count_(0),
-      has_anonymous_subscriber_(false),
+      has_untracked_subscriber_(false),
       publisher_count_(0),
-      has_anonymous_publisher_(false),
+      has_untracked_publisher_(false),
       instance_(instance) {}
 
 uorb::DeviceNode::~DeviceNode() { delete[] data_; }
