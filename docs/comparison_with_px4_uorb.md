@@ -8,6 +8,7 @@ The main difference lies in the implementation of the bottom layer, and the appl
 * Pass pointers when unpublishing and unsubscribing to avoid wild pointers(Reference from zmq)
 * Use ``bool`` type (include in ``<stdbool.h>``) to indicate whether the operation is successful
 * Add independent ``orb_poll`` function, instead of ``px4_poll`` in PX4 Autopilot
+* Add EventLoop/EventPoll APIs (`uorb/event_loop.h`, `orb_event_poll_*`) for callback/event-loop style dispatch
 * Configure the topic's queue size in the topic's metadata, not at the time of publishing, which is good for a single topic with multiple publishers.
 
 | PX4 uORB                                                     | Current uORB                                                 |
