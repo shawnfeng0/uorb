@@ -103,21 +103,26 @@ struct TypeMap;
  * Note that there must be no more than one instance of this macro
  * for each topic.
  *
+ * Simple topics can omit logger metadata:
+ *   ORB_DEFINE(my_topic, struct my_topic_s, 1);
+ *
+ * Topics with logger metadata can use the full form:
+ *   ORB_DEFINE(my_topic, struct my_topic_s, 12, "uint64_t timestamp;int32_t val", 1);
+ *
  * @param _name		The name of the topic.
  * @param _struct	The structure the topic provides.
  * @param _size_no_padding	Struct size w/o padding at the end
  * @param _fields	All fields in a semicolon separated list
  *                      e.g: "float[3] position;bool armed"
+ * @param _queue_size	The maximum number of queued samples.
  */
-#define ORB_DEFINE(_name, _struct, _size_no_padding, _fields, _queue_size)                                        \
+#define ORB_DEFINE_3(_name, _struct, _queue_size) ORB_DEFINE_5(_name, _struct, 0, "", _queue_size)
+#define ORB_DEFINE_5(_name, _struct, _size_no_padding, _fields, _queue_size)                                      \
   const struct orb_metadata uorb::msg::_name = {#_name, sizeof(_struct), _size_no_padding, _fields, _queue_size}; \
   const struct orb_metadata *__orb_##_name = &uorb::msg::_name;                                                   \
   struct hack
-
-/**
- * Simple define ORB topics, ignore _size_no_padding and _fields
- */
-#define ORB_SIMPLE_DEFINE(_name, _struct) ORB_DEFINE(_name, _struct, 0, "", 1)
+#define ORB_DEFINE_SELECT(_1, _2, _3, _4, _5, NAME, ...) NAME
+#define ORB_DEFINE(...) ORB_DEFINE_SELECT(__VA_ARGS__, ORB_DEFINE_5, invalid, ORB_DEFINE_3)(__VA_ARGS__)
 
 #ifdef __cplusplus
 extern "C" {
