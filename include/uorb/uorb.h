@@ -405,8 +405,12 @@ bool orb_get_topic_status(const struct orb_metadata *meta, unsigned int instance
  * @param nfds      The number of orb_pollfd structures in the fds array.
  * @param timeout_ms   Maximum waiting time for poll.
  * If the value of timeout is 0, poll() shall return immediately.
- * If the value of timeout is −1, poll() shall block until a requested event
+ * If the value of timeout is < 0, poll() shall block until a requested event
  * occurs or until the call is interrupted.
+ *
+ * A subscription handle can be bound to at most one waiting notifier at a
+ * time. Calling orb_poll() while any fd in fds is already bound by another
+ * orb_poll()/orb_event_poll_wait() call fails with orb_errno = EBUSY.
  *
  * @return  Upon successful completion, poll() shall return a
  * non-negative value. A positive value indicates the total number of file
@@ -419,6 +423,15 @@ int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) __EXPORT
 
 /**
  ** Event poll handle (opaque type for C API)
+ *
+ * Thread-safety contract:
+ *  - orb_event_poll_quit() is thread-safe and may be called from any thread.
+ *  - orb_event_poll_add(), orb_event_poll_remove(), orb_event_poll_wait() must
+ *    be called from a single thread and must not run concurrently.
+ *
+ * Lifetime contract:
+ *  - Quit is sticky: after orb_event_poll_quit(), all subsequent
+ *    orb_event_poll_wait() calls return -1 until the poll object is destroyed.
  */
 typedef struct orb_event_poll orb_event_poll_t;
 
@@ -440,6 +453,10 @@ bool orb_event_poll_destroy(orb_event_poll_t **handle_ptr) __EXPORT;
  * @param poll event poll handle
  * @param sub subscription handle (orb_subscription_t*)
  * @return true on success
+ *
+ * A subscription handle can only be added to one active event poll/waiter at
+ * a time. If already bound elsewhere, this returns false and sets orb_errno to
+ * EBUSY.
  */
 bool orb_event_poll_add(orb_event_poll_t *poll, orb_subscription_t *sub) __EXPORT;
 

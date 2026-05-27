@@ -183,7 +183,7 @@ int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
     for (unsigned i = 0; i < nfds; ++i) {
       fds[i].revents = 0;
       auto &item_sub = *reinterpret_cast<ReceiverLocal *>(fds[i].fd);
-      if (item_sub.updates_available()) {
+      if (item_sub.is_ready()) {
         fds[i].revents |= fds[i].events & POLLIN;
         ++number_of_new_data;
       }
@@ -194,9 +194,16 @@ int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
   if (CheckDataUpdate()) return number_of_new_data;
 
   uorb::base::LiteNotifier notifier;
-  for (unsigned i = 0; i < nfds; ++i) {
-    auto &item_sub = *reinterpret_cast<ReceiverLocal *>(fds[i].fd);
-    item_sub.SetNotifier(&notifier);
+  unsigned registered = 0;
+  for (; registered < nfds; ++registered) {
+    auto &item_sub = *reinterpret_cast<ReceiverLocal *>(fds[registered].fd);
+    if (!item_sub.SetNotifier(&notifier)) {
+      for (unsigned j = 0; j < registered; ++j) {
+        auto &rollback_sub = *reinterpret_cast<ReceiverLocal *>(fds[j].fd);
+        rollback_sub.RemoveNotifier();
+      }
+      return -1;
+    }
   }
 
   if (timeout_ms > 0) {
@@ -205,7 +212,7 @@ int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
     notifier.wait(CheckDataUpdate);
   }
 
-  for (unsigned i = 0; i < nfds; ++i) {
+  for (unsigned i = 0; i < registered; ++i) {
     auto &item_sub = *reinterpret_cast<ReceiverLocal *>(fds[i].fd);
     item_sub.RemoveNotifier();
   }
@@ -231,16 +238,14 @@ bool orb_event_poll_add(orb_event_poll_t *poll, orb_subscription_t *sub) {
   ORB_CHECK_TRUE(poll && sub, EINVAL, return false);
   auto *cpp_poll = reinterpret_cast<uorb::EventPoll *>(poll);
   auto *receiver = reinterpret_cast<uorb::ReceiverLocal *>(sub);
-  cpp_poll->AddReceiver(*receiver);
-  return true;
+  return cpp_poll->AddReceiver(*receiver);
 }
 
 bool orb_event_poll_remove(orb_event_poll_t *poll, orb_subscription_t *sub) {
   ORB_CHECK_TRUE(poll && sub, EINVAL, return false);
   auto *cpp_poll = reinterpret_cast<uorb::EventPoll *>(poll);
   auto *receiver = reinterpret_cast<uorb::ReceiverLocal *>(sub);
-  cpp_poll->RemoveReceiver(*receiver);
-  return true;
+  return cpp_poll->RemoveReceiver(*receiver);
 }
 
 int orb_event_poll_wait(orb_event_poll_t *poll, orb_subscription_t *subs[], int max_subs, int timeout_ms) {

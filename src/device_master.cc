@@ -53,12 +53,9 @@ uorb::DeviceNode *uorb::DeviceMaster::GetDeviceNode(const orb_metadata &meta, ui
 }
 
 uorb::DeviceNode *uorb::DeviceMaster::GetDeviceNodeLocked(const orb_metadata &meta, uint8_t instance) const {
-  // We can safely return the node that can be used by any thread, because a
-  // DeviceNode never gets deleted.
   for (auto &node : node_list_) {
     if (node.IsSameWith(meta, instance)) return &node;
   }
-
   return nullptr;
 }
 

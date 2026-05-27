@@ -7,47 +7,57 @@
 
 namespace uorb {
 
+// EventPoll: notifier-based wakeup + scan for ready receivers.
+//
+// Publish path: zero extra overhead (only notifier wakeup).
+// Wait path: linear scan over the subscription list.
+//
+// Thread-safety:
+//  - Stop() may be called from any thread.
+//  - All other methods must be called from a single thread.
 class EventPoll {
  public:
   ~EventPoll() {
-    for (auto &receiver : event_poll_list_) {
+    for (auto &receiver : receivers_) {
       receiver.RemoveNotifier();
     }
   }
-  void AddReceiver(ReceiverLocal &receiver) {
-    receiver.SetNotifier(&notifier_);
-    event_poll_list_.push_front(receiver);
-  }
-  void RemoveReceiver(ReceiverLocal &receiver) {
-    receiver.RemoveNotifier();
-    event_poll_list_.remove(receiver);
-  }
 
-  int Wait(ReceiverLocal *receivers[], int max_receivers, const int timeout_ms) {
-    int number_of_new_data = 0;
-
-    auto CheckDataUpdate = [&] {
-      for (auto &item_sub : event_poll_list_) {
-        if (item_sub.updates_available()) {
-          receivers[number_of_new_data++] = &item_sub;
-          if (number_of_new_data >= max_receivers) {
-            break;  // Reached the maximum number of receivers
-          }
-        }
-      }
-      return number_of_new_data > 0;
-    };
-
-    if (timeout_ms > 0) {
-      notifier_.wait_for(timeout_ms, [&] { return stop_ || CheckDataUpdate(); });
-    } else if (timeout_ms < 0) {
-      notifier_.wait([&] { return stop_ || CheckDataUpdate(); });
+  bool AddReceiver(ReceiverLocal &receiver) {
+    if (!receiver.SetNotifier(&notifier_)) {
+      return false;
     }
+    receivers_.push_front(receiver);
+    return true;
+  }
 
-    // need to quit the loop
+  bool RemoveReceiver(ReceiverLocal &receiver) {
+    if (!receiver.RemoveNotifier()) {
+      return false;
+    }
+    return receivers_.remove(receiver);
+  }
+
+  int Wait(ReceiverLocal *ready[], int max_ready, const int timeout_ms) {
     if (stop_) return -1;
 
-    return number_of_new_data;
+    int count = ScanReady(ready, max_ready);
+    if (count > 0) return count;
+
+    if (timeout_ms > 0) {
+      notifier_.wait_for(timeout_ms, [&] {
+        count = ScanReady(ready, max_ready);
+        return stop_ || count > 0;
+      });
+    } else if (timeout_ms < 0) {
+      notifier_.wait([&] {
+        count = ScanReady(ready, max_ready);
+        return stop_ || count > 0;
+      });
+    }
+
+    if (stop_) return -1;
+    return count;
   }
 
   void Stop() {
@@ -56,8 +66,19 @@ class EventPoll {
   }
 
  private:
+  int ScanReady(ReceiverLocal *ready[], int max_ready) {
+    int count = 0;
+    for (auto &receiver : receivers_) {
+      if (receiver.is_ready()) {
+        ready[count++] = &receiver;
+        if (count >= max_ready) break;
+      }
+    }
+    return count;
+  }
+
   base::LiteNotifier notifier_;
-  intrusive_list::forward_list<ReceiverLocal, &ReceiverLocal::event_poll_node> event_poll_list_;
+  intrusive_list::forward_list<ReceiverLocal, &ReceiverLocal::event_poll_node> receivers_;
   std::atomic_bool stop_{false};
 };
 }  // namespace uorb

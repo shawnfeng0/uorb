@@ -19,30 +19,54 @@ class ReceiverLocal final : public detail::ReceiverBase {
   }
 
   ~ReceiverLocal() override {
-    if (notifier_) {
-      dev_.UnregisterCallback(this);
-    }
+    RemoveNotifier();
     dev_.remove_subscriber();
   }
 
   bool Copy(void *buffer) { return dev_.Copy(buffer, &last_generation_); }
   unsigned updates_available() const { return dev_.updates_available(last_generation_); }
+  bool is_ready() const { return updates_available() > 0; }
 
-  void SetNotifier(base::LiteNotifier *notifier) {
+  bool SetNotifier(base::LiteNotifier *notifier) {
+    if (!notifier) {
+      errno = EINVAL;
+      return false;
+    }
+
+    if (notifier_ == notifier) {
+      return true;
+    }
+
+    if (notifier_) {
+      errno = EBUSY;
+      return false;
+    }
+
+    if (!dev_.RegisterCallback(this)) {
+      return false;
+    }
+
     notifier_ = notifier;
-    dev_.RegisterCallback(this);
+    return true;
   }
 
-  void RemoveNotifier() {
-    dev_.UnregisterCallback(this);
+  bool RemoveNotifier() {
+    if (!notifier_) {
+      return true;
+    }
+
+    if (!dev_.UnregisterCallback(this)) {
+      return false;
+    }
+
     notifier_ = nullptr;
+    return true;
   }
 
   intrusive_list::forward_list_node event_poll_node{};
 
  private:
   base::LiteNotifier *notifier_ = nullptr;
-
   DeviceNode &dev_;
   unsigned last_generation_{}; /**< last generation the subscriber has seen */
 };
