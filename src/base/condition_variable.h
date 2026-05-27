@@ -26,9 +26,13 @@ class ConditionVariable {
     pthread_cond_init(&cond_, nullptr);
 #else
     pthread_condattr_t attr;
-    pthread_condattr_init(&attr);
-    pthread_condattr_setclock(&attr, kWhichClock);
-    pthread_cond_init(&cond_, &attr);
+    const bool attr_ready = (pthread_condattr_init(&attr) == 0);
+    const bool use_custom_clock =
+        attr_ready && (pthread_condattr_setclock(&attr, kWhichClock) == 0);
+    pthread_cond_init(&cond_, use_custom_clock ? &attr : nullptr);
+    if (attr_ready) {
+      pthread_condattr_destroy(&attr);
+    }
 #endif
   }
 
@@ -82,9 +86,28 @@ class ConditionVariable {
   // Return true if successful
   template <typename Predicate>
   bool wait_for(Mutex &lock, uint32_t time_ms, Predicate p) {  // NOLINT
-    // Not returned until timeout or other error
-    while (!p())
-      if (!wait_for(lock, time_ms)) return p();
+    const auto deadline = std::chrono::steady_clock::now() +
+                          std::chrono::milliseconds(time_ms);
+
+    while (!p()) {
+      const auto now = std::chrono::steady_clock::now();
+      if (now >= deadline) {
+        return p();
+      }
+
+      const auto remaining_ns =
+          std::chrono::duration_cast<std::chrono::nanoseconds>(deadline - now)
+              .count();
+      uint32_t remaining_ms =
+          static_cast<uint32_t>((remaining_ns + 999999) / 1000000);
+      if (remaining_ms == 0) {
+        remaining_ms = 1;
+      }
+
+      if (!wait_for(lock, remaining_ms)) {
+        return p();
+      }
+    }
     return true;
   }
 

@@ -123,3 +123,31 @@ TEST(ConditionVariableTest, wait_for_timeout) {
     EXPECT_LE(actual_waiting_time, 100);
   }
 }
+
+TEST(ConditionVariableTest, wait_for_predicate_total_timeout_not_extended) {
+  using namespace uorb::base;
+
+  ConditionVariable cv;
+  Mutex mutex;
+  bool flag = false;
+
+  std::thread notifier([&]() {
+    for (int i = 0; i < 4; ++i) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+      cv.notify_one();
+    }
+  });
+
+  Timer timer;
+  {
+    LockGuard<> lock(mutex);
+    EXPECT_FALSE(cv.wait_for(mutex, 60, [&]() { return flag; }));
+  }
+  const auto elapsed_ms = timer.elapsed_ms();
+
+  notifier.join();
+
+  EXPECT_GE(elapsed_ms, 45UL);
+  EXPECT_LT(elapsed_ms, 120UL);
+}
+
