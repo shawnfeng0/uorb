@@ -91,12 +91,16 @@ bool uorb::DeviceNode::Publish(const void *data) {
 
 void uorb::DeviceNode::add_subscriber() {
   base::LockGuard<base::Mutex> lg(lock_);
-  subscriber_count_++;
+  if (subscriber_count_ < UINT16_MAX) {
+    subscriber_count_++;
+  }
 }
 
 void uorb::DeviceNode::remove_subscriber() {
   base::LockGuard<base::Mutex> lg(lock_);
-  subscriber_count_--;
+  if (subscriber_count_ > 0) {
+    subscriber_count_--;
+  }
 }
 
 unsigned uorb::DeviceNode::initial_generation() const {
@@ -108,10 +112,14 @@ unsigned uorb::DeviceNode::initial_generation() const {
 
 void uorb::DeviceNode::remove_publisher() {
   base::LockGuard<base::Mutex> lg(lock_);
-  publisher_count_--;
+  if (publisher_count_ > 0) {
+    publisher_count_--;
+  }
 }
 
 void uorb::DeviceNode::add_publisher() {
   base::LockGuard<base::Mutex> lg(lock_);
-  publisher_count_++;
+  if (publisher_count_ < UINT16_MAX) {
+    publisher_count_++;
+  }
 }

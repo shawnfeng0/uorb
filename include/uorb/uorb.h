@@ -39,10 +39,10 @@ struct orb_metadata {
  */
 struct orb_status {
   uint16_t queue_size;            // Queue size
-  uint8_t subscriber_count;       // Number of subscribers
+  uint16_t subscriber_count;      // Number of subscribers
   bool has_anonymous_subscriber;  // Whether there are anonymous subscribers
                                   // (orb_anonymous_copy() is called)
-  uint8_t publisher_count;        // Number of publishers
+  uint16_t publisher_count;       // Number of publishers
   bool has_anonymous_publisher;   // Whether there are anonymous publisher
                                   // (orb_anonymous_publish() is called)
   unsigned latest_data_index;     // The latest data index
