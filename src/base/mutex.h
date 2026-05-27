@@ -17,41 +17,27 @@ namespace uorb::base {
 /// The standard Mutex type.
 class Mutex {
   UORB_NONCOPYABLE(Mutex);
-#define SAFE_PTHREAD_MUTEX(fncall)          \
-  do { /* run fncall if is_safe_ is true */ \
-    if (is_safe_) fncall(&mutex_);          \
-  } while (0)
 
  public:
 #ifdef PTHREAD_MUTEX_INITIALIZER
   constexpr Mutex() noexcept = default;
   ~Mutex() = default;
 #else
-  Mutex() noexcept {
-    SetIsSafe();
-    pthread_mutex_init(&mutex_, nullptr);
-  }
-  ~Mutex() noexcept { SAFE_PTHREAD_MUTEX(pthread_mutex_destroy); }
+  Mutex() noexcept { pthread_mutex_init(&mutex_, nullptr); }
+  ~Mutex() noexcept { pthread_mutex_destroy(&mutex_); }
 #endif
-  void lock() { SAFE_PTHREAD_MUTEX(pthread_mutex_lock); }
-  void unlock() { SAFE_PTHREAD_MUTEX(pthread_mutex_unlock); }
+  void lock() { pthread_mutex_lock(&mutex_); }
+  void unlock() { pthread_mutex_unlock(&mutex_); }
 
-  bool try_lock() noexcept { return is_safe_ ? 0 == pthread_mutex_trylock(&mutex_) : true; }
+  bool try_lock() noexcept { return 0 == pthread_mutex_trylock(&mutex_); }
 
   pthread_mutex_t *native_handle() noexcept { return &mutex_; }
 
  private:
 #ifdef PTHREAD_MUTEX_INITIALIZER
   pthread_mutex_t mutex_ = PTHREAD_MUTEX_INITIALIZER;
-  volatile bool is_safe_{true};
 #else
   pthread_mutex_t mutex_{};
-
-  // We want to make sure that the compiler sets is_safe_ to true only
-  // when we tell it to, and never makes assumptions is_safe_ is
-  // always true.  volatile is the most reliable way to do that.
-  volatile bool is_safe_{};
-  inline void SetIsSafe() { is_safe_ = true; }
 #endif
 };
 

@@ -15,49 +15,30 @@ namespace base {
 
 // The read/write mutex type.
 class RwMutex {
-#define SAFE_PTHREAD_MUTEX(fncall)          \
-  do { /* run fncall if is_safe_ is true */ \
-    if (is_safe_) fncall(&mutex_);          \
-  } while (0)
-
  public:
 #ifdef PTHREAD_RWLOCK_INITIALIZER
   constexpr RwMutex() noexcept = default;
   ~RwMutex() = default;
 #else
-  RwMutex() noexcept {
-    SetIsSafe();
-    pthread_rwlock_init((&mutex_), nullptr);
-  }
-  ~RwMutex() noexcept { SAFE_PTHREAD_MUTEX(pthread_rwlock_destroy); }
+  RwMutex() noexcept { pthread_rwlock_init(&mutex_, nullptr); }
+  ~RwMutex() noexcept { pthread_rwlock_destroy(&mutex_); }
 #endif
   RwMutex(const RwMutex &) = delete;
   RwMutex &operator=(const RwMutex &) = delete;
 
-  void lock() { SAFE_PTHREAD_MUTEX(pthread_rwlock_wrlock); }
-  void unlock() { SAFE_PTHREAD_MUTEX(pthread_rwlock_unlock); }
+  void lock() { pthread_rwlock_wrlock(&mutex_); }
+  void unlock() { pthread_rwlock_unlock(&mutex_); }
 
-  bool try_lock() noexcept {
-    return !is_safe_ || 0 == pthread_rwlock_trywrlock(&mutex_);
-  }
+  bool try_lock() noexcept { return 0 == pthread_rwlock_trywrlock(&mutex_); }
 
-  void reader_lock() { SAFE_PTHREAD_MUTEX(pthread_rwlock_rdlock); }
-  void reader_unlock() { SAFE_PTHREAD_MUTEX(pthread_rwlock_unlock); }
-
-#undef SAFE_PTHREAD_MUTEX
+  void reader_lock() { pthread_rwlock_rdlock(&mutex_); }
+  void reader_unlock() { pthread_rwlock_unlock(&mutex_); }
 
  private:
 #ifdef PTHREAD_RWLOCK_INITIALIZER
   pthread_rwlock_t mutex_ = PTHREAD_RWLOCK_INITIALIZER;
-  volatile bool is_safe_{true};
 #else
   pthread_rwlock_t mutex_{};
-
-  // We want to make sure that the compiler sets is_safe_ to true only
-  // when we tell it to, and never makes assumptions is_safe_ is
-  // always true.  volatile is the most reliable way to do that.
-  volatile bool is_safe_{};
-  inline void SetIsSafe() { is_safe_ = true; }
 #endif
 };
 

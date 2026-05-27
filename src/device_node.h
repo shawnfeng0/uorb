@@ -90,22 +90,23 @@ class DeviceNode {
  private:
   friend uORBTest::UnitTest;
 
-  const orb_metadata &meta_; /**< object metadata information */
-  const uint8_t instance_;   /**< orb multi instance identifier */
+  static constexpr uint8_t kMaxCounterValue = 0x7F;
 
-  uint8_t *data_{nullptr};    /**< allocated object buffer */
-  const uint16_t queue_size_; /**< maximum number of elements in the queue */
-  std::atomic_uint32_t generation_{0};    /**< object generation count */
+  const orb_metadata &meta_; /**< object metadata information */
+  uint8_t *data_{nullptr};   /**< allocated object buffer */
 
   mutable base::Mutex lock_{};
 
-  uint16_t subscriber_count_{0};
-  bool has_anonymous_subscriber_{false};
-  uint16_t publisher_count_{0};
-  bool has_anonymous_publisher_{false};
-
   intrusive_list::forward_list<detail::ReceiverBase, &detail::ReceiverBase::receiver_node> receiver_list_;
   intrusive_list::forward_list_node device_list_node_{};
+
+  std::atomic_uint32_t generation_{0}; /**< object generation count */
+  const uint16_t queue_size_;          /**< maximum number of elements in the queue */
+  uint8_t subscriber_count_ : 7;
+  bool has_anonymous_subscriber_ : 1;
+  uint8_t publisher_count_ : 7;
+  bool has_anonymous_publisher_ : 1;
+  const uint8_t instance_; /**< orb multi instance identifier */
 
   DeviceNode(const struct orb_metadata &meta, uint8_t instance);
   ~DeviceNode();

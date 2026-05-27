@@ -641,10 +641,12 @@ TEST_F(UnitTest, topic_status_counter_saturation) {
     subs.push_back(sub);
   }
 
+  constexpr uint16_t kMaxTrackedHandles = 127;
+
   orb_status status{};
   ASSERT_TRUE(orb_get_topic_status(ORB_ID(orb_test), 0, &status));
-  EXPECT_GE(status.publisher_count, static_cast<uint16_t>(kManyHandles));
-  EXPECT_GE(status.subscriber_count, static_cast<uint16_t>(kManyHandles));
+  EXPECT_EQ(status.publisher_count, kMaxTrackedHandles);
+  EXPECT_EQ(status.subscriber_count, kMaxTrackedHandles);
 
   for (auto *sub : subs) {
     EXPECT_TRUE(orb_destroy_subscription(&sub));

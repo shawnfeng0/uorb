@@ -26,7 +26,13 @@ static inline uint16_t RoundPowOfTwo(uint16_t n) {
 }
 
 uorb::DeviceNode::DeviceNode(const struct orb_metadata &meta, uint8_t instance)
-    : meta_(meta), instance_(instance), queue_size_(RoundPowOfTwo(meta.o_queue_size)) {}
+    : meta_(meta),
+      queue_size_(RoundPowOfTwo(meta.o_queue_size)),
+      subscriber_count_(0),
+      has_anonymous_subscriber_(false),
+      publisher_count_(0),
+      has_anonymous_publisher_(false),
+      instance_(instance) {}
 
 uorb::DeviceNode::~DeviceNode() { delete[] data_; }
 
@@ -91,7 +97,7 @@ bool uorb::DeviceNode::Publish(const void *data) {
 
 void uorb::DeviceNode::add_subscriber() {
   base::LockGuard<base::Mutex> lg(lock_);
-  if (subscriber_count_ < UINT16_MAX) {
+  if (subscriber_count_ < kMaxCounterValue) {
     subscriber_count_++;
   }
 }
@@ -119,7 +125,7 @@ void uorb::DeviceNode::remove_publisher() {
 
 void uorb::DeviceNode::add_publisher() {
   base::LockGuard<base::Mutex> lg(lock_);
-  if (publisher_count_ < UINT16_MAX) {
+  if (publisher_count_ < kMaxCounterValue) {
     publisher_count_++;
   }
 }
