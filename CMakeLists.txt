@@ -18,7 +18,7 @@ message(STATUS "uORB version: ${UORB_GIT_TAG}")
 
 configure_file(
         "src/git_version.cc.in"
-        "src/git_version.cc"
+        "uorb_generated/git_version.cc"
 )
 
 add_compile_options(-Wextra -Wall)
@@ -30,7 +30,7 @@ target_sources(uorb PRIVATE
         src/device_master.cc
         src/device_node.cc
         src/uorb.cc
-        ${CMAKE_CURRENT_BINARY_DIR}/src/git_version.cc
+        ${CMAKE_CURRENT_BINARY_DIR}/uorb_generated/git_version.cc
         )
 target_include_directories(uorb PUBLIC include)
 target_include_directories(uorb PRIVATE src)
