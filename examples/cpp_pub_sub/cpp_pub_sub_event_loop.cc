@@ -2,10 +2,10 @@
 //
 // Demonstrates:
 //   * Subscribe<Topic>(cb)        -- EventLoop owns the subscription.
-//   * RegisterCallback(sub, cb)   -- the caller owns the subscription.
+//   * AddSubscription(sub, cb)   -- the caller owns the subscription.
 //   * Multiple publisher threads on different topics.
 //   * Quit() from another thread to stop the loop.
-//   * UnregisterCallback() on teardown.
+//   * RemoveSubscription() on teardown.
 //
 // Copyright (c) 2021-2025 shawnfeng. All rights reserved.
 
@@ -90,16 +90,16 @@ int main() {
   });
 
   // (2) User-owned subscription: create the Subscription*Data yourself, then
-  //     RegisterCallback(). Ownership stays with the caller; it must outlive
-  //     the EventLoop (or be unregistered before destruction).
+  //     AddSubscription(). Ownership stays with the caller; it must outlive
+  //     the EventLoop (or be removed before destruction).
   uorb::SubscriptionData<uorb::msg::sensor_gyro> sub_gyro;
-  loop.RegisterCallback(sub_gyro, [](const sensor_gyro_s &msg) {
+  loop.AddSubscription(sub_gyro, [](const sensor_gyro_s &msg) {
     LOGGER_INFO("[sensor_gyro] timestamp: %" PRIu64 ", gyro: (%.2f, %.2f, %.2f), temp: %.2f", msg.timestamp, msg.x,
                 msg.y, msg.z, msg.temperature);
   });
 
-  // Run the event loop on a worker thread. Loop() blocks until Quit().
-  std::thread loop_thread([&] { loop.Loop(); });
+  // Run the event loop on a worker thread. Run() blocks until Quit().
+  std::thread loop_thread([&] { loop.Run(); });
 
   // Publish from multiple threads.
   std::thread pub_thread1(thread_publisher_example_string);
@@ -109,14 +109,14 @@ int main() {
   pub_thread2.join();
   pub_thread3.join();
 
-  // (3) Quit() is thread-safe: it wakes up Loop() from outside.
+  // (3) Quit() is thread-safe: it wakes up Run() from outside.
   loop.Quit();
   loop_thread.join();
 
-  // Unregister the externally owned subscription before it goes out of scope
+  // Remove the externally owned subscription before it goes out of scope
   // (optional here because the EventLoop will be destroyed next, but good
   // practice in longer-lived programs).
-  loop.UnregisterCallback(sub_gyro);
+  loop.RemoveSubscription(sub_gyro);
 
   return 0;
 }

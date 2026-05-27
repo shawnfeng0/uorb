@@ -15,13 +15,13 @@ namespace uorb {
 //
 // Thread-safety:
 //  - Quit() is thread-safe and may be called from any thread.
-//  - All other member functions (RegisterCallback, UnregisterCallback,
-//    Subscribe, PollOnce, Loop) must be invoked from a single thread
+//  - All other member functions (AddSubscription, RemoveSubscription,
+//    Subscribe, RunOnce, Run) must be invoked from a single thread
 //    (typically the loop thread).
 //
 // Lifetime:
-//  - Quit() is sticky: once called, PollOnce() returns -1 immediately and
-//    Loop() exits. The EventLoop cannot be restarted after Quit().
+//  - Quit() is sticky: once called, RunOnce() returns -1 immediately and
+//    Run() exits. The EventLoop cannot be restarted after Quit().
 class EventLoop {
  public:
   EventLoop() : event_poll_(orb_event_poll_create()) {}
@@ -47,30 +47,26 @@ class EventLoop {
   EventLoop &operator=(EventLoop &&) = delete;
 
   // Whether the loop was successfully constructed.
-  bool valid() const { return event_poll_ != nullptr; }
-  explicit operator bool() const { return valid(); }
+  explicit operator bool() const { return event_poll_ != nullptr; }
 
-  // Register a callback on an externally managed subscription.
-  // Returns false if the loop is invalid, the subscription is null, or the
-  // subscription was already registered.
+  // Add an externally managed subscription and dispatch its callback when data
+  // becomes available. The caller retains ownership of `sub_cpp`; it must
+  // remain alive until either RemoveSubscription() is called or the EventLoop
+  // is destroyed.
   //
   // A subscription can be bound to only one active waiter/notifier at a time;
   // registration also fails if the subscription is currently used by another
   // EventLoop / orb_poll / orb_event_poll_wait call.
-  //
-  // The caller retains ownership of `sub_cpp`. It MUST remain alive until
-  // either UnregisterCallback() is called for it or the EventLoop is
-  // destroyed; otherwise the stored handle dangles and dispatch is UB.
   template <typename Sub, typename F>
-  bool RegisterCallback(Sub &sub_cpp, F &&cb) {
+  bool AddSubscription(Sub &sub_cpp, F &&cb) {
     using Msg = typename Sub::ValueType;
     return AddEntry<Msg>(sub_cpp.handle(), std::forward<F>(cb), /*owned=*/false);
   }
 
-  // Unregister a callback previously registered with an external subscription.
+  // Remove a previously added external subscription.
   // Returns false if the subscription was not registered.
   template <typename Sub>
-  bool UnregisterCallback(Sub &sub_cpp) {
+  bool RemoveSubscription(Sub &sub_cpp) {
     return RemoveEntry(sub_cpp.handle());
   }
 
@@ -91,7 +87,7 @@ class EventLoop {
     return true;
   }
 
-  [[nodiscard]] int PollOnce(const int timeout_ms = -1) {
+  [[nodiscard]] int RunOnce(const int timeout_ms = -1) {
     if (!event_poll_) return -1;
     if (entries_.empty()) return 0;
 
@@ -109,12 +105,12 @@ class EventLoop {
   // Run the loop until Quit() is requested or a poll error occurs.
   // Returns true if the loop exited because of Quit(), false on poll error
   // or if it was invoked on an invalid / empty EventLoop.
-  bool Loop() {
-    // PollOnce(-1) blocks until either a subscription has data (returns > 0)
+  bool Run() {
+    // RunOnce(-1) blocks until either a subscription has data (returns > 0)
     // or Quit() is requested (returns < 0). It returns 0 only when there are
     // no registered entries, in which case we exit as false (nothing to do).
     for (;;) {
-      const int n = PollOnce(-1);
+      const int n = RunOnce(-1);
       if (n < 0) return quit_requested_.load();
       if (n == 0) return false;
     }
@@ -122,7 +118,7 @@ class EventLoop {
 
   // Thread-safe: request the event loop to quit.
   //
-  // This is sticky: after Quit() returns, subsequent PollOnce() calls return
+  // This is sticky: after Quit() returns, subsequent RunOnce() calls return
   // -1 immediately and the EventLoop cannot be restarted.
   void Quit() {
     quit_requested_ = true;
@@ -170,7 +166,7 @@ class EventLoop {
       std::unique_ptr<EntryBase> entry(
           new TypedEntry<Msg, Callable>(sub, owned, std::forward<F>(cb)));
       entries_.emplace(sub, std::move(entry));
-      // Keep ready_buf_ sized to match entries_ so PollOnce does not have to
+      // Keep ready_buf_ sized to match entries_ so RunOnce does not have to
       // resize on every call. Only grow: shrinking on remove would churn the
       // allocation under add/remove cycles.
       if (ready_buf_.size() < entries_.size()) {
