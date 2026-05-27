@@ -1,4 +1,12 @@
-// Example using orb_event_poll (EventPoll C interface)
+// uorb::EventLoop example.
+//
+// Demonstrates:
+//   * Subscribe<Topic>(cb)        -- EventLoop owns the subscription.
+//   * RegisterCallback(sub, cb)   -- the caller owns the subscription.
+//   * Multiple publisher threads on different topics.
+//   * Quit() from another thread to stop the loop.
+//   * UnregisterCallback() on teardown.
+//
 // Copyright (c) 2021-2025 shawnfeng. All rights reserved.
 
 #include <inttypes.h>
@@ -22,7 +30,7 @@ void thread_publisher_example_string() {
     auto &data = pub_example_string.get();
     data.timestamp = orb_absolute_time_us();
     snprintf(reinterpret_cast<char *>(data.str), example_string_s::STRING_LENGTH, "%d: %s", i,
-             "This is a string message (event poll). ");
+             "This is a string message. ");
     if (!pub_example_string.Publish()) {
       LOGGER_ERROR("Publish example_string error");
     }
@@ -65,31 +73,35 @@ void thread_publisher_sensor_gyro() {
   LOGGER_WARN("sensor_gyro publication over.");
 }
 
-void *thread_subscriber(uorb::EventLoop *loop) {
-  uorb::SubscriptionData<uorb::msg::example_string> sub_example_string;
-  loop->RegisterCallback(sub_example_string, [](const example_string_s &msg) {
-    LOGGER_INFO("sub [example_string] timestamp: %" PRIu64 ", msg: '%s'", msg.timestamp, msg.str);
-  });
-  loop->RegisterCallback<uorb::msg::example_string>([](const example_string_s &msg) {
+int main() {
+  uorb::EventLoop loop;
+  if (!loop) {
+    LOGGER_ERROR("EventLoop create failed");
+    return -1;
+  }
+
+  // (1) Loop-owned subscriptions: Subscribe<Topic>(callback).
+  loop.Subscribe<uorb::msg::example_string>([](const example_string_s &msg) {
     LOGGER_INFO("[example_string] timestamp: %" PRIu64 ", msg: '%s'", msg.timestamp, msg.str);
   });
-  loop->RegisterCallback<uorb::msg::sensor_accel>([](const sensor_accel_s &msg) {
+  loop.Subscribe<uorb::msg::sensor_accel>([](const sensor_accel_s &msg) {
     LOGGER_INFO("[sensor_accel] timestamp: %" PRIu64 ", accel: (%.2f, %.2f, %.2f), temp: %.2f", msg.timestamp, msg.x,
                 msg.y, msg.z, msg.temperature);
   });
-  loop->RegisterCallback<uorb::msg::sensor_gyro>([](const sensor_gyro_s &msg) {
+
+  // (2) User-owned subscription: create the Subscription*Data yourself, then
+  //     RegisterCallback(). Ownership stays with the caller; it must outlive
+  //     the EventLoop (or be unregistered before destruction).
+  uorb::SubscriptionData<uorb::msg::sensor_gyro> sub_gyro;
+  loop.RegisterCallback(sub_gyro, [](const sensor_gyro_s &msg) {
     LOGGER_INFO("[sensor_gyro] timestamp: %" PRIu64 ", gyro: (%.2f, %.2f, %.2f), temp: %.2f", msg.timestamp, msg.x,
                 msg.y, msg.z, msg.temperature);
   });
-  loop->Loop();
-  loop->UnRegisterCallback(sub_example_string);
-  return nullptr;
-}
 
-int main() {
-  uorb::EventLoop loop;
-  std::thread sub_thread(thread_subscriber, &loop);
-  usleep(100 * 1000);  // Let subscriber start first
+  // Run the event loop on a worker thread. Loop() blocks until Quit().
+  std::thread loop_thread([&] { loop.Loop(); });
+
+  // Publish from multiple threads.
   std::thread pub_thread1(thread_publisher_example_string);
   std::thread pub_thread2(thread_publisher_sensor_accel);
   std::thread pub_thread3(thread_publisher_sensor_gyro);
@@ -97,9 +109,14 @@ int main() {
   pub_thread2.join();
   pub_thread3.join();
 
-  // Request the subscriber to quit after all publishers are done
+  // (3) Quit() is thread-safe: it wakes up Loop() from outside.
   loop.Quit();
-  sub_thread.join();
+  loop_thread.join();
+
+  // Unregister the externally owned subscription before it goes out of scope
+  // (optional here because the EventLoop will be destroyed next, but good
+  // practice in longer-lived programs).
+  loop.UnregisterCallback(sub_gyro);
 
   return 0;
 }
