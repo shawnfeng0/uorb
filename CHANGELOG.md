@@ -7,9 +7,32 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-[Unreleased]: https://github.com/ShawnFeng0/uorb/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/ShawnFeng0/uorb/compare/v0.4.1...HEAD
 
-## [0.4.0] - 2024-07-23
+## [0.4.1] - 2026-05-28
+[0.4.1]: https://github.com/ShawnFeng0/uorb/compare/v0.4.0...v0.4.1
+
+### Added
+
+- Add EventPoll, EventLoop and blocking benchmark coverage.
+- Add EventLoop-based C++ publish/subscribe example.
+- Add getting started documentation and thread-safety contract notes.
+
+### Changed
+
+- Simplify EventPoll notifier binding and EventLoop callback dispatch.
+- Reduce core object memory footprint.
+- Fold simple topic definition into ORB_DEFINE.
+- Align public C++ wrapper accessors with Google C++ style.
+- Rename and polish EventLoop and public uORB APIs.
+- Generate git version source under a dedicated build directory.
+
+### Fixed
+
+- Make condition variable timeout handling robust.
+- Guard topic publisher and subscriber counters against overflow and underflow.
+
+## [0.4.0] - 2025-07-15
 [0.4.0]: https://github.com/ShawnFeng0/uorb/compare/v0.3.1...v0.4.0
 
 ### Changed
