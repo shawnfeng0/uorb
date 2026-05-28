@@ -40,32 +40,9 @@ pip3 install -r tools/msg/tools/requirements.txt
 
 ## 示例
 
-[uorb-examples](https://github.com/ShawnFeng0/uorb-examples.git)
+* [C++ 发布/订阅示例](examples/cpp_pub_sub)
+* [TCP 话题监听器示例](examples/tcp_topic_listener)
 
-多实例发布/订阅建议加上错误处理：
-
-```cpp
-unsigned instance = 0;
-orb_publication_t *pub = orb_create_publication_multi(ORB_ID(orb_test), &instance);
-if (!pub) {
-  // 读取 errno 并返回
-  return;
-}
-
-orb_subscription_t *sub = orb_create_subscription_multi(ORB_ID(orb_test), instance);
-if (!sub) {
-  orb_destroy_publication(&pub);
-  return;
-}
-
-orb_test_s msg{};
-if (!orb_publish(pub, &msg)) {
-  // 处理发布失败
-}
-
-orb_destroy_subscription(&sub);
-orb_destroy_publication(&pub);
-```
 
 ## 工具
 
