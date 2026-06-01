@@ -1,7 +1,8 @@
 #include "device_node.h"
 
 #include <cerrno>
-#include <cstring>
+#include <cstddef>
+#include <new>
 
 static inline uint16_t RoundPowOfTwo(uint16_t n) {
   if (n == 0) {
@@ -34,7 +35,76 @@ uorb::DeviceNode::DeviceNode(const struct orb_metadata &meta, uint8_t instance)
       has_untracked_publisher_(false),
       instance_(instance) {}
 
-uorb::DeviceNode::~DeviceNode() { delete[] data_; }
+uorb::DeviceNode::~DeviceNode() { DestroyQueue(); }
+
+void uorb::DeviceNode::ResetQueueForTesting() {
+  DestroyQueue();
+  generation_ = 0;
+  constructed_slot_count_ = 0;
+}
+
+bool uorb::DeviceNode::AllocateQueueStorage() {
+  if (!meta_.o_operations || !meta_.o_operations->copy_construct || !meta_.o_operations->copy_assign ||
+      !meta_.o_operations->destroy) {
+    errno = EINVAL;
+    return false;
+  }
+
+  try {
+    data_ = static_cast<unsigned char *>(::operator new(meta_.o_size * queue_size_));
+  } catch (const std::bad_alloc &) {
+    errno = ENOMEM;
+    return false;
+  }
+
+  return true;
+}
+
+void uorb::DeviceNode::DestroyQueue() {
+  if (data_) {
+    const uint16_t constructed_slot_count = ConstructedSlotCount();
+    for (uint16_t slot_index = 0; slot_index < constructed_slot_count; ++slot_index) {
+      meta_.o_operations->destroy(SlotAddress(slot_index));
+    }
+  }
+
+  ::operator delete(data_);
+  data_ = nullptr;
+  constructed_slot_count_ = 0;
+}
+
+void *uorb::DeviceNode::SlotAddress(unsigned index) const { return data_ + (meta_.o_size * index); }
+
+bool uorb::DeviceNode::IsSlotConstructed(unsigned slot_index) const { return slot_index < constructed_slot_count_; }
+
+uint16_t uorb::DeviceNode::ConstructedSlotCount() const { return constructed_slot_count_; }
+
+bool uorb::DeviceNode::CopyIntoSlot(unsigned index, const void *data) {
+  const auto slot_index = index & (queue_size_ - 1);
+  void *slot_address = SlotAddress(slot_index);
+
+  try {
+    if (IsSlotConstructed(slot_index)) {
+      if (!meta_.o_operations->copy_assign(slot_address, data)) {
+        errno = EFAULT;
+        return false;
+      }
+    } else if (!meta_.o_operations->copy_construct(slot_address, data)) {
+      errno = EFAULT;
+      return false;
+    } else if (constructed_slot_count_ < queue_size_) {
+      ++constructed_slot_count_;
+    }
+  } catch (const std::bad_alloc &) {
+    errno = ENOMEM;
+    return false;
+  } catch (...) {
+    errno = EFAULT;
+    return false;
+  }
+
+  return true;
+}
 
 bool uorb::DeviceNode::Copy(void *dst, unsigned *sub_generation_ptr) const {
   if (!dst || !sub_generation_ptr || !data_) {
@@ -57,7 +127,23 @@ bool uorb::DeviceNode::Copy(void *dst, unsigned *sub_generation_ptr) const {
     sub_generation = generation_ - queue_size_;
   }
 
-  memcpy(dst, data_ + (meta_.o_size * (sub_generation & (queue_size_ - 1))), meta_.o_size);
+  const unsigned slot_index = sub_generation & (queue_size_ - 1);
+  if (!IsSlotConstructed(slot_index)) {
+    return false;
+  }
+
+  try {
+    if (!meta_.o_operations->copy_assign(dst, SlotAddress(slot_index))) {
+      errno = EFAULT;
+      return false;
+    }
+  } catch (const std::bad_alloc &) {
+    errno = ENOMEM;
+    return false;
+  } catch (...) {
+    errno = EFAULT;
+    return false;
+  }
 
   ++sub_generation;
 
@@ -74,17 +160,13 @@ bool uorb::DeviceNode::Publish(const void *data) {
 
   base::LockGuard<base::Mutex> lg(lock_);
 
-  if (nullptr == data_) {
-    data_ = new uint8_t[meta_.o_size * queue_size_];
-
-    /* failed or could not allocate */
-    if (nullptr == data_) {
-      errno = ENOMEM;
-      return false;
-    }
+  if (nullptr == data_ && !AllocateQueueStorage()) {
+    return false;
   }
 
-  memcpy(data_ + (meta_.o_size * (generation_ % queue_size_)), (const char *)data, meta_.o_size);
+  if (!CopyIntoSlot(generation_, data)) {
+    return false;
+  }
 
   generation_++;
 

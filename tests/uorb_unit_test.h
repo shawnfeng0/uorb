@@ -65,6 +65,8 @@ class uORBTest::UnitTest : public testing::Test {
     node.generation_ = generation;
   }
 
+  static void reset_queue_for_testing(uorb::DeviceNode &node) { node.ResetQueueForTesting(); }
+
   template <typename S>
   void latency_test(const orb_metadata *T);
 

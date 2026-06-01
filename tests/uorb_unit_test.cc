@@ -35,18 +35,132 @@
 
 #include <gtest/gtest.h>
 #include <uorb/abs_time.h>
+#include <uorb/publication.h>
+#include <uorb/subscription.h>
 
 #include <cerrno>
 #include <cstdarg>
 #include <cstdio>
+#include <string>
 #include <thread>
 #include <vector>
+
+struct cpp_object_topic_s {
+  struct Counters {
+    int copy_construct_count{0};
+    int copy_assign_count{0};
+    int destroy_count{0};
+  };
+
+  static Counters counters;
+
+  std::string text;
+  std::vector<int> values;
+
+  cpp_object_topic_s() = default;
+
+  cpp_object_topic_s(const cpp_object_topic_s &other) : text(other.text), values(other.values) {
+    ++counters.copy_construct_count;
+  }
+
+  cpp_object_topic_s &operator=(const cpp_object_topic_s &other) {
+    if (this == &other) {
+      return *this;
+    }
+
+    text = other.text;
+    values = other.values;
+    ++counters.copy_assign_count;
+    return *this;
+  }
+
+  ~cpp_object_topic_s() { ++counters.destroy_count; }
+
+  static void reset_counters() { counters = {}; }
+};
+
+cpp_object_topic_s::Counters cpp_object_topic_s::counters;
+
+ORB_DECLARE(cpp_object_topic, cpp_object_topic_s);
+ORB_DEFINE(cpp_object_topic, struct cpp_object_topic_s, 0, "", 4);
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
 namespace uORBTest {
+
+TEST_F(UnitTest, cpp_object_topic) {
+  cpp_object_topic_s::reset_counters();
+
+  auto *publication = orb_create_publication(ORB_ID(cpp_object_topic));
+  ASSERT_NE(publication, nullptr) << "advertise failed: " << errno;
+
+  auto *subscription = orb_create_subscription(ORB_ID(cpp_object_topic));
+  ASSERT_NE(subscription, nullptr) << "subscribe failed: " << errno;
+
+  cpp_object_topic_s source;
+  source.text = "first";
+  source.values = {1, 2, 3};
+
+  ASSERT_TRUE(orb_publish(publication, &source));
+  EXPECT_EQ(cpp_object_topic_s::counters.copy_construct_count, 1);
+  EXPECT_EQ(cpp_object_topic_s::counters.copy_assign_count, 0);
+
+  source.text = "mutated";
+  source.values = {9, 9, 9};
+
+  cpp_object_topic_s received;
+  ASSERT_TRUE(orb_copy(subscription, &received));
+  EXPECT_EQ(received.text, "first");
+  EXPECT_EQ(received.values, (std::vector<int>{1, 2, 3}));
+  EXPECT_EQ(cpp_object_topic_s::counters.copy_construct_count, 1);
+  EXPECT_EQ(cpp_object_topic_s::counters.copy_assign_count, 1);
+
+  for (int value = 1; value <= 4; ++value) {
+    source.text = "value-" + std::to_string(value);
+    source.values = {value};
+    ASSERT_TRUE(orb_publish(publication, &source));
+  }
+
+  EXPECT_EQ(cpp_object_topic_s::counters.copy_construct_count, 4);
+  EXPECT_EQ(cpp_object_topic_s::counters.copy_assign_count, 2);
+
+  for (int value = 1; value <= 4; ++value) {
+    ASSERT_TRUE(orb_copy(subscription, &received));
+    EXPECT_EQ(received.text, "value-" + std::to_string(value));
+    EXPECT_EQ(received.values, (std::vector<int>{value}));
+  }
+
+  EXPECT_EQ(cpp_object_topic_s::counters.copy_assign_count, 6);
+
+  auto *node = uorb::DeviceMaster::get_instance().GetDeviceNode(*ORB_ID(cpp_object_topic), 0);
+  ASSERT_NE(node, nullptr);
+
+  ASSERT_TRUE(orb_destroy_subscription(&subscription));
+  ASSERT_TRUE(orb_destroy_publication(&publication));
+
+  const int destroy_count_before_queue_cleanup = cpp_object_topic_s::counters.destroy_count;
+  reset_queue_for_testing(*node);
+  EXPECT_EQ(cpp_object_topic_s::counters.destroy_count - destroy_count_before_queue_cleanup, 4);
+
+  cpp_object_topic_s::reset_counters();
+  uorb::PublicationData<uorb::msg::cpp_object_topic> publication_data;
+  uorb::SubscriptionData<uorb::msg::cpp_object_topic> subscription_data;
+
+  publication_data.data().text = "wrapped";
+  publication_data.data().values = {7, 8};
+  ASSERT_TRUE(publication_data.Publish());
+  ASSERT_TRUE(subscription_data.Update());
+  EXPECT_EQ(subscription_data.data().text, "wrapped");
+  EXPECT_EQ(subscription_data.data().values, (std::vector<int>{7, 8}));
+
+  node = uorb::DeviceMaster::get_instance().GetDeviceNode(*ORB_ID(cpp_object_topic), 0);
+  ASSERT_NE(node, nullptr);
+  const int wrapped_destroy_count_before_queue_cleanup = cpp_object_topic_s::counters.destroy_count;
+  reset_queue_for_testing(*node);
+  EXPECT_EQ(cpp_object_topic_s::counters.destroy_count - wrapped_destroy_count_before_queue_cleanup, 1);
+}
 
 TEST_F(UnitTest, unadvertise) {
   // try to advertise and see whether we get the right instance
@@ -417,6 +531,11 @@ TEST_F(UnitTest, wrap_around) {
   ptopic = orb_create_publication(ORB_ID(orb_test_medium_wrap_around));
   ASSERT_NE(ptopic, nullptr) << "advertise failed: " << errno;
   orb_publish(ptopic, &pub_data);
+
+  for (int i = 1; i < queue_size; ++i) {
+    pub_data.val = i;
+    ASSERT_TRUE(orb_publish(ptopic, &pub_data));
+  }
 
   // Set generation to the location where wrap-around is about to be
   {

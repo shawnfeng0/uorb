@@ -4,6 +4,7 @@
 #include <uorb/uorb.h>
 
 #include <cerrno>
+#include <cstddef>
 
 #include "base/condition_variable.h"
 #include "base/intrusive_list/forward_list.h"
@@ -92,8 +93,16 @@ class DeviceNode {
 
   static constexpr uint8_t kMaxCounterValue = 0x7F;
 
-  const orb_metadata &meta_; /**< object metadata information */
-  uint8_t *data_{nullptr};   /**< allocated object buffer */
+  bool AllocateQueueStorage();
+  void ResetQueueForTesting();
+  void DestroyQueue();
+  void *SlotAddress(unsigned index) const;
+  bool IsSlotConstructed(unsigned slot_index) const;
+  uint16_t ConstructedSlotCount() const;
+  bool CopyIntoSlot(unsigned index, const void *data);
+
+  const orb_metadata &meta_;     /**< object metadata information */
+  unsigned char *data_{nullptr}; /**< raw queue storage */
 
   mutable base::Mutex lock_{};
 
@@ -101,6 +110,7 @@ class DeviceNode {
   intrusive_list::forward_list_node device_list_node_{};
 
   std::atomic_uint32_t generation_{0}; /**< object generation count */
+  uint16_t constructed_slot_count_{0}; /**< number of lazily constructed queue slots */
   const uint16_t queue_size_;          /**< maximum number of elements in the queue */
   uint8_t subscriber_count_ : 7;
   bool has_untracked_subscriber_ : 1;

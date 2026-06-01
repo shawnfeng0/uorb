@@ -7,7 +7,12 @@
 
 #include <errno.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
+
+#ifdef __cplusplus
+#include <new>
+#endif
 
 #if __GNUC__ >= 4
 #ifdef __EXPORT
@@ -24,14 +29,24 @@
 #endif
 
 /**
+ * Type lifecycle operations for a topic.
+ */
+struct orb_type_operations {
+  bool (*copy_construct)(void *dst, const void *src);
+  bool (*copy_assign)(void *dst, const void *src);
+  void (*destroy)(void *ptr);
+};
+
+/**
  * Object metadata.
  */
 struct orb_metadata {
-  const char *o_name;               /**< unique object name */
-  const uint16_t o_size;            /**< object size */
-  const uint16_t o_size_no_padding; /**< object size w/o padding at the end (for logger) */
-  const char *o_fields;             /**< semicolon separated list of fields (with type) */
-  uint16_t o_queue_size;            /**< maximum number of queued samples */
+  const char *o_name;                             /**< unique object name */
+  const uint16_t o_size;                          /**< object size */
+  const uint16_t o_size_no_padding;               /**< object size w/o padding at the end (for logger) */
+  const char *o_fields;                           /**< semicolon separated list of fields (with type) */
+  uint16_t o_queue_size;                          /**< maximum number of queued samples */
+  const struct orb_type_operations *o_operations; /**< lifecycle operations for object storage */
 };
 
 /**
@@ -53,7 +68,41 @@ namespace uorb {
 namespace msg {
 template <const orb_metadata &>
 struct TypeMap;
+
+namespace detail {
+template <typename Type>
+bool CopyConstruct(void *dst, const void *src) {
+  if (!dst || !src) {
+    return false;
+  }
+
+  new (dst) Type(*static_cast<const Type *>(src));
+  return true;
 }
+
+template <typename Type>
+bool CopyAssign(void *dst, const void *src) {
+  if (!dst || !src) {
+    return false;
+  }
+
+  *static_cast<Type *>(dst) = *static_cast<const Type *>(src);
+  return true;
+}
+
+template <typename Type>
+void Destroy(void *ptr) {
+  if (!ptr) {
+    return;
+  }
+
+  static_cast<Type *>(ptr)->~Type();
+}
+
+template <typename Type>
+const orb_type_operations operations = {CopyConstruct<Type>, CopyAssign<Type>, Destroy<Type>};
+}  // namespace detail
+}  // namespace msg
 }  // namespace uorb
 #endif
 
@@ -117,10 +166,15 @@ struct TypeMap;
  * @param _queue_size	The maximum number of queued samples.
  */
 #define ORB_DEFINE_3(_name, _struct, _queue_size) ORB_DEFINE_5(_name, _struct, 0, "", _queue_size)
-#define ORB_DEFINE_5(_name, _struct, _size_no_padding, _fields, _queue_size)                                      \
-  const struct orb_metadata uorb::msg::_name = {#_name, sizeof(_struct), _size_no_padding, _fields, _queue_size}; \
-  const struct orb_metadata *__orb_##_name = &uorb::msg::_name;                                                   \
-  struct hack
+#define ORB_DEFINE_5(_name, _struct, _size_no_padding, _fields, _queue_size)                       \
+  const struct orb_metadata uorb::msg::_name = {#_name,                                           \
+                                                sizeof(_struct),                                  \
+                                                _size_no_padding,                                 \
+                                                _fields,                                          \
+                                                _queue_size,                                      \
+                                                &uorb::msg::detail::operations<_struct>};         \
+  const struct orb_metadata *__orb_##_name = &uorb::msg::_name;                                    \
+  struct orb_define_requires_semicolon
 #define ORB_DEFINE_SELECT(_1, _2, _3, _4, _5, NAME, ...) NAME
 #define ORB_DEFINE(...) ORB_DEFINE_SELECT(__VA_ARGS__, ORB_DEFINE_5, invalid, ORB_DEFINE_3)(__VA_ARGS__)
 

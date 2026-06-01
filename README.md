@@ -22,6 +22,7 @@ PX4.
 * Based on POSIX, good compatibility
 * Real-time response mechanism similar to poll() function
 * A flexible and easy-to-use C++ interface, which can operate topics like local structures
+* Support for transmitting C++ object topics with complete copy construction, copy assignment, and destruction semantics
 
 ## Dependencies
 
@@ -36,10 +37,15 @@ We have a message generator that can easily generate message meta-data. These li
 pip3 install -r tools/msg/tools/requirements.txt
 ```
 
+## C++ Object Topics
+
+uORB can transmit C++ object topics, including types with members such as `std::string` or `std::vector`. Queue storage is reserved as raw memory first; each slot is copy-constructed on its first publication, copy-assigned on later overwrite, and destroyed when the queue storage is released.
+
+When using object topics, the destination passed to `orb_copy()` must already be a constructed object. Object topics are not suitable for binary logger metadata or TCP topic listener field parsing, which are designed for POD-style message fields.
+
 ## Documentation
 
 * [Getting Started Guide](docs/getting_started.md)
-* API reference (TODO)
 * [Changelog](CHANGELOG.md)
 
 ## Examples
