@@ -7,9 +7,11 @@ link_libraries(Threads::Threads)
 # Generate orb message
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/msg)
 
-# uorb test source (exclude standalone bench)
-aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR} TEST_SOURCE)
-list(REMOVE_ITEM TEST_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/device_master_bench.cc)
+set(TEST_SOURCE
+        event_loop_test.cc
+        event_poll_internal_test.cc
+        uorb_unit_test.cc
+        )
 add_executable(${PROJECT_NAME} ${TEST_SOURCE})
 target_link_libraries(${PROJECT_NAME} PRIVATE GTest::gtest_main)
 target_link_libraries(${PROJECT_NAME} PRIVATE uorb_unittests_msgs)

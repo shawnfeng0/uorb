@@ -16,9 +16,8 @@ file(GLOB msg_files
         *.msg
         )
 
-# headers
-set(msg_out_path ${CMAKE_CURRENT_SOURCE_DIR}/uorb/topics)
-set(msg_source_out_path ${CMAKE_CURRENT_SOURCE_DIR}/uorb/topics_sources)
+set(msg_out_path ${CMAKE_CURRENT_BINARY_DIR}/uorb/topics)
+set(msg_source_out_path ${CMAKE_CURRENT_BINARY_DIR}/uorb/topics_sources)
 
 set(uorb_headers)
 set(uorb_sources ${msg_source_out_path}/uorb_topics.cc)
@@ -70,5 +69,5 @@ add_custom_command(OUTPUT ${uorb_sources}
         )
 
 add_library(${PROJECT_NAME} ${uorb_sources} ${uorb_headers})
-target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(${PROJECT_NAME} PUBLIC uorb)
