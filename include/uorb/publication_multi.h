@@ -41,20 +41,20 @@ class PublicationMulti {
 /**
  * The publication class with data embedded.
  */
-template <const orb_metadata &T>
-class PublicationMultiData : public PublicationMulti<T> {
-  using Type = typename msg::TypeMap<T>::type;
+template <const orb_metadata &meta>
+class PublicationMultiData : public PublicationMulti<meta> {
+  using Type = typename msg::TypeMap<meta>::type;
 
  public:
   PublicationMultiData() noexcept = default;
 
-  using PublicationMulti<T>::Publish;
+  using PublicationMulti<meta>::Publish;
 
   Type &data() { return data_; }
   const Type &data() const { return data_; }
 
   // Publishes the embedded struct.
-  bool Publish() { return PublicationMulti<T>::Publish(data_); }
+  bool Publish() { return PublicationMulti<meta>::Publish(data_); }
 
  private:
   Type data_{};

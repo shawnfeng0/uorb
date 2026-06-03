@@ -60,19 +60,19 @@ class Subscription {
 };
 
 // Subscription wrapper class with data
-template <const orb_metadata &T>
-class SubscriptionData : public Subscription<T> {
+template <const orb_metadata &meta>
+class SubscriptionData : public Subscription<meta> {
  public:
-  using ValueType = typename msg::TypeMap<T>::type;
+  using ValueType = typename msg::TypeMap<meta>::type;
 
-  explicit SubscriptionData(uint8_t instance = 0) noexcept : Subscription<T>(instance) {}
+  explicit SubscriptionData(uint8_t instance = 0) noexcept : Subscription<meta>(instance) {}
 
   ~SubscriptionData() override = default;
 
-  using Subscription<T>::Update;
+  using Subscription<meta>::Update;
 
   // update the embedded struct.
-  bool Update() { return Subscription<T>::Update(&data_); }
+  bool Update() { return Subscription<meta>::Update(&data_); }
 
   const ValueType &data() const { return data_; }
 

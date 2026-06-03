@@ -5,8 +5,8 @@
 
 namespace uorb {
 
-template <const orb_metadata &T>
-class SubscriptionInterval : public Subscription<T> {
+template <const orb_metadata &meta>
+class SubscriptionInterval : public Subscription<meta> {
  private:
   template <typename Tp>
   constexpr Tp constrain(Tp val, Tp min_val, Tp max_val) const {
@@ -14,7 +14,7 @@ class SubscriptionInterval : public Subscription<T> {
   }
 
  public:
-  using ValueType = typename msg::TypeMap<T>::type;
+  using ValueType = typename msg::TypeMap<meta>::type;
 
   /**
    * Constructor
@@ -25,7 +25,7 @@ class SubscriptionInterval : public Subscription<T> {
    * @param instance The instance for multi sub.
    */
   explicit SubscriptionInterval(uint32_t interval_us = 0, uint8_t instance = 0) noexcept
-      : Subscription<T>(instance), interval_us_(interval_us) {}
+      : Subscription<meta>(instance), interval_us_(interval_us) {}
 
   ~SubscriptionInterval() override = default;
 
@@ -33,7 +33,7 @@ class SubscriptionInterval : public Subscription<T> {
    * Check if there is a new update.
    * */
   bool Updated() override {
-    return Subscription<T>::Updated() &&
+    return Subscription<meta>::Updated() &&
            (orb_elapsed_time_us(last_update_) >= interval_us_);
   }
 
@@ -57,7 +57,7 @@ class SubscriptionInterval : public Subscription<T> {
    * @return true only if topic was copied successfully.
    */
   bool Copy(ValueType *dst) override {
-    if (Subscription<T>::Copy(dst)) {
+    if (Subscription<meta>::Copy(dst)) {
       const orb_abstime_us now = orb_absolute_time_us();
       // shift last update time forward, but don't let it get further behind
       // than the interval
