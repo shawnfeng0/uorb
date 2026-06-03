@@ -113,6 +113,96 @@ TEST(EventPollInternalTest, WaitInterruptedByStopReturnsMinusOne) {
   EXPECT_TRUE(orb_destroy_subscription(&sub));
 }
 
+TEST(EventPollInternalTest, AddReceiverIsIdempotentForSamePoll) {
+  orb_subscription_t *sub = orb_create_subscription(ORB_ID(orb_test));
+  ASSERT_NE(sub, nullptr);
+
+  uorb::EventPoll poll;
+  uorb::ReceiverLocal *receiver = as_receiver(sub);
+
+  EXPECT_TRUE(poll.AddReceiver(*receiver));
+  EXPECT_TRUE(poll.AddReceiver(*receiver));
+  EXPECT_TRUE(poll.RemoveReceiver(*receiver));
+  EXPECT_FALSE(poll.RemoveReceiver(*receiver));
+  EXPECT_TRUE(orb_destroy_subscription(&sub));
+}
+
+TEST(EventPollInternalTest, RemoveReceiverRejectsReceiverBoundToAnotherPoll) {
+  orb_subscription_t *sub = orb_create_subscription(ORB_ID(orb_test));
+  ASSERT_NE(sub, nullptr);
+
+  uorb::EventPoll owner_poll;
+  uorb::EventPoll other_poll;
+  uorb::ReceiverLocal *receiver = as_receiver(sub);
+
+  ASSERT_TRUE(owner_poll.AddReceiver(*receiver));
+  EXPECT_FALSE(other_poll.RemoveReceiver(*receiver));
+  EXPECT_EQ(errno, EBUSY);
+  EXPECT_TRUE(owner_poll.RemoveReceiver(*receiver));
+  EXPECT_TRUE(orb_destroy_subscription(&sub));
+}
+
+TEST(EventPollInternalTest, DestroySubscriptionRejectsBoundReceiver) {
+  orb_subscription_t *sub = orb_create_subscription(ORB_ID(orb_test));
+  ASSERT_NE(sub, nullptr);
+
+  uorb::EventPoll poll;
+  uorb::ReceiverLocal *receiver = as_receiver(sub);
+
+  ASSERT_TRUE(poll.AddReceiver(*receiver));
+  EXPECT_FALSE(orb_destroy_subscription(&sub));
+  EXPECT_EQ(errno, EBUSY);
+  ASSERT_NE(sub, nullptr);
+  EXPECT_TRUE(poll.RemoveReceiver(*receiver));
+  EXPECT_TRUE(orb_destroy_subscription(&sub));
+}
+
+TEST(EventPollInternalTest, WaitAllowsZeroMaxReadyWithoutWritingReadyArray) {
+  orb_publication_t *pub = orb_create_publication(ORB_ID(orb_test));
+  ASSERT_NE(pub, nullptr);
+
+  orb_subscription_t *sub = orb_create_subscription(ORB_ID(orb_test));
+  ASSERT_NE(sub, nullptr);
+
+  uorb::EventPoll poll;
+  uorb::ReceiverLocal *receiver = as_receiver(sub);
+  ASSERT_TRUE(poll.AddReceiver(*receiver));
+
+  drain_nonblocking(poll, sub, receiver);
+
+  orb_test_s msg{};
+  msg.val = 654;
+  ASSERT_TRUE(orb_publish(pub, &msg));
+
+  uorb::ReceiverLocal *ready[1] = {reinterpret_cast<uorb::ReceiverLocal *>(0x1)};
+  EXPECT_EQ(poll.Wait(ready, 0, 0), 1);
+  EXPECT_EQ(ready[0], reinterpret_cast<uorb::ReceiverLocal *>(0x1));
+
+  EXPECT_TRUE(orb_copy(sub, &msg));
+  EXPECT_EQ(msg.val, 654);
+
+  EXPECT_TRUE(poll.RemoveReceiver(*receiver));
+  EXPECT_TRUE(orb_destroy_subscription(&sub));
+  EXPECT_TRUE(orb_destroy_publication(&pub));
+}
+
+TEST(EventPollInternalTest, WaitRejectsNullReadyArray) {
+  uorb::EventPoll poll;
+
+  errno = 0;
+  EXPECT_EQ(poll.Wait(nullptr, 1, 0), -1);
+  EXPECT_EQ(errno, EINVAL);
+}
+
+TEST(EventPollInternalTest, WaitRejectsNegativeMaxReady) {
+  uorb::EventPoll poll;
+  uorb::ReceiverLocal *ready[1] = {nullptr};
+
+  errno = 0;
+  EXPECT_EQ(poll.Wait(ready, -1, 0), -1);
+  EXPECT_EQ(errno, EINVAL);
+}
+
 TEST(EventPollInternalTest, AddRemovePressureWithActivePublisher) {
   orb_publication_t *pub = orb_create_publication(ORB_ID(orb_test));
   ASSERT_NE(pub, nullptr);

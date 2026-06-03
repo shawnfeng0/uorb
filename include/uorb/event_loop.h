@@ -3,7 +3,9 @@
 #include <uorb/uorb.h>
 
 #include <atomic>
+#include <cerrno>
 #include <memory>
+#include <new>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -161,6 +163,12 @@ class EventLoop {
 
     // From here on, `sub` is registered on the poll set. If anything below
     // throws we must detach it again to avoid leaving a dangling binding.
+    auto rollback_registration = [this, sub]() {
+      orb_event_poll_remove(event_poll_, sub);
+      auto it = entries_.find(sub);
+      if (it != entries_.end()) entries_.erase(it);
+    };
+
     try {
       using Callable = typename std::decay<F>::type;
       std::unique_ptr<EntryBase> entry(
@@ -172,11 +180,12 @@ class EventLoop {
       if (ready_buf_.size() < entries_.size()) {
         ready_buf_.resize(entries_.size());
       }
+    } catch (const std::bad_alloc &) {
+      rollback_registration();
+      errno = ENOMEM;
+      return false;
     } catch (...) {
-      orb_event_poll_remove(event_poll_, sub);
-      // If emplace partially succeeded, roll it back too.
-      auto it = entries_.find(sub);
-      if (it != entries_.end()) entries_.erase(it);
+      rollback_registration();
       throw;
     }
     return true;

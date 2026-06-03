@@ -24,21 +24,38 @@ class EventPoll {
   }
 
   bool AddReceiver(ReceiverLocal &receiver) {
+    if (receiver.HasNotifier(&notifier_)) {
+      return true;
+    }
+
     if (!receiver.SetNotifier(&notifier_)) {
       return false;
     }
+
     receivers_.push_front(receiver);
     return true;
   }
 
   bool RemoveReceiver(ReceiverLocal &receiver) {
-    if (!receiver.RemoveNotifier()) {
+    if (!receiver.HasNotifier(&notifier_)) {
+      errno = receiver.HasNotifier() ? EBUSY : EINVAL;
       return false;
     }
-    return receivers_.remove(receiver);
+
+    if (!receivers_.remove(receiver)) {
+      errno = ENOENT;
+      return false;
+    }
+
+    return receiver.RemoveNotifier();
   }
 
   int Wait(ReceiverLocal *ready[], int max_ready, const int timeout_ms) {
+    if (!ready || max_ready < 0) {
+      errno = EINVAL;
+      return -1;
+    }
+
     if (stop_) return -1;
 
     int count = ScanReady(ready, max_ready);
@@ -69,9 +86,17 @@ class EventPoll {
   int ScanReady(ReceiverLocal *ready[], int max_ready) {
     int count = 0;
     for (auto &receiver : receivers_) {
-      if (receiver.is_ready()) {
-        ready[count++] = &receiver;
-        if (count >= max_ready) break;
+      if (!receiver.is_ready()) {
+        continue;
+      }
+
+      if (count < max_ready) {
+        ready[count] = &receiver;
+      }
+      ++count;
+
+      if (max_ready > 0 && count >= max_ready) {
+        break;
       }
     }
     return count;

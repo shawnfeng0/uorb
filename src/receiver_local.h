@@ -63,6 +63,9 @@ class ReceiverLocal final : public detail::ReceiverBase {
     return true;
   }
 
+  bool HasNotifier() const { return notifier_ != nullptr; }
+  bool HasNotifier(const base::LiteNotifier *notifier) const { return notifier_ == notifier; }
+
   intrusive_list::forward_list_node event_poll_node{};
 
  private:

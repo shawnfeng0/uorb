@@ -99,8 +99,10 @@ bool orb_destroy_subscription(orb_subscription_t **handle_ptr) {
   ORB_CHECK_TRUE(handle_ptr && *handle_ptr, EINVAL, return false);
 
   auto &subscription_handle = *handle_ptr;
+  auto *receiver = reinterpret_cast<ReceiverLocal *>(subscription_handle);
+  ORB_CHECK_TRUE(!receiver->HasNotifier(), EBUSY, return false);
 
-  delete reinterpret_cast<ReceiverLocal *>(subscription_handle);
+  delete receiver;
   subscription_handle = nullptr;  // Set the original pointer to null
 
   return true;
