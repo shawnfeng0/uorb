@@ -9,6 +9,7 @@
 #include <uorb/publication.h>
 #include <uorb/subscription.h>
 #include <uorb/topics/orb_test.h>
+#include <uorb/topics/orb_test_large.h>
 #include <uorb/topics/orb_test_medium.h>
 
 #include <atomic>
@@ -227,6 +228,100 @@ TEST(EventLoopTest, DestructorCleansUpOwnedAndExternal) {
   }
   // The external subscription must still be usable after the loop is gone.
   EXPECT_NE(external_sub.handle(), nullptr);
+}
+
+TEST(EventLoopTest, CallbackCanQuitLoop) {
+  uorb::EventLoop loop;
+  ASSERT_TRUE(loop);
+
+  std::atomic<int> call_count{0};
+  ASSERT_TRUE(loop.Subscribe<uorb::msg::orb_test_large>(
+      [&](const orb_test_large_s &) {
+        ++call_count;
+        loop.Quit();
+      }));
+
+  uorb::PublicationData<uorb::msg::orb_test_large> pub;
+  pub.data().val = 808;
+  ASSERT_TRUE(pub.Publish());
+
+  EXPECT_EQ(loop.RunOnce(1000), 1);
+  EXPECT_EQ(call_count.load(), 1);
+  EXPECT_EQ(loop.RunOnce(0), -1);
+}
+
+TEST(EventLoopTest, CallbackCanRemoveAnotherSubscription) {
+  uorb::EventLoop loop;
+  ASSERT_TRUE(loop);
+
+  uorb::SubscriptionData<uorb::msg::orb_test_large> first_sub;
+  uorb::SubscriptionData<uorb::msg::orb_test_medium> second_sub;
+  std::atomic<int> first_calls{0};
+  std::atomic<int> second_calls{0};
+  orb_test_large_s first_stale_msg{};
+  orb_test_medium_s second_stale_msg{};
+  first_sub.Copy(first_stale_msg);
+  second_sub.Copy(second_stale_msg);
+
+  ASSERT_TRUE(loop.AddSubscription(second_sub, [&](const orb_test_medium_s &) {
+    ++second_calls;
+  }));
+  ASSERT_TRUE(loop.AddSubscription(first_sub, [&](const orb_test_large_s &) {
+    ++first_calls;
+    EXPECT_TRUE(loop.RemoveSubscription(second_sub));
+  }));
+
+  uorb::PublicationData<uorb::msg::orb_test_large> first_pub;
+  first_pub.data().val = 11;
+  ASSERT_TRUE(first_pub.Publish());
+
+  EXPECT_EQ(loop.RunOnce(1000), 1);
+  EXPECT_EQ(first_calls.load(), 1);
+  EXPECT_EQ(second_calls.load(), 0);
+  EXPECT_FALSE(loop.RemoveSubscription(second_sub));
+  EXPECT_TRUE(loop.RemoveSubscription(first_sub));
+}
+
+TEST(EventLoopTest, CallbackCanAddSubscriptionForFutureEvents) {
+  uorb::EventLoop loop;
+  ASSERT_TRUE(loop);
+
+  uorb::SubscriptionData<uorb::msg::orb_test_large> first_sub;
+  uorb::SubscriptionData<uorb::msg::orb_test_medium> second_sub;
+  std::atomic<int> first_calls{0};
+  std::atomic<int> second_calls{0};
+  bool second_added = false;
+
+  ASSERT_TRUE(loop.AddSubscription(first_sub, [&](const orb_test_large_s &) {
+    ++first_calls;
+    if (!second_added) {
+      second_added = true;
+      EXPECT_TRUE(loop.AddSubscription(second_sub, [&](const orb_test_medium_s &) {
+        ++second_calls;
+      }));
+    }
+  }));
+
+  for (int i = 0; i < kMaxDrainIterations && loop.RunOnce(0) > 0; ++i) {
+  }
+  first_calls = 0;
+  second_calls = 0;
+
+  uorb::PublicationData<uorb::msg::orb_test_large> first_pub;
+  first_pub.data().val = 33;
+  ASSERT_TRUE(first_pub.Publish());
+  EXPECT_EQ(loop.RunOnce(1000), 1);
+  EXPECT_EQ(first_calls.load(), 1);
+  ASSERT_TRUE(second_added);
+
+  uorb::PublicationData<uorb::msg::orb_test_medium> second_pub;
+  second_pub.data().val = 44;
+  ASSERT_TRUE(second_pub.Publish());
+  EXPECT_EQ(loop.RunOnce(1000), 1);
+  EXPECT_EQ(second_calls.load(), 1);
+
+  EXPECT_TRUE(loop.RemoveSubscription(first_sub));
+  EXPECT_TRUE(loop.RemoveSubscription(second_sub));
 }
 
 TEST(EventLoopTest, SubscriptionCannotBindToMultipleEventPolls) {

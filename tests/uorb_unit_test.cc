@@ -35,7 +35,9 @@
 
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <cerrno>
+#include <chrono>
 #include <cstdarg>
 #include <cstdio>
 #include <thread>
@@ -89,6 +91,125 @@ TEST_F(UnitTest, subscription_multi_reports_einval_for_invalid_instance) {
   errno = 0;
   orb_subscription_t *subscription = orb_create_subscription_multi(ORB_ID(orb_test), ORB_MULTI_MAX_INSTANCES);
   EXPECT_EQ(subscription, nullptr);
+  EXPECT_EQ(errno, EINVAL);
+}
+
+TEST_F(UnitTest, rejects_null_arguments) {
+  orb_test_s msg{};
+  orb_pollfd_t fds[1]{};
+
+  errno = 0;
+  EXPECT_EQ(orb_create_publication(nullptr), nullptr);
+  EXPECT_EQ(errno, EINVAL);
+
+  errno = 0;
+  EXPECT_EQ(orb_create_publication_multi(nullptr, nullptr), nullptr);
+  EXPECT_EQ(errno, EINVAL);
+
+  errno = 0;
+  EXPECT_EQ(orb_create_subscription(nullptr), nullptr);
+  EXPECT_EQ(errno, EINVAL);
+
+  errno = 0;
+  EXPECT_EQ(orb_create_subscription_multi(nullptr, 0), nullptr);
+  EXPECT_EQ(errno, EINVAL);
+
+  errno = 0;
+  EXPECT_FALSE(orb_destroy_publication(nullptr));
+  EXPECT_EQ(errno, EINVAL);
+
+  errno = 0;
+  EXPECT_FALSE(orb_destroy_subscription(nullptr));
+  EXPECT_EQ(errno, EINVAL);
+
+  errno = 0;
+  EXPECT_FALSE(orb_publish(nullptr, &msg));
+  EXPECT_EQ(errno, EINVAL);
+
+  auto *publication = orb_create_publication(ORB_ID(orb_test));
+  ASSERT_NE(publication, nullptr);
+
+  errno = 0;
+  EXPECT_FALSE(orb_publish(publication, nullptr));
+  EXPECT_EQ(errno, EINVAL);
+
+  errno = 0;
+  EXPECT_FALSE(orb_publish_once(nullptr, &msg));
+  EXPECT_EQ(errno, EINVAL);
+
+  errno = 0;
+  EXPECT_FALSE(orb_publish_once(ORB_ID(orb_test), nullptr));
+  EXPECT_EQ(errno, EFAULT);
+
+  errno = 0;
+  EXPECT_FALSE(orb_copy(nullptr, &msg));
+  EXPECT_EQ(errno, EINVAL);
+
+  auto *subscription = orb_create_subscription(ORB_ID(orb_test));
+  ASSERT_NE(subscription, nullptr);
+
+  errno = 0;
+  EXPECT_FALSE(orb_copy(subscription, nullptr));
+  EXPECT_EQ(errno, EINVAL);
+
+  errno = 0;
+  EXPECT_FALSE(orb_copy_once(nullptr, &msg));
+  EXPECT_EQ(errno, EINVAL);
+
+  errno = 0;
+  EXPECT_FALSE(orb_copy_once(ORB_ID(orb_test), nullptr));
+
+  errno = 0;
+  EXPECT_FALSE(orb_check_update(nullptr));
+  EXPECT_EQ(errno, EINVAL);
+
+  errno = 0;
+  EXPECT_FALSE(orb_exists(nullptr, 0));
+  EXPECT_EQ(errno, EINVAL);
+
+  errno = 0;
+  EXPECT_EQ(orb_group_count(nullptr), 0U);
+  EXPECT_EQ(errno, EINVAL);
+
+  errno = 0;
+  EXPECT_FALSE(orb_get_topic_status(nullptr, 0, nullptr));
+  EXPECT_EQ(errno, EINVAL);
+
+  errno = 0;
+  EXPECT_EQ(orb_poll(nullptr, 1, 0), -1);
+  EXPECT_EQ(errno, EINVAL);
+
+  errno = 0;
+  EXPECT_EQ(orb_poll(fds, 0, 0), -1);
+  EXPECT_EQ(errno, EINVAL);
+
+  errno = 0;
+  EXPECT_EQ(orb_poll(fds, 1, 0), -1);
+  EXPECT_EQ(errno, EINVAL);
+
+  EXPECT_TRUE(orb_destroy_subscription(&subscription));
+  EXPECT_TRUE(orb_destroy_publication(&publication));
+}
+
+TEST_F(UnitTest, destroy_resets_handles_and_rejects_repeated_destroy) {
+  auto *publication = orb_create_publication(ORB_ID(orb_test));
+  ASSERT_NE(publication, nullptr);
+
+  EXPECT_TRUE(orb_destroy_publication(&publication));
+  EXPECT_EQ(publication, nullptr);
+
+  errno = 0;
+  EXPECT_FALSE(orb_destroy_publication(&publication));
+  EXPECT_EQ(errno, EINVAL);
+
+  auto *subscription = orb_create_subscription(ORB_ID(orb_test));
+  ASSERT_NE(subscription, nullptr);
+
+  EXPECT_TRUE(orb_destroy_subscription(&subscription));
+  EXPECT_EQ(subscription, nullptr);
+
+  errno = 0;
+  EXPECT_FALSE(orb_destroy_subscription(&subscription));
   EXPECT_EQ(errno, EINVAL);
 }
 
@@ -260,7 +381,7 @@ TEST_F(UnitTest, multi_topic) {
 TEST_F(UnitTest, multi_topic2_queue_simulation) {
   // test: first subscribe, then advertise
 
-  volatile bool thread_should_exit = false;
+  std::atomic_bool thread_should_exit{false};
   const int num_instances = 3;
   orb_subscription_t *orb_data_fd[num_instances]{};
   int orb_data_next = 0;
@@ -317,11 +438,10 @@ TEST_F(UnitTest, multi_topic2_queue_simulation) {
     }
     return 0;
   });
-  pub_test_multi2_main.detach();
 
   orb_abstime_us last_time = 0;
 
-  while (!thread_should_exit) {
+  while (!thread_should_exit.load()) {
     usleep(1000);
 
     auto orb_data_cur_fd = orb_data_fd[orb_data_next];
@@ -338,6 +458,8 @@ TEST_F(UnitTest, multi_topic2_queue_simulation) {
       orb_data_next = (orb_data_next + 1) % num_instances;
     }
   }
+
+  pub_test_multi2_main.join();
 
   for (auto &i : orb_data_fd) {
     orb_destroy_subscription(&i);
@@ -533,8 +655,8 @@ TEST_F(UnitTest, wrap_around) {
 
 TEST_F(UnitTest, queue_poll_notify) {
   orb_test_medium_s t{};
-  volatile int num_messages_sent = 0;
-  volatile bool thread_should_exit = false;
+  std::atomic<int> num_messages_sent{0};
+  std::atomic_bool thread_should_exit{false};
 
   orb_subscription_t *sfd;
   ASSERT_NE(sfd = orb_create_subscription(ORB_ID(orb_test_queue_poll)), nullptr)
@@ -572,17 +694,16 @@ TEST_F(UnitTest, queue_poll_notify) {
     thread_should_exit = true;
     orb_destroy_publication(&ptopic);
   }};
-  test_queue_thread.detach();
 
   int next_expected_val = 0;
   orb_pollfd_t fds[1]{};
   fds[0].fd = sfd;
 
-  while (!thread_should_exit) {
+  while (!thread_should_exit.load()) {
     int poll_ret = orb_poll(fds, 1, 500);
     ASSERT_GE(poll_ret, 0) << "poll error (" << poll_ret << "," << errno << ")";
 
-    if (thread_should_exit) {
+    if (thread_should_exit.load()) {
       break;
     }
 
@@ -595,9 +716,11 @@ TEST_F(UnitTest, queue_poll_notify) {
     }
   }
 
+  test_queue_thread.join();
+
   ASSERT_TRUE(orb_destroy_subscription(&sfd));
 
-  ASSERT_EQ(num_messages_sent, next_expected_val)
+  ASSERT_EQ(num_messages_sent.load(), next_expected_val)
       << "number of sent and received messages mismatch";
 }
 

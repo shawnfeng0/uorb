@@ -88,6 +88,59 @@ TEST(EventPollInternalTest, WaitZeroReturnsReadyReceiverWhenDataArrives) {
   EXPECT_TRUE(orb_destroy_publication(&pub));
 }
 
+TEST(EventPollInternalTest, WaitReturnsMultipleReadyReceivers) {
+  orb_publication_t *pub = orb_create_publication(ORB_ID(orb_test));
+  ASSERT_NE(pub, nullptr);
+
+  orb_subscription_t *first_sub = orb_create_subscription(ORB_ID(orb_test));
+  ASSERT_NE(first_sub, nullptr);
+  orb_subscription_t *second_sub = orb_create_subscription(ORB_ID(orb_test));
+  ASSERT_NE(second_sub, nullptr);
+
+  uorb::EventPoll poll;
+  uorb::ReceiverLocal *first_receiver = as_receiver(first_sub);
+  uorb::ReceiverLocal *second_receiver = as_receiver(second_sub);
+  ASSERT_TRUE(poll.AddReceiver(*first_receiver));
+  ASSERT_TRUE(poll.AddReceiver(*second_receiver));
+
+  drain_nonblocking(poll, first_sub, first_receiver);
+  drain_nonblocking(poll, second_sub, second_receiver);
+
+  orb_test_s msg{};
+  msg.val = 777;
+  ASSERT_TRUE(orb_publish(pub, &msg));
+
+  uorb::ReceiverLocal *ready[2] = {nullptr, nullptr};
+  const int n = poll.Wait(ready, 2, 0);
+  ASSERT_EQ(n, 2);
+  EXPECT_TRUE((ready[0] == first_receiver && ready[1] == second_receiver) ||
+              (ready[0] == second_receiver && ready[1] == first_receiver));
+
+  EXPECT_TRUE(poll.RemoveReceiver(*first_receiver));
+  EXPECT_TRUE(poll.RemoveReceiver(*second_receiver));
+  EXPECT_TRUE(orb_destroy_subscription(&first_sub));
+  EXPECT_TRUE(orb_destroy_subscription(&second_sub));
+  EXPECT_TRUE(orb_destroy_publication(&pub));
+}
+
+TEST(EventPollInternalTest, WaitAfterStopReturnsMinusOneImmediately) {
+  orb_subscription_t *sub = orb_create_subscription(ORB_ID(orb_test));
+  ASSERT_NE(sub, nullptr);
+
+  uorb::EventPoll poll;
+  uorb::ReceiverLocal *receiver = as_receiver(sub);
+  ASSERT_TRUE(poll.AddReceiver(*receiver));
+
+  poll.Stop();
+
+  uorb::ReceiverLocal *ready[1] = {nullptr};
+  EXPECT_EQ(poll.Wait(ready, 1, 0), -1);
+  EXPECT_EQ(poll.Wait(ready, 1, 10), -1);
+
+  EXPECT_TRUE(poll.RemoveReceiver(*receiver));
+  EXPECT_TRUE(orb_destroy_subscription(&sub));
+}
+
 TEST(EventPollInternalTest, WaitInterruptedByStopReturnsMinusOne) {
   orb_subscription_t *sub = orb_create_subscription(ORB_ID(orb_test));
   ASSERT_NE(sub, nullptr);
