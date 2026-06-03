@@ -8,8 +8,11 @@
 namespace uorb::detail {
 
 struct ReceiverBase {
-  UORB_NONCOPYABLE(ReceiverBase);
   ReceiverBase() = default;
+  ReceiverBase(const ReceiverBase &) = delete;
+  ReceiverBase(ReceiverBase &&) = delete;
+  ReceiverBase &operator=(const ReceiverBase &) = delete;
+  ReceiverBase &operator=(ReceiverBase &&) = delete;
   virtual ~ReceiverBase() = default;
 
   virtual void notify_all() = 0;

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <uorb/internal/noncopyable.h>
 #include <uorb/publication.h>
 #include <uorb/uorb.h>
 
@@ -11,7 +10,10 @@ class Subscription {
  public:
   using ValueType = typename msg::TypeMap<meta>::type;
 
-  UORB_NONCOPYABLE(Subscription);
+  Subscription(const Subscription &) = delete;
+  Subscription(Subscription &&) = delete;
+  Subscription &operator=(const Subscription &) = delete;
+  Subscription &operator=(Subscription &&) = delete;
 
   /**
    * Constructor

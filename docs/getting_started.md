@@ -182,7 +182,7 @@ Fill data:
 ```C++
 auto &data = pub_example_string.get();
 
-data.timestamp = orb_absolute_time_us(); // orb_absolute_time_us() from "uorb/abs_time.h"
+data.timestamp = orb_absolute_time_us();
 snprintf((char *)data.string, example_string_s::STRING_LENGTH, "%d: %s", i,
              "This is a string message.");
 ```

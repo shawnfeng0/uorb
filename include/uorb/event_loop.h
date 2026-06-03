@@ -87,7 +87,7 @@ class EventLoop {
     return true;
   }
 
-  [[nodiscard]] int RunOnce(const int timeout_ms = -1) {
+  int RunOnce(const int timeout_ms = -1) {
     if (!event_poll_) return -1;
     if (entries_.empty()) return 0;
 

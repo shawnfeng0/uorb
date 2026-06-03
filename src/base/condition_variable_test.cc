@@ -8,12 +8,6 @@
 #include <chrono>
 #include <thread>
 
-#include "uorb/abs_time.h"
-
-#define DEBUG_MARK(mark)                                                                                          \
-  printf("%s:%d %" PRIu64 ".%03" PRIu64 "ms " #mark "\r\n", __FILE__, __LINE__, orb_absolute_time_us() / 1000000, \
-         (orb_absolute_time_us() / 1000) % 1000)
-
 class Timer {
  public:
   Timer() { start_ = std::chrono::high_resolution_clock::now(); }
@@ -75,28 +69,28 @@ TEST(ConditionVariableTest, get_time) {
 
 bool wait_for_case(int set_timeout_ms, int wait_timeout_ms, uint64_t *actual_waiting_time) {
   using namespace uorb::base;
-  auto cv = std::make_shared<ConditionVariable>();
-  auto mutex = std::make_shared<Mutex>();
-  auto barrier = std::make_shared<ThreadBarrier>(2);
-  auto flag = std::make_shared<bool>(false);
-  std::thread t([=]() {
-    barrier->wait();
+  ConditionVariable condition_variable;
+  Mutex mutex;
+  ThreadBarrier barrier(2);
+  bool flag = false;
+  std::thread setter([&]() {
+    barrier.wait();
     std::this_thread::sleep_for(std::chrono::milliseconds(set_timeout_ms));
     {
-      LockGuard<> lg(*mutex);
-      *flag = true;
+      LockGuard<> lock(mutex);
+      flag = true;
     }
-    cv->notify_all();
+    condition_variable.notify_all();
   });
-  barrier->wait();
+  barrier.wait();
   Timer timer;
   bool ret;
   {
-    LockGuard<> lg(*mutex);
-    ret = cv->wait_for(*mutex, wait_timeout_ms, [&]() { return *flag; });
+    LockGuard<> lock(mutex);
+    ret = condition_variable.wait_for(mutex, wait_timeout_ms, [&]() { return flag; });
   }
   if (actual_waiting_time) *actual_waiting_time = timer.elapsed_ms();
-  t.join();
+  setter.join();
   return ret;
 }
 

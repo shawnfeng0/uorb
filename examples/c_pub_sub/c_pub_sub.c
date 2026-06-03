@@ -4,7 +4,6 @@
 
 #include <pthread.h>
 #include <unistd.h>
-#include <uorb/abs_time.h>
 
 #include "slog.h"
 #include "uorb/topics/example_string.h"

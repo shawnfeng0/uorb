@@ -10,15 +10,15 @@
 
 #include <pthread.h>
 
-#include "uorb/internal/noncopyable.h"
-
 namespace uorb::base {
 
 /// The standard Mutex type.
 class Mutex {
-  UORB_NONCOPYABLE(Mutex);
-
  public:
+  Mutex(const Mutex &) = delete;
+  Mutex(Mutex &&) = delete;
+  Mutex &operator=(const Mutex &) = delete;
+  Mutex &operator=(Mutex &&) = delete;
 #ifdef PTHREAD_MUTEX_INITIALIZER
   constexpr Mutex() noexcept = default;
   ~Mutex() = default;

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <uorb/internal/noncopyable.h>
 #include <uorb/uorb.h>
 
 #include <cerrno>
@@ -24,7 +23,11 @@ class DeviceNode {
   friend DeviceMaster;
 
  public:
-  UORB_NONCOPYABLE(DeviceNode);
+  DeviceNode(const DeviceNode &) = delete;
+  DeviceNode(DeviceNode &&) = delete;
+  DeviceNode &operator=(const DeviceNode &) = delete;
+  DeviceNode &operator=(DeviceNode &&) = delete;
+
   // Publish data to this node.
   bool Publish(const void *data);
 

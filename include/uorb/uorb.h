@@ -6,8 +6,14 @@
 #pragma once
 
 #include <errno.h>
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <time.h>
+
+#ifdef __cplusplus
+#include <type_traits>
+#endif
 
 #if __GNUC__ >= 4
 #ifdef __EXPORT
@@ -116,8 +122,21 @@ struct TypeMap;
  *                      e.g: "float[3] position;bool armed"
  * @param _queue_size	The maximum number of queued samples.
  */
+#ifdef __cplusplus
+#define ORB_CHECK_TOPIC_TYPE(_struct)                                                             \
+  static_assert(std::is_trivially_copyable<_struct>::value,                                       \
+                "uORB topic type must be trivially copyable; std::string, std::vector, "          \
+                "custom copy operations, and custom destructors are unsupported");                \
+  static_assert(std::is_standard_layout<_struct>::value,                                          \
+                "uORB topic type must use standard layout; virtual functions, mixed access "      \
+                "control, and non-standard object layout are unsupported")
+#else
+#define ORB_CHECK_TOPIC_TYPE(_struct)
+#endif
+
 #define ORB_DEFINE_3(_name, _struct, _queue_size) ORB_DEFINE_5(_name, _struct, 0, "", _queue_size)
 #define ORB_DEFINE_5(_name, _struct, _size_no_padding, _fields, _queue_size)                                      \
+  ORB_CHECK_TOPIC_TYPE(_struct);                                                                                  \
   const struct orb_metadata uorb::msg::_name = {#_name, sizeof(_struct), _size_no_padding, _fields, _queue_size}; \
   const struct orb_metadata *__orb_##_name = &uorb::msg::_name;                                                   \
   struct hack
@@ -489,6 +508,30 @@ bool orb_event_poll_quit(orb_event_poll_t *poll) __EXPORT;
  * @return version string
  */
 const char *orb_version(void) __EXPORT;
+
+/**
+ * Absolute time, in microsecond units.
+ *
+ * Absolute time is measured from some arbitrary epoch shortly after
+ * system startup.  It should never wrap or go backwards.
+ */
+typedef uint64_t orb_abstime_us;
+
+/**
+ * Get absolute time in [us] (does not wrap).
+ */
+static inline orb_abstime_us orb_absolute_time_us(void) {
+  struct timespec ts = {};
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return (orb_abstime_us)(ts.tv_sec) * 1000000 + ts.tv_nsec / 1000;
+}
+
+/**
+ * Compute the delta between a timestamp taken in the past and now.
+ */
+static inline orb_abstime_us orb_elapsed_time_us(const orb_abstime_us then) {
+  return orb_absolute_time_us() - then;
+}
 
 #ifdef __cplusplus
 }

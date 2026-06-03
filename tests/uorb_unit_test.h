@@ -35,7 +35,6 @@
 
 #include <gtest/gtest.h>
 #include <unistd.h>
-#include <uorb/abs_time.h>
 #include <uorb/topics/orb_test.h>
 #include <uorb/topics/orb_test_large.h>
 #include <uorb/topics/orb_test_medium.h>

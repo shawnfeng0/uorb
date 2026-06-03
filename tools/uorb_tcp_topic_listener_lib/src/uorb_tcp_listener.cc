@@ -4,7 +4,6 @@
 
 #include "uorb_tcp_listener.h"
 
-#include <uorb/abs_time.h>
 #include <uorb/uorb.h>
 
 #include <csignal>

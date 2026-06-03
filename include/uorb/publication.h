@@ -1,6 +1,5 @@
 #pragma once
 
-#include <uorb/internal/noncopyable.h>
 #include <uorb/uorb.h>
 
 namespace uorb {
@@ -13,8 +12,11 @@ class Publication {
   using Type = typename msg::TypeMap<meta>::type;
 
  public:
-  UORB_NONCOPYABLE(Publication);
   Publication() noexcept = default;
+  Publication(const Publication &) = delete;
+  Publication(Publication &&) = delete;
+  Publication &operator=(const Publication &) = delete;
+  Publication &operator=(Publication &&) = delete;
   ~Publication() { handle_ &&orb_destroy_publication(&handle_); }
 
   /**

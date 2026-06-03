@@ -11,7 +11,6 @@
 #include <chrono>
 
 #include "base/mutex.h"
-#include "uorb/internal/noncopyable.h"
 
 namespace uorb {
 namespace base {
@@ -20,7 +19,11 @@ class ConditionVariableTest;
 
 class ConditionVariable {
  public:
-  UORB_NONCOPYABLE(ConditionVariable);
+  ConditionVariable(const ConditionVariable &) = delete;
+  ConditionVariable(ConditionVariable &&) = delete;
+  ConditionVariable &operator=(const ConditionVariable &) = delete;
+  ConditionVariable &operator=(ConditionVariable &&) = delete;
+
   ConditionVariable() noexcept {
 #ifdef __APPLE__
     pthread_cond_init(&cond_, nullptr);

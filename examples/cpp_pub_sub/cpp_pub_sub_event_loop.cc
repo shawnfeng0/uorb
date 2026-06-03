@@ -16,7 +16,6 @@
 #include <thread>
 
 #include "slog.h"
-#include "uorb/abs_time.h"
 #include "uorb/event_loop.h"
 #include "uorb/publication.h"
 #include "uorb/subscription.h"
