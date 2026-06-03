@@ -13,6 +13,7 @@ jobs:
     name: Build ${{ matrix.platform.name }}
     runs-on: ${{ matrix.platform.os }}
     strategy:
+      fail-fast: false
       matrix:
         platform:
           - name: linux-x86_64
@@ -30,33 +31,62 @@ jobs:
 
       - name: Configure CMake
         run: |
-          cmake -B ${{github.workspace}}/build \
-            -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
-            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ 
+          cmake -B ${{ github.workspace }}/build \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -DUORB_BUILD_TESTS=ON \
+            -DUORB_BUILD_EXAMPLES=ON \
+            -DINSTALL_GTEST=OFF \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++
 
       - name: Build
-        run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} -j$(nproc)
+        run: cmake --build ${{ github.workspace }}/build --config ${{ env.BUILD_TYPE }} --parallel
+
+      - name: Test
+        working-directory: ${{ github.workspace }}/build
+        run: ctest -C ${{ env.BUILD_TYPE }} --output-on-failure
 
       - name: Install to staging area
         run: |
-          mkdir -p ${{github.workspace}}/package
-          cmake --install ${{github.workspace}}/build --prefix ${{github.workspace}}/package
+          mkdir -p ${{ github.workspace }}/package
+          cmake --install ${{ github.workspace }}/build --prefix ${{ github.workspace }}/package
 
-      - name: Copy binaries
+      - name: Verify installed package can be consumed
         run: |
-          # No need to copy binaries, install step already handles this
+          mkdir -p ${{ github.workspace }}/consumer
+          cat > ${{ github.workspace }}/consumer/CMakeLists.txt <<'EOF'
+          cmake_minimum_required(VERSION 3.12)
+          project(uorb_consumer LANGUAGES CXX)
+          set(CMAKE_CXX_STANDARD 14)
+          set(CMAKE_CXX_STANDARD_REQUIRED ON)
+          add_executable(uorb_consumer main.cc)
+          target_include_directories(uorb_consumer PRIVATE "${UORB_INSTALL_PREFIX}/include")
+          target_link_libraries(uorb_consumer PRIVATE "${UORB_INSTALL_PREFIX}/lib/libuorb.a" pthread)
+          EOF
+          cat > ${{ github.workspace }}/consumer/main.cc <<'EOF'
+          #include <uorb/uorb.h>
+
+          int main() {
+            return orb_exists(nullptr, 0) ? 1 : 0;
+          }
+          EOF
+          cmake -S ${{ github.workspace }}/consumer -B ${{ github.workspace }}/consumer-build \
+            -DUORB_INSTALL_PREFIX=${{ github.workspace }}/package \
+            -DCMAKE_CXX_COMPILER=clang++
+          cmake --build ${{ github.workspace }}/consumer-build --parallel
+          ${{ github.workspace }}/consumer-build/uorb_consumer
 
       - name: Create package archive
         run: |
           repo_name="${{ github.event.repository.name }}"
-          cd ${{github.workspace}}/package
+          cd ${{ github.workspace }}/package
           tar -czf ../${repo_name}-${{ matrix.platform.name }}-${{ github.ref_name }}.tar.gz *
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ github.event.repository.name }}-${{ matrix.platform.name }}-${{ github.ref_name }}
-          path: ${{github.workspace}}/${{ github.event.repository.name }}-${{ matrix.platform.name }}-${{ github.ref_name }}.tar.gz
+          path: ${{ github.workspace }}/${{ github.event.repository.name }}-${{ matrix.platform.name }}-${{ github.ref_name }}.tar.gz
           retention-days: 30
 
   release:
