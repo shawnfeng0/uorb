@@ -35,11 +35,13 @@ pip3 install -r tools/msg/tools/requirements.txt
 ## 文档
 
 * [入门指导](docs/getting_started_cn.md)
-* API 参考 (TODO)
+* 公共 C API：[include/uorb/uorb.h](include/uorb/uorb.h)
+* C++ 封装：[include/uorb](include/uorb)
 * [变更日志](CHANGELOG.md)
 
 ## 示例
 
+* [C 发布/订阅示例](examples/c_pub_sub)
 * [C++ 发布/订阅示例](examples/cpp_pub_sub)
 * [TCP 话题监听器示例](examples/tcp_topic_listener)
 

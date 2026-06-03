@@ -39,12 +39,14 @@ pip3 install -r tools/msg/tools/requirements.txt
 ## Documentation
 
 * [Getting Started Guide](docs/getting_started.md)
-* API reference (TODO)
+* Public C API: [include/uorb/uorb.h](include/uorb/uorb.h)
+* C++ wrappers: [include/uorb](include/uorb)
 * [Changelog](CHANGELOG.md)
 
 ## Examples
 
-* [C++ publish/subscribe example](examples/cpp_pub_sub)
+* [C publish/subscribe examples](examples/c_pub_sub)
+* [C++ publish/subscribe examples](examples/cpp_pub_sub)
 * [TCP topic listener example](examples/tcp_topic_listener)
 
 

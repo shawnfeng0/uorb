@@ -1,14 +1,14 @@
 # Add uORB to your project
 
-There are two ways use uORB in your project:
+There are two common ways to use uORB in your project:
 
-* [**Use the uorb pre-built library binaries and headers**](#use-the-uorb-pre-built-library). Use this approach if you just want to use a stable version of the uorb library in your project.
+* [**Build and install uORB**](#build-and-install-uorb). Use this when you want to consume installed headers and libraries from another project.
 
-* [**Build uorb from source**](#build-uorb-from-source). Use this approach if you would like to debug or want the latest modifications.
+* [**Build uORB from source**](#build-uorb-from-source). Use this when you want to vendor uORB as a subdirectory and debug it together with your project.
 
-## Use the uORB pre-built library
+## Build and install uORB
 
-It is recommended that you build uORB outside of the source directory, to avoid having issues with CMake generated files polluting the source directory:
+It is recommended that you build uORB outside of the source directory, so generated files stay in the build tree:
 
 ```shell
 mkdir uorb-build
@@ -69,28 +69,28 @@ The topic is defined by the following macros and needs to include the topic name
 
 ### Use tools to manage uORB topics
 
-In order to manage and modify topics in a unified way, we use a message generation tool, which uses a way similar to ROS to define topics.
-
-I am lazy : ). I am not familiar with the code generation tool at the moment, so the generation tool is still using the official PX4 (may be cut later), but the uORB topic template has been modified.
+In order to manage and modify topics in a unified way, uORB provides a message generation tool. Topics are described with compact `.msg` files and generated into C/C++ headers plus topic metadata sources during the CMake build.
 
 #### Add uORB topics
 
-First, create a folder to store uORB topics (the original topics are defined using .msg files, and it will generate *.h/*.cc topic files). Then add a topic file.
+First, create a folder to store `.msg` topic definitions. Each `.msg` file is generated into a topic header and source file during the CMake build.
 
 ```
 # msg/example_string.msg
 
-uint64 timestamp # time since system start (microseconds)
+uint64 timestamp # required: time since system start (microseconds)
 
 uint32 STRING_LENGTH = 128
 char[128] str
+
+uint16 ORB_QUEUE_SIZE = 3 # optional: queued samples per subscription
 ```
 
-For the format of msg file, please refer to ros and PX4 or the examples in this project.
+For the `.msg` format, start with the examples in this project and keep one topic per file.
 
-Use the message generation tool in the `tools/msg` directory of this project to generate `*.h` and `*.cc` topic source files from `*.msg` files. There are many tool parameters. It is currently recommended to refer to the [examples](../examples) directory of this project or the independent [uorb examples](https://github.com/ShawnFeng0/uorb-examples.git) project `msg/CMakeLists.txt` realizes message generation.
+Use the message generation tool in the `tools/msg` directory of this project to generate `*.h` and `*.cc` topic source files from `*.msg` files. The generated files should be written to the CMake binary directory, not committed into the source tree. It is recommended to follow the `msg/CMakeLists.txt` files under [examples](../examples) and [tests](../tests).
 
-It should be noted that the address of the setting generation tool path in msg/CMakeLists.txt must be correct.
+Make sure `tools_root` points at this repository's message generator. If CMake fails during generation, first verify Python dependencies with `pip3 install -r tools/msg/tools/requirements.txt`.
 
 ```Cmake
 # Need to specify the path of generator and message template, they are in the tools/msg directory of this project.
@@ -104,10 +104,10 @@ Add the following statement to `CMakeLists.txt` at the level of the msg director
 ```cmake
 # Generate orb message
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/msg)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/msg)
+target_link_libraries(${PROJECT_NAME} PRIVATE uorb_examples_msgs)
 
-# The name of your topic library. It is a library generated after compiling all [topic].cc files. Please refer to the example implementation for details.
-link_libraries(uorb_examples_msgs)
+# The topic library exposes its generated binary include directory, so consumers
+# can include generated headers such as <uorb/topics/example_string.h>.
 ```
 
 ### Manually manage uORB topics
@@ -285,3 +285,9 @@ Include the header:
 ### Full examples
 
 See [examples/cpp_pub_sub/cpp_pub_sub_event_loop.cc](../examples/cpp_pub_sub/cpp_pub_sub_event_loop.cc) for a runnable example covering both loop-owned `Subscribe<>()` and user-owned `AddSubscription()`, multi-threaded publishers, and a cross-thread `Quit()`.
+
+## Additional examples
+
+* [C event poll](../examples/c_pub_sub/c_event_poll.c): waits on multiple C subscriptions with `orb_event_poll_*`.
+* [C++ multi-instance publishing](../examples/cpp_pub_sub/cpp_pub_sub_multi.cc): publishes the same topic type on independent instances.
+* [C++ subscription interval](../examples/cpp_pub_sub/cpp_subscription_interval.cc): throttles a fast publisher with `SubscriptionInterval`.
