@@ -46,10 +46,10 @@ struct orb_metadata {
 struct orb_status {
   uint16_t queue_size;  // Queue size
 
-  uint8_t subscriber_count : 7;      // Number of tracked subscribers
-  bool has_untracked_subscriber : 1; // Whether orb_copy_once() has been used
-  uint8_t publisher_count : 7;       // Number of tracked publishers
-  bool has_untracked_publisher : 1;  // Whether orb_publish_once() has been used
+  uint8_t subscriber_count;       // Number of tracked subscribers
+  bool has_untracked_subscriber;  // Whether orb_copy_once() has been used
+  uint8_t publisher_count;        // Number of tracked publishers
+  bool has_untracked_publisher;   // Whether orb_publish_once() has been used
 
   unsigned latest_data_index;  // The latest data index
 };
@@ -130,10 +130,6 @@ struct TypeMap;
   static_assert(std::is_standard_layout<_struct>::value,                                          \
                 "uORB topic type must use standard layout; virtual functions, mixed access "      \
                 "control, and non-standard object layout are unsupported")
-#else
-#define ORB_CHECK_TOPIC_TYPE(_struct)
-#endif
-
 #define ORB_DEFINE_3(_name, _struct, _queue_size) ORB_DEFINE_5(_name, _struct, 0, "", _queue_size)
 #define ORB_DEFINE_5(_name, _struct, _size_no_padding, _fields, _queue_size)                                      \
   ORB_CHECK_TOPIC_TYPE(_struct);                                                                                  \
@@ -142,6 +138,13 @@ struct TypeMap;
   struct hack
 #define ORB_DEFINE_SELECT(_1, _2, _3, _4, _5, NAME, ...) NAME
 #define ORB_DEFINE(...) ORB_DEFINE_SELECT(__VA_ARGS__, ORB_DEFINE_5, invalid, ORB_DEFINE_3)(__VA_ARGS__)
+#else
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+#define ORB_DEFINE(...) _Static_assert(0, "ORB_DEFINE is only supported in C++ translation units")
+#else
+#define ORB_DEFINE(...) typedef char ORB_DEFINE_is_only_supported_in_Cplusplus_translation_units[-1]
+#endif
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -153,8 +156,10 @@ extern "C" {
  * "struct orb_publication" does not exist, it is only defined to hide the
  * implementation and avoid the implicit conversion of "void*" types.
  *
- * Advertiser handles are global; once obtained they can be shared freely and do
- * not need to be closed or released.
+ * Publication handles are owned by the caller. Each handle returned from
+ * orb_create_publication() or orb_create_publication_multi() must be released
+ * with orb_destroy_publication(). C++ publication wrappers own their handles
+ * exclusively and destroy them in their destructors.
  */
 typedef struct orb_publication orb_publication_t;
 
@@ -521,7 +526,7 @@ typedef uint64_t orb_abstime_us;
  * Get absolute time in [us] (does not wrap).
  */
 static inline orb_abstime_us orb_absolute_time_us(void) {
-  struct timespec ts = {};
+  struct timespec ts = {0, 0};
   clock_gettime(CLOCK_MONOTONIC, &ts);
   return (orb_abstime_us)(ts.tv_sec) * 1000000 + ts.tv_nsec / 1000;
 }

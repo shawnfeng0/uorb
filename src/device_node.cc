@@ -2,6 +2,7 @@
 
 #include <cerrno>
 #include <cstring>
+#include <new>
 
 static inline uint16_t RoundPowOfTwo(uint16_t n) {
   if (n == 0) {
@@ -75,7 +76,7 @@ bool uorb::DeviceNode::Publish(const void *data) {
   base::LockGuard<base::Mutex> lg(lock_);
 
   if (nullptr == data_) {
-    data_ = new uint8_t[meta_.o_size * queue_size_];
+    data_ = new (std::nothrow) uint8_t[meta_.o_size * queue_size_];
 
     /* failed or could not allocate */
     if (nullptr == data_) {

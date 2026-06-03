@@ -5,6 +5,8 @@
 
 #include <pthread.h>
 
+#include <new>
+
 static pthread_key_t key;
 static pthread_once_t init_done = PTHREAD_ONCE_INIT;
 static int errno_aux;
@@ -21,7 +23,7 @@ int *__orb_errno_location() {
   int *p_errno = reinterpret_cast<int *>(pthread_getspecific(key));
 
   if (p_errno == nullptr) {
-    p_errno = new int;
+    p_errno = new (std::nothrow) int;
   }
 
   if (p_errno != nullptr) {

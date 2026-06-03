@@ -6,6 +6,7 @@
 #include <uorb/uorb.h>
 
 #include <cerrno>
+#include <new>
 
 #include "device_master.h"
 #include "device_node.h"
@@ -31,8 +32,9 @@ orb_publication_t *orb_create_publication_multi(const struct orb_metadata *meta,
   auto &meta_ = *meta;
   auto &device_master = DeviceMaster::get_instance();
   auto *dev_ = device_master.CreateAdvertiser(meta_, instance);
-
-  ORB_CHECK_TRUE(dev_, ENOMEM, return nullptr);
+  if (!dev_) {
+    return nullptr;
+  }
 
   return reinterpret_cast<orb_publication_t *>(dev_);
 }
@@ -62,7 +64,9 @@ bool orb_publish_once(const struct orb_metadata *meta, const void *data) {
 
   auto &device_master = DeviceMaster::get_instance();
   auto *dev = device_master.OpenDeviceNode(*meta, 0);
-  ORB_CHECK_TRUE(dev, ENOMEM, return false);
+  if (!dev) {
+    return false;
+  }
 
   // Mark as an untracked publisher, then copy the latest data.
   dev->mark_untracked_publisher();
@@ -79,11 +83,13 @@ orb_subscription_t *orb_create_subscription_multi(const struct orb_metadata *met
   DeviceMaster &device_master = uorb::DeviceMaster::get_instance();
 
   auto *dev = device_master.OpenDeviceNode(*meta, instance);
-  ORB_CHECK_TRUE(dev, ENOMEM, return nullptr);
+  if (!dev) {
+    return nullptr;
+  }
 
   // Create a subscriber, if it fails, we don't have to release device_node (it
   // only increases but not decreases)
-  auto *subscriber = new ReceiverLocal(*dev);
+  auto *subscriber = new (std::nothrow) ReceiverLocal(*dev);
   ORB_CHECK_TRUE(subscriber, ENOMEM, return nullptr);
 
   return reinterpret_cast<orb_subscription_t *>(subscriber);
@@ -113,7 +119,9 @@ bool orb_copy_once(const struct orb_metadata *meta, void *buffer) {
 
   auto &device_master = DeviceMaster::get_instance();
   auto *dev = device_master.OpenDeviceNode(*meta, 0);
-  ORB_CHECK_TRUE(dev, ENOMEM, return false);
+  if (!dev) {
+    return false;
+  }
 
   // Mark as an untracked subscriber, then copy the latest data.
   dev->mark_untracked_subscriber();

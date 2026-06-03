@@ -1,5 +1,8 @@
 #include "device_master.h"
 
+#include <cerrno>
+#include <new>
+
 #include "device_node.h"
 
 uorb::DeviceMaster uorb::DeviceMaster::instance_;
@@ -25,7 +28,7 @@ uorb::DeviceNode *uorb::DeviceMaster::CreateAdvertiser(const orb_metadata &meta,
     }
 
     if (!device_node) {
-      device_node = new DeviceNode(meta, group_tries);
+      device_node = new (std::nothrow) DeviceNode(meta, group_tries);
       if (!device_node) {
         errno = ENOMEM;
         return nullptr;
@@ -61,6 +64,7 @@ uorb::DeviceNode *uorb::DeviceMaster::GetDeviceNodeLocked(const orb_metadata &me
 
 uorb::DeviceNode *uorb::DeviceMaster::OpenDeviceNode(const orb_metadata &meta, unsigned int instance) {
   if (instance >= ORB_MULTI_MAX_INSTANCES) {
+    errno = EINVAL;
     return nullptr;
   }
 
@@ -71,7 +75,7 @@ uorb::DeviceNode *uorb::DeviceMaster::OpenDeviceNode(const orb_metadata &meta, u
     return device_node;
   }
 
-  device_node = new DeviceNode(meta, instance);
+  device_node = new (std::nothrow) DeviceNode(meta, instance);
 
   if (!device_node) {
     errno = ENOMEM;

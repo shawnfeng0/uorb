@@ -65,6 +65,33 @@ TEST_F(UnitTest, unadvertise) {
   }
 }
 
+TEST_F(UnitTest, publication_multi_reports_eexist_when_instances_are_full) {
+  orb_publication_t *publications[ORB_MULTI_MAX_INSTANCES]{};
+  unsigned instances[ORB_MULTI_MAX_INSTANCES]{};
+
+  for (unsigned index = 0; index < ORB_MULTI_MAX_INSTANCES; ++index) {
+    publications[index] = orb_create_publication_multi(ORB_ID(orb_test_medium), &instances[index]);
+    ASSERT_NE(publications[index], nullptr);
+    EXPECT_EQ(instances[index], index);
+  }
+
+  unsigned extra_instance = 0;
+  errno = 0;
+  EXPECT_EQ(orb_create_publication_multi(ORB_ID(orb_test_medium), &extra_instance), nullptr);
+  EXPECT_EQ(errno, EEXIST);
+
+  for (auto *publication : publications) {
+    EXPECT_TRUE(orb_destroy_publication(&publication));
+  }
+}
+
+TEST_F(UnitTest, subscription_multi_reports_einval_for_invalid_instance) {
+  errno = 0;
+  orb_subscription_t *subscription = orb_create_subscription_multi(ORB_ID(orb_test), ORB_MULTI_MAX_INSTANCES);
+  EXPECT_EQ(subscription, nullptr);
+  EXPECT_EQ(errno, EINVAL);
+}
+
 TEST_F(UnitTest, single_topic) {
   orb_test_s t{};
   orb_test_s u{};
