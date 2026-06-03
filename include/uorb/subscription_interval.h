@@ -5,6 +5,13 @@
 
 namespace uorb {
 
+/**
+ * Subscription wrapper that throttles updates by a minimum time interval.
+ *
+ * Use this when a publisher may update faster than the consumer needs. The
+ * subscription still tracks the latest topic data, but Update() returns true no
+ * more often than the configured interval.
+ */
 template <const orb_metadata &meta>
 class SubscriptionInterval : public Subscription<meta> {
  private:

@@ -13,7 +13,9 @@
 namespace uorb {
 
 // EventLoop: register callbacks on subscriptions and dispatch them when new
-// data becomes available.
+// data becomes available. Prefer EventLoop when one thread needs to wait on
+// multiple subscriptions and dispatch type-safe callbacks instead of manually
+// managing orb_poll() loops.
 //
 // Thread-safety:
 //  - Quit() is thread-safe and may be called from any thread.

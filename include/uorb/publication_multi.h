@@ -5,7 +5,11 @@
 namespace uorb {
 
 /**
- * uORB publication wrapper class
+ * Lightweight C++ publisher wrapper for multi-instance topics.
+ *
+ * Use this when multiple independent publishers need to publish the same topic
+ * type on different instances. The allocated instance can be read through
+ * instance() after the first successful Publish().
  */
 template <const orb_metadata &meta>
 class PublicationMulti {
@@ -39,7 +43,10 @@ class PublicationMulti {
 };
 
 /**
- * The publication class with data embedded.
+ * Multi-instance publisher wrapper with embedded message storage.
+ *
+ * This is the recommended C++ helper for multi-instance publishing: fill
+ * data(), call Publish(), and use instance() to learn the assigned instance.
  */
 template <const orb_metadata &meta>
 class PublicationMultiData : public PublicationMulti<meta> {

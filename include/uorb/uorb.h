@@ -137,6 +137,25 @@ extern "C" {
 #endif
 
 /**
+ * Public C API index:
+ *
+ * - Metadata: ORB_ID(), ORB_DECLARE(), ORB_DEFINE(), orb_metadata.
+ * - Publication: orb_create_publication(), orb_create_publication_multi(),
+ *   orb_destroy_publication(), orb_publish(), orb_publish_once(),
+ *   orb_publish_auto().
+ * - Subscription: orb_create_subscription(),
+ *   orb_create_subscription_multi(), orb_destroy_subscription(), orb_copy(),
+ *   orb_copy_once(), orb_check_update(), orb_check_and_copy().
+ * - Waiting: orb_poll().
+ * - Event poll: orb_event_poll_create(), orb_event_poll_destroy(),
+ *   orb_event_poll_add(), orb_event_poll_remove(), orb_event_poll_wait(),
+ *   orb_event_poll_quit().
+ * - Introspection: orb_exists(), orb_group_count(),
+ *   orb_get_topic_status(), orb_version().
+ * - Time: orb_absolute_time_us(), orb_elapsed_time_us().
+ */
+
+/**
  * ORB topic advertiser handle
  *
  * "struct orb_publication" does not exist, it is only defined to hide the

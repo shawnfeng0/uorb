@@ -5,7 +5,11 @@
 namespace uorb {
 
 /**
- * uORB publication wrapper class
+ * Lightweight C++ publisher wrapper for a single topic instance.
+ *
+ * Use Publication when the message storage is managed by the caller. For the
+ * common case where the publisher owns one reusable message object, prefer
+ * PublicationData.
  */
 template <const orb_metadata &meta>
 class Publication {
@@ -36,7 +40,10 @@ class Publication {
 };
 
 /**
- * The publication class with data embedded.
+ * Publisher wrapper with embedded message storage.
+ *
+ * This is the recommended C++ helper for regular single-instance publishing:
+ * fill data(), then call Publish().
  */
 template <const orb_metadata &meta>
 class PublicationData : public Publication<meta> {

@@ -5,6 +5,14 @@
 
 namespace uorb {
 
+/**
+ * Lightweight C++ subscription wrapper.
+ *
+ * Use Subscription when the destination message storage is managed by the
+ * caller. For the common case where the subscription owns one reusable message
+ * object, prefer SubscriptionData. Use EventLoop when callbacks are preferable
+ * to manual polling.
+ */
 template <const orb_metadata &meta>
 class Subscription {
  public:
@@ -59,7 +67,12 @@ class Subscription {
   orb_subscription_t *handle_{nullptr};
 };
 
-// Subscription wrapper class with data
+/**
+ * Subscription wrapper with embedded message storage.
+ *
+ * This is the recommended C++ helper for regular manual subscription loops:
+ * poll/check for updates, call Update(), then read data().
+ */
 template <const orb_metadata &meta>
 class SubscriptionData : public Subscription<meta> {
  public:
