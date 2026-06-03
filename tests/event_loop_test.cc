@@ -26,6 +26,11 @@ namespace uORBTest {
 // small and bounded, so a small fixed cap is plenty.
 static constexpr int kMaxDrainIterations = 4;
 
+void DrainPendingEvents(uorb::EventLoop &loop) {
+  for (int i = 0; i < kMaxDrainIterations && loop.RunOnce(0) > 0; ++i) {
+  }
+}
+
 // RunOnce() on an EventLoop that has no entries should return 0 immediately,
 // regardless of the timeout value.
 TEST(EventLoopTest, RunOnceEmptyReturnsZero) {
@@ -59,8 +64,7 @@ TEST(EventLoopTest, SubscribeReceivesPublishedData) {
 
   // Drain any pre-existing updates from previous tests that published to
   // this topic.
-  for (int i = 0; i < kMaxDrainIterations && loop.RunOnce(0) > 0; ++i) {
-  }
+  DrainPendingEvents(loop);
   call_count = 0;
   received_val = -1;
 
@@ -89,8 +93,7 @@ TEST(EventLoopTest, AddAndRemoveExternalSubscription) {
   }));
 
   // Drain any pre-existing updates.
-  for (int i = 0; i < kMaxDrainIterations && loop.RunOnce(0) > 0; ++i) {
-  }
+  DrainPendingEvents(loop);
   received_val = -1;
 
   // Adding the same subscription twice must be refused.
@@ -128,8 +131,7 @@ TEST(EventLoopTest, RunOnceTimeoutNoData) {
   // Other test cases may already have published to this topic. A brand new
   // subscription sees the most recent data as "updated", so drain any pending
   // events first with a non-blocking poll before measuring the timeout.
-  for (int i = 0; i < kMaxDrainIterations && loop.RunOnce(0) > 0; ++i) {
-  }
+  DrainPendingEvents(loop);
 
   const auto start = std::chrono::steady_clock::now();
   const int n = loop.RunOnce(50);
@@ -187,8 +189,7 @@ TEST(EventLoopTest, MultipleSubscriptionsDispatchIndependently) {
       [&](const orb_test_medium_s &) { ++b_calls; }));
 
   // Drain any pre-existing updates, then reset counters.
-  for (int i = 0; i < kMaxDrainIterations && loop.RunOnce(0) > 0; ++i) {
-  }
+  DrainPendingEvents(loop);
   a_calls = 0;
   b_calls = 0;
 
@@ -302,8 +303,7 @@ TEST(EventLoopTest, CallbackCanAddSubscriptionForFutureEvents) {
     }
   }));
 
-  for (int i = 0; i < kMaxDrainIterations && loop.RunOnce(0) > 0; ++i) {
-  }
+  DrainPendingEvents(loop);
   first_calls = 0;
   second_calls = 0;
 

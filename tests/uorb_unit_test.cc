@@ -213,6 +213,60 @@ TEST_F(UnitTest, destroy_resets_handles_and_rejects_repeated_destroy) {
   EXPECT_EQ(errno, EINVAL);
 }
 
+TEST_F(UnitTest, event_poll_rejects_invalid_arguments) {
+  orb_subscription_t *subscription = orb_create_subscription(ORB_ID(orb_test));
+  ASSERT_NE(subscription, nullptr);
+  orb_subscription_t *ready[1] = {nullptr};
+
+  errno = 0;
+  EXPECT_FALSE(orb_event_poll_destroy(nullptr));
+  EXPECT_EQ(errno, EINVAL);
+
+  orb_event_poll_t *null_poll = nullptr;
+  errno = 0;
+  EXPECT_FALSE(orb_event_poll_destroy(&null_poll));
+  EXPECT_EQ(errno, EINVAL);
+
+  errno = 0;
+  EXPECT_FALSE(orb_event_poll_add(nullptr, subscription));
+  EXPECT_EQ(errno, EINVAL);
+
+  errno = 0;
+  EXPECT_FALSE(orb_event_poll_add(reinterpret_cast<orb_event_poll_t *>(0x1), nullptr));
+  EXPECT_EQ(errno, EINVAL);
+
+  errno = 0;
+  EXPECT_FALSE(orb_event_poll_remove(nullptr, subscription));
+  EXPECT_EQ(errno, EINVAL);
+
+  errno = 0;
+  EXPECT_FALSE(orb_event_poll_remove(reinterpret_cast<orb_event_poll_t *>(0x1), nullptr));
+  EXPECT_EQ(errno, EINVAL);
+
+  errno = 0;
+  EXPECT_EQ(orb_event_poll_wait(nullptr, ready, 1, 0), -1);
+  EXPECT_EQ(errno, EINVAL);
+
+  orb_event_poll_t *poll = orb_event_poll_create();
+  ASSERT_NE(poll, nullptr);
+
+  errno = 0;
+  EXPECT_EQ(orb_event_poll_wait(poll, nullptr, 1, 0), -1);
+  EXPECT_EQ(errno, EINVAL);
+
+  errno = 0;
+  EXPECT_EQ(orb_event_poll_wait(poll, ready, 0, 0), -1);
+  EXPECT_EQ(errno, EINVAL);
+
+  errno = 0;
+  EXPECT_FALSE(orb_event_poll_quit(nullptr));
+  EXPECT_EQ(errno, EINVAL);
+
+  EXPECT_TRUE(orb_event_poll_destroy(&poll));
+  EXPECT_EQ(poll, nullptr);
+  EXPECT_TRUE(orb_destroy_subscription(&subscription));
+}
+
 TEST_F(UnitTest, single_topic) {
   orb_test_s t{};
   orb_test_s u{};
@@ -767,6 +821,79 @@ TEST_F(UnitTest, poll_timeout_semantics) {
   publisher.join();
   EXPECT_TRUE(orb_destroy_publication(&pub));
   EXPECT_TRUE(orb_destroy_subscription(&sub));
+}
+
+TEST_F(UnitTest, concurrent_publish_copy_with_multiple_handles) {
+  constexpr int kPublisherCount = 2;
+  constexpr int kSubscriberCount = 3;
+  constexpr int kMessagesPerPublisher = 200;
+
+  orb_publication_t *publications[kPublisherCount]{};
+  for (auto &publication : publications) {
+    publication = orb_create_publication(ORB_ID(orb_test_medium));
+    ASSERT_NE(publication, nullptr);
+  }
+
+  orb_subscription_t *subscriptions[kSubscriberCount]{};
+  for (auto &subscription : subscriptions) {
+    subscription = orb_create_subscription(ORB_ID(orb_test_medium));
+    ASSERT_NE(subscription, nullptr);
+  }
+
+  std::atomic<int> total_published{0};
+  std::atomic<int> total_copied{0};
+  std::atomic_bool publishers_done{false};
+  std::vector<std::thread> publishers;
+  std::vector<std::thread> subscribers;
+
+  for (int publisher_index = 0; publisher_index < kPublisherCount;
+       ++publisher_index) {
+    publishers.emplace_back([&, publisher_index]() {
+      orb_test_medium_s msg{};
+      for (int message_index = 0; message_index < kMessagesPerPublisher;
+           ++message_index) {
+        msg.timestamp = orb_absolute_time_us();
+        msg.val = publisher_index * kMessagesPerPublisher + message_index;
+        EXPECT_TRUE(orb_publish(publications[publisher_index], &msg));
+        total_published.fetch_add(1, std::memory_order_relaxed);
+        std::this_thread::yield();
+      }
+    });
+  }
+
+  for (auto *subscription : subscriptions) {
+    subscribers.emplace_back([&, subscription]() {
+      orb_test_medium_s msg{};
+      while (!publishers_done.load(std::memory_order_acquire) ||
+             orb_check_update(subscription)) {
+        if (orb_check_update(subscription)) {
+          EXPECT_TRUE(orb_copy(subscription, &msg));
+          total_copied.fetch_add(1, std::memory_order_relaxed);
+        } else {
+          std::this_thread::yield();
+        }
+      }
+    });
+  }
+
+  for (auto &publisher : publishers) {
+    publisher.join();
+  }
+  publishers_done.store(true, std::memory_order_release);
+
+  for (auto &subscriber : subscribers) {
+    subscriber.join();
+  }
+
+  EXPECT_EQ(total_published.load(), kPublisherCount * kMessagesPerPublisher);
+  EXPECT_GT(total_copied.load(), 0);
+
+  for (auto &subscription : subscriptions) {
+    EXPECT_TRUE(orb_destroy_subscription(&subscription));
+  }
+  for (auto &publication : publications) {
+    EXPECT_TRUE(orb_destroy_publication(&publication));
+  }
 }
 
 TEST_F(UnitTest, topic_status_counter_saturation) {

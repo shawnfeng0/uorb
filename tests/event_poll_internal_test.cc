@@ -123,6 +123,45 @@ TEST(EventPollInternalTest, WaitReturnsMultipleReadyReceivers) {
   EXPECT_TRUE(orb_destroy_publication(&pub));
 }
 
+TEST(EventPollInternalTest, WaitTruncatesReadyOutputToCapacity) {
+  orb_publication_t *pub = orb_create_publication(ORB_ID(orb_test));
+  ASSERT_NE(pub, nullptr);
+
+  orb_subscription_t *first_sub = orb_create_subscription(ORB_ID(orb_test));
+  ASSERT_NE(first_sub, nullptr);
+  orb_subscription_t *second_sub = orb_create_subscription(ORB_ID(orb_test));
+  ASSERT_NE(second_sub, nullptr);
+
+  uorb::EventPoll poll;
+  uorb::ReceiverLocal *first_receiver = as_receiver(first_sub);
+  uorb::ReceiverLocal *second_receiver = as_receiver(second_sub);
+  ASSERT_TRUE(poll.AddReceiver(*first_receiver));
+  ASSERT_TRUE(poll.AddReceiver(*second_receiver));
+
+  drain_nonblocking(poll, first_sub, first_receiver);
+  drain_nonblocking(poll, second_sub, second_receiver);
+
+  orb_test_s msg{};
+  msg.val = 888;
+  ASSERT_TRUE(orb_publish(pub, &msg));
+
+  uorb::ReceiverLocal *ready[1] = {nullptr};
+  ASSERT_EQ(poll.Wait(ready, 1, 0), 1);
+  ASSERT_TRUE(ready[0] == first_receiver || ready[0] == second_receiver);
+  EXPECT_TRUE(orb_copy(ready[0] == first_receiver ? first_sub : second_sub, &msg));
+
+  uorb::ReceiverLocal *remaining_ready[1] = {nullptr};
+  ASSERT_EQ(poll.Wait(remaining_ready, 1, 0), 1);
+  EXPECT_NE(remaining_ready[0], ready[0]);
+  EXPECT_TRUE(orb_copy(remaining_ready[0] == first_receiver ? first_sub : second_sub, &msg));
+
+  EXPECT_TRUE(poll.RemoveReceiver(*first_receiver));
+  EXPECT_TRUE(poll.RemoveReceiver(*second_receiver));
+  EXPECT_TRUE(orb_destroy_subscription(&first_sub));
+  EXPECT_TRUE(orb_destroy_subscription(&second_sub));
+  EXPECT_TRUE(orb_destroy_publication(&pub));
+}
+
 TEST(EventPollInternalTest, WaitAfterStopReturnsMinusOneImmediately) {
   orb_subscription_t *sub = orb_create_subscription(ORB_ID(orb_test));
   ASSERT_NE(sub, nullptr);
