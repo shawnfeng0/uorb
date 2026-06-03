@@ -352,6 +352,26 @@ TEST_F(UnitTest, once_pub_sub) {
   ASSERT_EQ(sub_data.val, pub_data.val) << "copy(2) mismatch";
 }
 
+TEST_F(UnitTest, orb_copy_once_reads_latest_queued_sample) {
+  orb_test_medium_s pub_data{};
+  auto *publication = orb_create_publication(ORB_ID(orb_test_medium_queue));
+  ASSERT_NE(publication, nullptr) << "advertise failed: " << errno;
+
+  const int queue_size = ORB_ID(orb_test_medium_queue)->o_queue_size;
+  const int last_value = queue_size * 2 + 3;
+
+  for (int value = 0; value <= last_value; ++value) {
+    pub_data.val = value;
+    ASSERT_TRUE(orb_publish(publication, &pub_data)) << "publish failed: " << errno;
+  }
+
+  orb_test_medium_s sub_data{};
+  ASSERT_TRUE(orb_copy_once(ORB_ID(orb_test_medium_queue), &sub_data)) << "copy failed: " << errno;
+  EXPECT_EQ(sub_data.val, last_value);
+
+  EXPECT_TRUE(orb_destroy_publication(&publication));
+}
+
 TEST_F(UnitTest, multi_topic) {
   orb_publication_t *pfd[4]{};  ///< used for test_multi and test_multi_reversed
 
