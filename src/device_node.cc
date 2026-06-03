@@ -110,6 +110,11 @@ void uorb::DeviceNode::remove_subscriber() {
   }
 }
 
+void uorb::DeviceNode::mark_untracked_subscriber() {
+  base::LockGuard<base::Mutex> lg(lock_);
+  has_untracked_subscriber_ = true;
+}
+
 unsigned uorb::DeviceNode::initial_generation() const {
   base::LockGuard<base::Mutex> lg(lock_);
 
@@ -129,4 +134,19 @@ void uorb::DeviceNode::add_publisher() {
   if (publisher_count_ < kMaxCounterValue) {
     publisher_count_++;
   }
+}
+
+void uorb::DeviceNode::mark_untracked_publisher() {
+  base::LockGuard<base::Mutex> lg(lock_);
+  has_untracked_publisher_ = true;
+}
+
+uorb::DeviceNode::StatusSnapshot uorb::DeviceNode::GetStatusSnapshot() const {
+  base::LockGuard<base::Mutex> lg(lock_);
+  return StatusSnapshot{queue_size_,
+                        subscriber_count_,
+                        has_untracked_subscriber_,
+                        publisher_count_,
+                        has_untracked_publisher_,
+                        generation_.load()};
 }

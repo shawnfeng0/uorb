@@ -44,8 +44,8 @@ bool orb_destroy_publication(orb_publication_t **handle_ptr) {
 
   auto &publication_handle = *handle_ptr;
 
-  auto &dev = *(uorb::DeviceNode *)publication_handle;
-  dev.remove_publisher();
+  auto *dev = reinterpret_cast<uorb::DeviceNode *>(publication_handle);
+  dev->remove_publisher();
 
   publication_handle = nullptr;
 
@@ -68,7 +68,6 @@ bool orb_publish_once(const struct orb_metadata *meta, const void *data) {
     return false;
   }
 
-  // Mark as an untracked publisher, then copy the latest data.
   dev->mark_untracked_publisher();
   return dev->Publish(data);
 }
@@ -87,10 +86,11 @@ orb_subscription_t *orb_create_subscription_multi(const struct orb_metadata *met
     return nullptr;
   }
 
-  // Create a subscriber, if it fails, we don't have to release device_node (it
-  // only increases but not decreases)
   auto *subscriber = new (std::nothrow) ReceiverLocal(*dev);
-  ORB_CHECK_TRUE(subscriber, ENOMEM, return nullptr);
+  if (!subscriber) {
+    errno = ENOMEM;
+    return nullptr;
+  }
 
   return reinterpret_cast<orb_subscription_t *>(subscriber);
 }
@@ -125,7 +125,6 @@ bool orb_copy_once(const struct orb_metadata *meta, void *buffer) {
     return false;
   }
 
-  // Mark as an untracked subscriber, then copy the latest data.
   dev->mark_untracked_subscriber();
   unsigned last_generation_ = dev->initial_generation();
   return dev->Copy(buffer, &last_generation_);
@@ -143,9 +142,7 @@ bool orb_exists(const struct orb_metadata *meta, unsigned int instance) {
   ORB_CHECK_TRUE(meta, EINVAL, return false);
 
   auto &master = DeviceMaster::get_instance();
-  auto *dev = master.GetDeviceNode(*meta, instance);
-
-  return dev && dev->publisher_count();
+  return master.TopicExists(*meta, instance);
 }
 
 unsigned int orb_group_count(const struct orb_metadata *meta) {
@@ -165,19 +162,7 @@ bool orb_get_topic_status(const struct orb_metadata *meta, unsigned int instance
   ORB_CHECK_TRUE(meta, EINVAL, return false);
 
   auto &master = DeviceMaster::get_instance();
-  auto *dev = master.GetDeviceNode(*meta, instance);
-
-  if (!dev) return false;
-
-  if (status) {
-    status->queue_size = dev->queue_size();
-    status->subscriber_count = dev->subscriber_count();
-    status->has_untracked_subscriber = dev->has_untracked_subscriber();
-    status->publisher_count = dev->publisher_count();
-    status->has_untracked_publisher = dev->has_untracked_publisher();
-    status->latest_data_index = dev->updates_available(0);
-  }
-  return true;
+  return master.GetTopicStatus(*meta, instance, status);
 }
 
 int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {

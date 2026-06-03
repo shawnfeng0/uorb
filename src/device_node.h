@@ -31,17 +31,26 @@ class DeviceNode {
   // Publish data to this node.
   bool Publish(const void *data);
 
+  struct StatusSnapshot {
+    uint16_t queue_size;
+    uint8_t subscriber_count;
+    bool has_untracked_subscriber;
+    uint8_t publisher_count;
+    bool has_untracked_publisher;
+    unsigned latest_data_index;
+  };
+
   void add_subscriber();
   void remove_subscriber();
   uint16_t subscriber_count() const { return subscriber_count_; }
-  bool has_untracked_subscriber() const { return has_untracked_subscriber_; }
-  void mark_untracked_subscriber() { has_untracked_subscriber_ = true; }
+  void mark_untracked_subscriber();
 
   void add_publisher();
   void remove_publisher();
   uint16_t publisher_count() const { return publisher_count_; }
-  bool has_untracked_publisher() const { return has_untracked_publisher_; }
-  void mark_untracked_publisher() { has_untracked_publisher_ = true; }
+  void mark_untracked_publisher();
+
+  StatusSnapshot GetStatusSnapshot() const;
 
   // Whether meta and instance are the same as the current one
   inline bool IsSameWith(const orb_metadata &meta, uint8_t instance) const {

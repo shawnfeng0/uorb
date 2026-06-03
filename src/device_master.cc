@@ -55,6 +55,32 @@ uorb::DeviceNode *uorb::DeviceMaster::GetDeviceNode(const orb_metadata &meta, ui
   return GetDeviceNodeLocked(meta, instance);
 }
 
+bool uorb::DeviceMaster::TopicExists(const orb_metadata &meta, uint8_t instance) const {
+  base::LockGuard<base::Mutex> lg(lock_);
+  auto *device_node = GetDeviceNodeLocked(meta, instance);
+  return device_node && device_node->publisher_count() > 0;
+}
+
+bool uorb::DeviceMaster::GetTopicStatus(const orb_metadata &meta, uint8_t instance, orb_status *status) const {
+  base::LockGuard<base::Mutex> lg(lock_);
+  auto *device_node = GetDeviceNodeLocked(meta, instance);
+  if (!device_node) {
+    return false;
+  }
+
+  if (status) {
+    const auto snapshot = device_node->GetStatusSnapshot();
+    status->queue_size = snapshot.queue_size;
+    status->subscriber_count = snapshot.subscriber_count;
+    status->has_untracked_subscriber = snapshot.has_untracked_subscriber;
+    status->publisher_count = snapshot.publisher_count;
+    status->has_untracked_publisher = snapshot.has_untracked_publisher;
+    status->latest_data_index = snapshot.latest_data_index;
+  }
+
+  return true;
+}
+
 uorb::DeviceNode *uorb::DeviceMaster::GetDeviceNodeLocked(const orb_metadata &meta, uint8_t instance) const {
   for (auto &node : node_list_) {
     if (node.IsSameWith(meta, instance)) return &node;

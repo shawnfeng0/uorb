@@ -35,6 +35,8 @@ class uorb::DeviceMaster {
   DeviceNode *CreateAdvertiser(const orb_metadata &meta, unsigned int *instance);
 
   DeviceNode *OpenDeviceNode(const orb_metadata &meta, unsigned int instance);
+  bool TopicExists(const orb_metadata &meta, uint8_t instance) const;
+  bool GetTopicStatus(const orb_metadata &meta, uint8_t instance, orb_status *status) const;
 
   /**
    * Public interface for GetDeviceNodeLocked(). Takes care of synchronization.

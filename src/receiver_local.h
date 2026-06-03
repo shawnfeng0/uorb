@@ -3,6 +3,8 @@
 //
 #pragma once
 
+#include <atomic>
+
 #include "device_node.h"
 
 namespace uorb {
@@ -15,7 +17,10 @@ class ReceiverLocal final : public detail::ReceiverBase {
   }
 
   void notify_all() override {
-    if (notifier_) notifier_->notify_all();
+    auto *notifier = notifier_.load(std::memory_order_acquire);
+    if (notifier) {
+      notifier->notify_all();
+    }
   }
 
   ~ReceiverLocal() override {
@@ -23,6 +28,7 @@ class ReceiverLocal final : public detail::ReceiverBase {
     dev_.remove_subscriber();
   }
 
+  DeviceNode *device_node() { return &dev_; }
   bool Copy(void *buffer) { return dev_.Copy(buffer, &last_generation_); }
   unsigned updates_available() const { return dev_.updates_available(last_generation_); }
   bool is_ready() const { return updates_available() > 0; }
@@ -33,25 +39,27 @@ class ReceiverLocal final : public detail::ReceiverBase {
       return false;
     }
 
-    if (notifier_ == notifier) {
-      return true;
-    }
+    auto *expected_notifier = static_cast<base::LiteNotifier *>(nullptr);
+    if (!notifier_.compare_exchange_strong(expected_notifier, notifier, std::memory_order_acq_rel)) {
+      if (expected_notifier == notifier) {
+        return true;
+      }
 
-    if (notifier_) {
       errno = EBUSY;
       return false;
     }
 
     if (!dev_.RegisterCallback(this)) {
+      notifier_.store(nullptr, std::memory_order_release);
       return false;
     }
 
-    notifier_ = notifier;
     return true;
   }
 
   bool RemoveNotifier() {
-    if (!notifier_) {
+    auto *notifier = notifier_.load(std::memory_order_acquire);
+    if (!notifier) {
       return true;
     }
 
@@ -59,17 +67,19 @@ class ReceiverLocal final : public detail::ReceiverBase {
       return false;
     }
 
-    notifier_ = nullptr;
+    notifier_.store(nullptr, std::memory_order_release);
     return true;
   }
 
-  bool HasNotifier() const { return notifier_ != nullptr; }
-  bool HasNotifier(const base::LiteNotifier *notifier) const { return notifier_ == notifier; }
+  bool HasNotifier() const { return notifier_.load(std::memory_order_acquire) != nullptr; }
+  bool HasNotifier(const base::LiteNotifier *notifier) const {
+    return notifier_.load(std::memory_order_acquire) == notifier;
+  }
 
   intrusive_list::forward_list_node event_poll_node{};
 
  private:
-  base::LiteNotifier *notifier_ = nullptr;
+  std::atomic<base::LiteNotifier *> notifier_{nullptr};
   DeviceNode &dev_;
   unsigned last_generation_{}; /**< last generation the subscriber has seen */
 };
