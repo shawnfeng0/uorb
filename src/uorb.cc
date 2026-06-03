@@ -218,6 +218,11 @@ int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
 
 orb_event_poll_t *orb_event_poll_create(void) {
   auto *cpp_poll = new (std::nothrow) uorb::EventPoll();
+  if (!cpp_poll) {
+    errno = ENOMEM;
+    return nullptr;
+  }
+
   return reinterpret_cast<orb_event_poll_t *>(cpp_poll);
 }
 
