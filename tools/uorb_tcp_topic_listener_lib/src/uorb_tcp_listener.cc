@@ -60,7 +60,7 @@ static void CmdListener(uorb::listener::Fd &fd,
   auto sub = orb_create_subscription(meta);
   std::vector<uint8_t> data(meta->o_size);
 
-  orb_pollfd fds{.fd = sub, .events = POLLIN, .revents = 0};
+  orb_pollfd fds{.fd = sub};
 
   uorb::listener::DataPrinter data_printer(*meta);
   orb_abstime_us last_write_timestamp{};

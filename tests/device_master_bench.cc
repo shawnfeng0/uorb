@@ -218,8 +218,6 @@ static void run_orb_poll_many_fds(int num_fds, int duration_ms,
         orb_create_subscription_multi(ORB_ID(orb_test), 0);
     subs.push_back(sub);
     fds[i].fd = sub;
-    fds[i].events = POLLIN;
-    fds[i].revents = 0;
   }
 
   // Ensure at least one fd is ready so we measure scanning/marking cost.
@@ -319,8 +317,6 @@ static void run_orb_poll_blocking(int num_fds, int duration_ms) {
         orb_create_subscription_multi(ORB_ID(orb_test), 0);
     subs.push_back(sub);
     fds[i].fd = sub;
-    fds[i].events = POLLIN;
-    fds[i].revents = 0;
   }
 
   // Drain initial state.
@@ -350,7 +346,7 @@ static void run_orb_poll_blocking(int num_fds, int duration_ms) {
     const int n = orb_poll(fds.data(), static_cast<unsigned>(fds.size()), 100);
     if (n > 0) {
       for (int i = 0; i < num_fds; ++i) {
-        if (fds[i].revents & POLLIN) orb_copy(fds[i].fd, &msg);
+        if (fds[i].ready) orb_copy(fds[i].fd, &msg);
       }
       ++loops;
     }

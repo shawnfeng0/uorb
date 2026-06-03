@@ -64,7 +64,7 @@ The topic is defined by the following macros and needs to include the topic name
 ```C++
 // uorb/uorb.h
 // Define a topic, usually define a topic in the source file, can only be defined once and need to be compiled in the C++ source file (*.cpp/*.cc)
-#define ORB_SIMPLE_DEFINE(_name, _struct) ...
+#define ORB_DEFINE(_name, _struct, _queue_size) ...
 ```
 
 ### Use tools to manage uORB topics
@@ -83,7 +83,7 @@ First, create a folder to store uORB topics (the original topics are defined usi
 uint64 timestamp # time since system start (microseconds)
 
 uint32 STRING_LENGTH = 128
-int8[128] string
+char[128] str
 ```
 
 For the format of msg file, please refer to ros and PX4 or the examples in this project.
@@ -112,7 +112,7 @@ link_libraries(uorb_examples_msgs)
 
 ### Manually manage uORB topics
 
-Although it is not recommended, we also support directly using macros to manually define topics, which may be good for beginners. You need to make sure to declare `ORB_DECLARE` in the topic header file, and define `ORB_SIMPLE_DEFINE` in the `C++` source file.
+Although it is not recommended, we also support directly using macros to manually define topics, which may be good for beginners. You need to make sure to declare `ORB_DECLARE` in the topic header file, and define `ORB_DEFINE` in the `C++` source file.
 
 #### Declare uORB topics
 
@@ -148,9 +148,9 @@ Similar to the declaration, define uORB topics in the source file after includin
 // orb_topic.cc
 #include "orb_topic.h"
 
-ORB_SIMPLE_DEFINE(example_struct_str, orb_example_struct_str);
+ORB_DEFINE(example_struct_str, orb_example_struct_str, 1);
 
-ORB_SIMPLE_DEFINE(example_struct_number, orb_example_struct_number);
+ORB_DEFINE(example_struct_number, orb_example_struct_number, 1);
 ```
 
 ## Publish uORB topic
@@ -180,11 +180,11 @@ uorb::PublicationData<uorb::msg::example_string> pub_example_string;
 Fill data:
 
 ```C++
-auto &data = pub_example_string.get();
+auto &data = pub_example_string.data();
 
 data.timestamp = orb_absolute_time_us();
-snprintf((char *)data.string, example_string_s::STRING_LENGTH, "%d: %s", i,
-             "This is a string message.");
+snprintf(reinterpret_cast<char *>(data.str), example_string_s::STRING_LENGTH,
+         "%d: %s", i, "This is a string message.");
 ```
 Publish data:
 
@@ -205,7 +205,7 @@ Include the uORB subscription header:
 Define variables of the subscription data type:
 
 ```c++
-uorb::SubscriptionDatauorb::msg::example_string sub_example_string;
+uorb::SubscriptionData<uorb::msg::example_string> sub_example_string;
 ```
 
 Polling for updates:
@@ -219,11 +219,10 @@ if (sub_example_string.Update()) {
 Or use `orb_poll()`, which is a function similar to `poll()`(Recommend this usage):
 
 ```c++
-struct orb_pollfd pollfds[] = {
-  {.fd = sub_example_string.handle(), .events = POLLIN}};
+struct orb_pollfd pollfds[] = {{.fd = sub_example_string.handle()}};
 
 if (0 < orb_poll(pollfds, ARRAY_SIZE(pollfds), timeout_ms)) {
-  if (sub_example_string.Update()) {
+  if (pollfds[0].ready && sub_example_string.Update()) {
     // Data processing...
   }
 }
@@ -232,9 +231,9 @@ if (0 < orb_poll(pollfds, ARRAY_SIZE(pollfds), timeout_ms)) {
 Get updated data and processing:
 
 ```c++
-auto data = sub_example_string.get();
-printf("timestamp: %" PRIu64 "[us], Receive msg: "%s"\n", data.timestamp,
-       data.string);
+auto data = sub_example_string.data();
+printf("timestamp: %" PRIu64 "[us], Receive msg: \"%s\"\n", data.timestamp,
+       data.str);
 ```
 
 Please refer to the complete routine: [examples/cpp_pub_sub/cpp_pub_sub.cc](../examples/cpp_pub_sub/cpp_pub_sub.cc)
@@ -261,28 +260,28 @@ Include the header:
        });
    ```
 
-2. **Caller owns the subscription** — build your own `uorb::SubscriptionData` and register it with `RegisterCallback(sub, cb)`. The caller must keep the subscription alive at least as long as the `EventLoop`, or call `UnregisterCallback(sub)` before the loop is destroyed.
+2. **Caller owns the subscription** — build your own `uorb::SubscriptionData` and register it with `AddSubscription(sub, cb)`. The caller must keep the subscription alive at least as long as the `EventLoop`, or call `RemoveSubscription(sub)` before the loop is destroyed.
 
    ```c++
    uorb::SubscriptionData<uorb::msg::sensor_accel> sub_accel;
-   loop.RegisterCallback(sub_accel, [](const sensor_accel_s &msg) {
+   loop.AddSubscription(sub_accel, [](const sensor_accel_s &msg) {
      // handle message
    });
    // ... later ...
-   loop.UnregisterCallback(sub_accel);
+   loop.RemoveSubscription(sub_accel);
    ```
 
 ### Driving the loop
 
-* `PollOnce(timeout_ms)` blocks for at most `timeout_ms` milliseconds and dispatches the ready callbacks once; `timeout_ms = -1` blocks until either an event arrives or `Quit()` is called. Returns the number of events dispatched; `-1` on error or when `Quit()` has been requested; `0` when there are no registered subscriptions.
-* `Loop()` calls `PollOnce(-1)` in a loop until `Quit()` is requested (returns `true`) or it sees an error / an empty loop (returns `false`).
-* `Quit()` is **thread-safe** and may be called from any thread to request loop shutdown. It is *sticky*: once called, subsequent `PollOnce()` calls return `-1` immediately and the `EventLoop` cannot be restarted.
+* `RunOnce(timeout_ms)` blocks for at most `timeout_ms` milliseconds and dispatches the ready callbacks once; `timeout_ms = -1` blocks until either an event arrives or `Quit()` is called. Returns the number of events dispatched; `-1` on error or when `Quit()` has been requested; `0` when there are no registered subscriptions.
+* `Run()` calls `RunOnce(-1)` in a loop until `Quit()` is requested (returns `true`) or it sees an error / an empty loop (returns `false`).
+* `Quit()` is **thread-safe** and may be called from any thread to request loop shutdown. It is *sticky*: once called, subsequent `RunOnce()` calls return `-1` immediately and the `EventLoop` cannot be restarted.
 
 ### Threading model
 
 * `Quit()` may be called from any thread.
-* All other member functions (`RegisterCallback` / `UnregisterCallback` / `Subscribe` / `PollOnce` / `Loop`) must be invoked from a single thread — typically the thread that runs the loop.
+* All other member functions (`AddSubscription` / `RemoveSubscription` / `Subscribe` / `RunOnce` / `Run`) must be invoked from a single thread — typically the thread that runs the loop.
 
 ### Full examples
 
-See [examples/cpp_pub_sub/cpp_pub_sub_event_loop.cc](../examples/cpp_pub_sub/cpp_pub_sub_event_loop.cc) for a runnable example covering both loop-owned `Subscribe<>()` and user-owned `RegisterCallback()`, multi-threaded publishers, and a cross-thread `Quit()`.
+See [examples/cpp_pub_sub/cpp_pub_sub_event_loop.cc](../examples/cpp_pub_sub/cpp_pub_sub_event_loop.cc) for a runnable example covering both loop-owned `Subscribe<>()` and user-owned `AddSubscription()`, multi-threaded publishers, and a cross-thread `Quit()`.

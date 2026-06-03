@@ -25,7 +25,7 @@ PX4.
 
 ## Dependencies
 
-Compiling the uorb library requires the support of c++11, and most compilations are currently supported.
+Compiling the uorb library requires C++14 support, and most modern compilers are currently supported.
 
 Officially supported build environments are POSIX platforms (Linux/macOS) with GCC/Clang.
 Native Windows/MSVC builds are currently not supported.
@@ -44,32 +44,9 @@ pip3 install -r tools/msg/tools/requirements.txt
 
 ## Examples
 
-[uorb-examples](https://github.com/ShawnFeng0/uorb-examples.git)
+* [C++ publish/subscribe example](examples/cpp_pub_sub)
+* [TCP topic listener example](examples/tcp_topic_listener)
 
-Minimal multi-instance error handling pattern:
-
-```cpp
-unsigned instance = 0;
-orb_publication_t *pub = orb_create_publication_multi(ORB_ID(orb_test), &instance);
-if (!pub) {
-  // check errno and bail out
-  return;
-}
-
-orb_subscription_t *sub = orb_create_subscription_multi(ORB_ID(orb_test), instance);
-if (!sub) {
-  orb_destroy_publication(&pub);
-  return;
-}
-
-orb_test_s msg{};
-if (!orb_publish(pub, &msg)) {
-  // handle publish failure
-}
-
-orb_destroy_subscription(&sub);
-orb_destroy_publication(&pub);
-```
 
 ## Tools
 

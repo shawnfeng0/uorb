@@ -15,20 +15,6 @@
 #include <type_traits>
 #endif
 
-#if __GNUC__ >= 4
-#ifdef __EXPORT
-#undef __EXPORT
-#endif
-#define __EXPORT __attribute__((visibility("default")))
-#ifdef __PRIVATE
-#undef __PRIVATE
-#endif
-#define __PRIVATE __attribute__((visibility("hidden")))
-#else
-#define __EXPORT
-#define __PRIVATE
-#endif
-
 /**
  * Object metadata.
  */
@@ -95,9 +81,9 @@ struct TypeMap;
   };                                      \
   }                                       \
   }                                       \
-  extern "C" const struct orb_metadata *__orb_##_name __EXPORT
+  extern "C" const struct orb_metadata *__orb_##_name
 #else
-#define ORB_DECLARE(_name, _struct) extern const struct orb_metadata *__orb_##_name __EXPORT
+#define ORB_DECLARE(_name, _struct) extern const struct orb_metadata *__orb_##_name
 #endif
 
 /**
@@ -171,20 +157,12 @@ typedef struct orb_publication orb_publication_t;
  */
 typedef struct orb_subscription orb_subscription_t;
 
-#ifndef POLLIN
-#define POLLIN (0x01u)
-#endif
-
 /**
- * The auxiliary data structure used to use orb_poll, similar to the poll()
- * function of POSIX.
- *
- * Only supports POLLIN function.
+ * The auxiliary data structure used to use orb_poll.
  */
 struct orb_pollfd {
   orb_subscription_t *fd;  // A handle returned from orb_create_subscription.
-  unsigned events;         // The input event flags
-  unsigned revents;        // The output event flags
+  bool ready;              // Whether the subscription has data to read.
 };
 
 typedef struct orb_pollfd orb_pollfd_t;
@@ -194,7 +172,7 @@ typedef struct orb_pollfd orb_pollfd_t;
  *
  * @see orb_create_publication_multi()
  */
-orb_publication_t *orb_create_publication(const struct orb_metadata *meta) __EXPORT;
+orb_publication_t *orb_create_publication(const struct orb_metadata *meta);
 
 /**
  * Advertise as the publisher of a topic.
@@ -225,7 +203,7 @@ orb_publication_t *orb_create_publication(const struct orb_metadata *meta) __EXP
  * @return NULL on error(No memory or too many instances), otherwise returns an
  * ORB topic advertiser handle that can be used to publish to the topic.
  */
-orb_publication_t *orb_create_publication_multi(const struct orb_metadata *meta, unsigned int *instance) __EXPORT;
+orb_publication_t *orb_create_publication_multi(const struct orb_metadata *meta, unsigned int *instance);
 
 /**
  * Destroy a publication handle.
@@ -234,7 +212,7 @@ orb_publication_t *orb_create_publication_multi(const struct orb_metadata *meta,
  * or orb_create_publication_multi(); it will be destroyed and set to NULL.
  * @return true on success
  */
-bool orb_destroy_publication(orb_publication_t **handle_ptr) __EXPORT;
+bool orb_destroy_publication(orb_publication_t **handle_ptr);
 
 /**
  * Publish new data to a topic.
@@ -248,7 +226,7 @@ bool orb_destroy_publication(orb_publication_t **handle_ptr) __EXPORT;
  *                The length must correspond to the topic structure.
  * @return        true on success, false with orb_errno set accordingly.
  */
-bool orb_publish(orb_publication_t *handle, const void *data) __EXPORT;
+bool orb_publish(orb_publication_t *handle, const void *data);
 
 /**
  * Publish data on topic instance 0 without creating a publication handle.
@@ -261,7 +239,7 @@ bool orb_publish(orb_publication_t *handle, const void *data) __EXPORT;
  * @param data @see orb_publish()
  * @return @see orb_publish()
  */
-bool orb_publish_once(const struct orb_metadata *meta, const void *data) __EXPORT;
+bool orb_publish_once(const struct orb_metadata *meta, const void *data);
 
 /**
  * Advertise as the publisher of a topic.
@@ -292,7 +270,7 @@ static inline bool orb_publish_auto(const struct orb_metadata *meta, orb_publica
  *
  * @see orb_create_subscription_multi()
  */
-orb_subscription_t *orb_create_subscription(const struct orb_metadata *meta) __EXPORT;
+orb_subscription_t *orb_create_subscription(const struct orb_metadata *meta);
 
 /**
  * Subscribe to a multi-instance of a topic.
@@ -327,7 +305,7 @@ orb_subscription_t *orb_create_subscription(const struct orb_metadata *meta) __E
  * @return    NULL on error, otherwise returns a subscriber handle
  *      that can be used to read and update the topic.
  */
-orb_subscription_t *orb_create_subscription_multi(const struct orb_metadata *meta, unsigned instance) __EXPORT;
+orb_subscription_t *orb_create_subscription_multi(const struct orb_metadata *meta, unsigned instance);
 
 /**
  * Destroy a subscription handle.
@@ -336,7 +314,7 @@ orb_subscription_t *orb_create_subscription_multi(const struct orb_metadata *met
  * or orb_create_subscription_multi(); it will be destroyed and set to NULL.
  * @return true on success.
  */
-bool orb_destroy_subscription(orb_subscription_t **handle_ptr) __EXPORT;
+bool orb_destroy_subscription(orb_subscription_t **handle_ptr);
 
 /**
  * Fetch data from a topic.
@@ -351,7 +329,7 @@ bool orb_destroy_subscription(orb_subscription_t **handle_ptr) __EXPORT;
  *                The length must correspond to the topic structure.
  * @return    true on success, false otherwise with orb_errno set accordingly.
  */
-bool orb_copy(orb_subscription_t *handle, void *buffer) __EXPORT;
+bool orb_copy(orb_subscription_t *handle, void *buffer);
 
 /**
  * Copy data from topic instance 0 without creating a subscription handle.
@@ -364,7 +342,7 @@ bool orb_copy(orb_subscription_t *handle, void *buffer) __EXPORT;
  * @param buffer @see orb_copy()
  * @return @see orb_copy()
  */
-bool orb_copy_once(const struct orb_metadata *meta, void *buffer) __EXPORT;
+bool orb_copy_once(const struct orb_metadata *meta, void *buffer);
 
 /**
  * Check whether a topic has been published to since the last orb_copy.
@@ -380,7 +358,7 @@ bool orb_copy_once(const struct orb_metadata *meta, void *buffer) __EXPORT;
  * @return true if the topic has been updated since the last time it was copied
  * using this handle.
  */
-bool orb_check_update(orb_subscription_t *handle) __EXPORT;
+bool orb_check_update(orb_subscription_t *handle);
 
 /**
  * If the message is updated, copy the message.
@@ -397,7 +375,7 @@ static inline bool orb_check_and_copy(orb_subscription_t *handle, void *buffer) 
  * @param instance  ORB instance
  * @return true if the topic exists, false otherwise.
  */
-bool orb_exists(const struct orb_metadata *meta, unsigned int instance) __EXPORT;
+bool orb_exists(const struct orb_metadata *meta, unsigned int instance);
 
 /**
  * Get the number of published instances of a topic group
@@ -405,7 +383,7 @@ bool orb_exists(const struct orb_metadata *meta, unsigned int instance) __EXPORT
  * @param meta    ORB topic metadata.
  * @return    The number of published instances of this topic
  */
-unsigned int orb_group_count(const struct orb_metadata *meta) __EXPORT;
+unsigned int orb_group_count(const struct orb_metadata *meta);
 
 /**
  * Get the status of a topic (number of publishers, subscribers, etc.)
@@ -415,34 +393,33 @@ unsigned int orb_group_count(const struct orb_metadata *meta) __EXPORT;
  * @param status [out] The topic status.
  * @return true on success.
  */
-bool orb_get_topic_status(const struct orb_metadata *meta, unsigned int instance, struct orb_status *status) __EXPORT;
+bool orb_get_topic_status(const struct orb_metadata *meta, unsigned int instance, struct orb_status *status);
 
 /**
- * Similar to the poll() function of POSIX.
+ * Wait for one or more subscriptions to receive new data.
  *
- * If none of the defined events have occurred on any selected handle, poll()
- * shall wait at least timeout milliseconds for an event to occur on any of the
- * selected handles.
+ * If no subscription is ready, orb_poll() shall wait at least timeout
+ * milliseconds for data to arrive on any selected handle.
  *
- * @param fds       A set of subscriber handles.
+ * @param fds       A set of subscriber handles. The ready field is set to true
+ *                  for subscriptions that have data to read.
  * @param nfds      The number of orb_pollfd structures in the fds array.
  * @param timeout_ms   Maximum waiting time for poll.
  * If the value of timeout is 0, poll() shall return immediately.
- * If the value of timeout is < 0, poll() shall block until a requested event
- * occurs or until the call is interrupted.
+ * If the value of timeout is < 0, poll() shall block until data arrives or
+ * until the call is interrupted.
  *
  * A subscription handle can be bound to at most one waiting notifier at a
  * time. Calling orb_poll() while any fd in fds is already bound by another
  * orb_poll()/orb_event_poll_wait() call fails with orb_errno = EBUSY.
  *
  * @return  Upon successful completion, poll() shall return a
- * non-negative value. A positive value indicates the total number of file
- * descriptors that have been selected (that is, handle for which the
- * revents member is non-zero). A value of 0 indicates  that the call timed out
- * and no handle have been selected. Upon failure, poll() shall return
+ * non-negative value. A positive value indicates the total number of
+ * subscriptions that are ready. A value of 0 indicates that the call timed out
+ * and no handle has been selected. Upon failure, poll() shall return
  * −1 and set orb_errno to indicate the error.
  */
-int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) __EXPORT;
+int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms);
 
 /**
  ** Event poll handle (opaque type for C API)
@@ -462,14 +439,14 @@ typedef struct orb_event_poll orb_event_poll_t;
  * Create an event poll object.
  * @return event poll handle, or NULL on error
  */
-orb_event_poll_t *orb_event_poll_create(void) __EXPORT;
+orb_event_poll_t *orb_event_poll_create(void);
 
 /**
  * Destroy an event poll object.
  * @param handle_ptr pointer to event poll handle, will be set to NULL
  * @return true on success
  */
-bool orb_event_poll_destroy(orb_event_poll_t **handle_ptr) __EXPORT;
+bool orb_event_poll_destroy(orb_event_poll_t **handle_ptr);
 
 /**
  * Add a subscription to the event poll.
@@ -481,7 +458,7 @@ bool orb_event_poll_destroy(orb_event_poll_t **handle_ptr) __EXPORT;
  * a time. If already bound elsewhere, this returns false and sets orb_errno to
  * EBUSY.
  */
-bool orb_event_poll_add(orb_event_poll_t *poll, orb_subscription_t *sub) __EXPORT;
+bool orb_event_poll_add(orb_event_poll_t *poll, orb_subscription_t *sub);
 
 /**
  * Remove a subscription from the event poll.
@@ -489,7 +466,7 @@ bool orb_event_poll_add(orb_event_poll_t *poll, orb_subscription_t *sub) __EXPOR
  * @param sub subscription handle (orb_subscription_t*)
  * @return true on success
  */
-bool orb_event_poll_remove(orb_event_poll_t *poll, orb_subscription_t *sub) __EXPORT;
+bool orb_event_poll_remove(orb_event_poll_t *poll, orb_subscription_t *sub);
 
 /**
  * Wait for events on the event poll.
@@ -499,20 +476,20 @@ bool orb_event_poll_remove(orb_event_poll_t *poll, orb_subscription_t *sub) __EX
  * @param timeout_ms timeout in ms (0: return immediately, <0: block)
  * @return number of ready subscriptions, or -1 on error
  */
-int orb_event_poll_wait(orb_event_poll_t *poll, orb_subscription_t *subs[], int max_subs, int timeout_ms) __EXPORT;
+int orb_event_poll_wait(orb_event_poll_t *poll, orb_subscription_t *subs[], int max_subs, int timeout_ms);
 
 /**
  * Quit the event poll loop (for use with orb_event_poll_wait).
  * @param poll event poll handle
  * @return true on success, false if poll is NULL
  */
-bool orb_event_poll_quit(orb_event_poll_t *poll) __EXPORT;
+bool orb_event_poll_quit(orb_event_poll_t *poll);
 
 /**
  * Get orb version string
  * @return version string
  */
-const char *orb_version(void) __EXPORT;
+const char *orb_version(void);
 
 /**
  * Absolute time, in microsecond units.

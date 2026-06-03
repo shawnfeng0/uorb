@@ -577,7 +577,6 @@ TEST_F(UnitTest, queue_poll_notify) {
   int next_expected_val = 0;
   orb_pollfd_t fds[1]{};
   fds[0].fd = sfd;
-  fds[0].events = POLLIN;
 
   while (!thread_should_exit) {
     int poll_ret = orb_poll(fds, 1, 500);
@@ -589,7 +588,7 @@ TEST_F(UnitTest, queue_poll_notify) {
 
     ASSERT_NE(poll_ret, 0) << "poll timeout";
 
-    if (fds[0].revents & POLLIN) {
+    if (fds[0].ready) {
       orb_copy(sfd, &t);
       ASSERT_EQ(next_expected_val, t.val) << "copy mismatch";
       ++next_expected_val;
@@ -614,7 +613,6 @@ TEST_F(UnitTest, poll_timeout_semantics) {
 
   orb_pollfd_t fds[1]{};
   fds[0].fd = sub;
-  fds[0].events = POLLIN;
 
   const auto zero_start = std::chrono::steady_clock::now();
   EXPECT_EQ(orb_poll(fds, 1, 0), 0);
@@ -641,7 +639,7 @@ TEST_F(UnitTest, poll_timeout_semantics) {
           std::chrono::steady_clock::now() - neg_start)
           .count();
   EXPECT_GE(neg_elapsed_ms, 25);
-  EXPECT_TRUE(fds[0].revents & POLLIN);
+  EXPECT_TRUE(fds[0].ready);
 
   publisher.join();
   EXPECT_TRUE(orb_destroy_publication(&pub));

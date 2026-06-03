@@ -45,8 +45,7 @@ void *thread_subscriber(void *unused) {
 
   int timeout_ms = 2000;
 
-  struct orb_pollfd poll_fds[] = {
-      {.fd = sub_example_string.handle(), .events = POLLIN, .revents = 0}};
+  struct orb_pollfd poll_fds[] = {{.fd = sub_example_string.handle()}};
 
   while (true) {
     if (0 < orb_poll(poll_fds, ARRAY_SIZE(poll_fds), timeout_ms)) {

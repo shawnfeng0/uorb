@@ -113,11 +113,8 @@ void uORBTest::UnitTest::latency_test(const orb_metadata *T) {
     orb_copy(test_multi_sub_large, &pub_data_large);
 
     fds[0].fd = test_multi_sub;
-    fds[0].events = POLLIN;
     fds[1].fd = test_multi_sub_medium;
-    fds[1].events = POLLIN;
     fds[2].fd = test_multi_sub_large;
-    fds[2].events = POLLIN;
 
     const unsigned max_runs = 1000;
     int current_value = pub_data_large.val;
@@ -131,13 +128,13 @@ void uORBTest::UnitTest::latency_test(const orb_metadata *T) {
       /* wait for up to 500ms for data */
       int pret = orb_poll(&fds[0], (sizeof(fds) / sizeof(fds[0])), 500);
 
-      if (fds[0].revents & POLLIN) {
+      if (fds[0].ready) {
         orb_copy(test_multi_sub, &pub_data_large);
 
-      } else if (fds[1].revents & POLLIN) {
+      } else if (fds[1].ready) {
         orb_copy(test_multi_sub_medium, &pub_data_large);
 
-      } else if (fds[2].revents & POLLIN) {
+      } else if (fds[2].ready) {
         orb_copy(test_multi_sub_large, &pub_data_large);
       }
 

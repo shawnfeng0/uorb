@@ -105,7 +105,7 @@ def print_parsed_fields():
 
 #ifdef __cplusplus
 @#class @(uorb_struct) {
-struct __EXPORT @(uorb_struct) {
+struct @(uorb_struct) {
 @#public:
 #else
 struct @(uorb_struct) {

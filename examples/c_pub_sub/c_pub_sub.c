@@ -39,7 +39,7 @@ void *thread_subscriber(void *unused) {
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 #endif
 
-  struct orb_pollfd pollfds[] = {{.fd = sub_example_string, .events = POLLIN}};
+  struct orb_pollfd pollfds[] = {{.fd = sub_example_string}};
   int timeout = 2000;
 
   while (true) {

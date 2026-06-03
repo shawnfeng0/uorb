@@ -71,8 +71,7 @@ template <const orb_metadata &T>
 
   int timeout_ms = 2000;
 
-  struct orb_pollfd poll_fds[] = {
-      {.fd = subscription_data.handle(), .events = POLLIN, .revents = 0}};
+  struct orb_pollfd poll_fds[] = {{.fd = subscription_data.handle()}};
 
   while (true) {
     if (0 < orb_poll(poll_fds, ARRAY_SIZE(poll_fds), timeout_ms)) {

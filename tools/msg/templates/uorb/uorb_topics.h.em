@@ -70,7 +70,7 @@ extern "C" {
 /*
  * Returns array of topics metadata
  */
-const struct orb_metadata *const *orb_get_topics(size_t *size) __EXPORT;
+const struct orb_metadata *const *orb_get_topics(size_t *size);
 
 #ifdef __cplusplus
 }

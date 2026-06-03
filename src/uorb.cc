@@ -191,10 +191,10 @@ int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
   auto CheckDataUpdate = [&] {
     number_of_new_data = 0;
     for (unsigned i = 0; i < nfds; ++i) {
-      fds[i].revents = 0;
+      fds[i].ready = false;
       auto &item_sub = *reinterpret_cast<ReceiverLocal *>(fds[i].fd);
       if (item_sub.is_ready()) {
-        fds[i].revents |= fds[i].events & POLLIN;
+        fds[i].ready = true;
         ++number_of_new_data;
       }
     }
