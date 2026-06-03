@@ -34,6 +34,7 @@
 #include "uorb_unit_test.h"
 
 #include <gtest/gtest.h>
+#include <uorb/subscription_interval.h>
 
 #include <atomic>
 #include <cerrno>
@@ -48,6 +49,18 @@ int main(int argc, char **argv) {
   return RUN_ALL_TESTS();
 }
 namespace uORBTest {
+
+class TestableSubscriptionInterval final : public uorb::SubscriptionInterval<uorb::msg::orb_test> {
+ public:
+  using uorb::SubscriptionInterval<uorb::msg::orb_test>::CalculateNextUpdateTime;
+};
+
+TEST_F(UnitTest, subscription_interval_handles_initial_time_less_than_interval) {
+  constexpr uint32_t interval_us = 60 * 1000 * 1000;
+  constexpr orb_abstime_us now = 1000;
+
+  EXPECT_EQ(TestableSubscriptionInterval::CalculateNextUpdateTime(0, interval_us, now), now);
+}
 
 TEST_F(UnitTest, unadvertise) {
   // try to advertise and see whether we get the right instance

@@ -16,7 +16,7 @@ template <const orb_metadata &meta>
 class SubscriptionInterval : public Subscription<meta> {
  private:
   template <typename Tp>
-  constexpr Tp constrain(Tp val, Tp min_val, Tp max_val) const {
+  static constexpr Tp constrain(Tp val, Tp min_val, Tp max_val) {
     return (val < min_val) ? min_val : ((val > max_val) ? max_val : val);
   }
 
@@ -65,10 +65,7 @@ class SubscriptionInterval : public Subscription<meta> {
    */
   bool Copy(ValueType *dst) override {
     if (Subscription<meta>::Copy(dst)) {
-      const orb_abstime_us now = orb_absolute_time_us();
-      // shift last update time forward, but don't let it get further behind
-      // than the interval
-      last_update_ = constrain(last_update_ + interval_us_, now - interval_us_, now);
+      last_update_ = CalculateNextUpdateTime(last_update_, interval_us_, orb_absolute_time_us());
       return true;
     }
 
@@ -82,6 +79,15 @@ class SubscriptionInterval : public Subscription<meta> {
   void set_interval_ms(uint32_t interval_ms) { interval_us_ = interval_ms * 1000; }
 
  protected:
+  static constexpr orb_abstime_us CalculateNextUpdateTime(orb_abstime_us last_update,
+                                                          uint32_t interval_us,
+                                                          orb_abstime_us now) {
+    const orb_abstime_us interval = interval_us;
+    const orb_abstime_us minimum_update_time = now > interval ? now - interval : now;
+
+    return constrain(last_update + interval, minimum_update_time, now);
+  }
+
   orb_abstime_us last_update_{0};  // last update in microseconds
   uint32_t interval_us_{0};        // maximum update interval in microseconds
 };
