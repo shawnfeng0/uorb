@@ -7,7 +7,8 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace intrusive_list::internal {
+namespace intrusive_list {
+namespace internal {
 
 template <class Type, class Member>
 static inline constexpr ptrdiff_t offset_of(const Member Type::*member) {
@@ -21,4 +22,5 @@ static inline constexpr Type *owner_of(const Member *ptr,
                                   offset_of(member));
 }
 
-}  // namespace intrusive_list::internal
+}  // namespace internal
+}  // namespace intrusive_list

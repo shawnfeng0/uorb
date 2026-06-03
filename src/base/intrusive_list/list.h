@@ -181,7 +181,7 @@ class list {
    * check if the list is empty.
    * @return true if list is empty.
    */
-  [[nodiscard]] bool empty() const { return internal::list_empty(&head_); }
+  bool empty() const { return internal::list_empty(&head_); }
 
   struct Iterator {
     explicit Iterator(Node *v) : node(v) {}

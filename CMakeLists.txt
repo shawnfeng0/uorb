@@ -6,7 +6,9 @@ use_cmake_policy()
 
 project(uorb)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(UORB_BUILD_EXAMPLES "Build examples" OFF)
 option(UORB_BUILD_TESTS "Build tests" OFF)

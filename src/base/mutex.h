@@ -10,7 +10,8 @@
 
 #include <pthread.h>
 
-namespace uorb::base {
+namespace uorb {
+namespace base {
 
 /// The standard Mutex type.
 class Mutex {
@@ -60,5 +61,6 @@ class LockGuard {
   MutexType &mutex_;
 };
 
-} // namespace uorb::base
+}  // namespace base
+}  // namespace uorb
 

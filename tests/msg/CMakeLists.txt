@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.12...4.0)
 # Support IN_LIST if() operator
 cmake_policy(SET CMP0057 NEW)
 
-find_package (Python3 COMPONENTS Interpreter Development)
+find_package(Python3 COMPONENTS Interpreter Development)
 # We have a custom error message to tell users how to install python3.
 if (NOT Python3_Interpreter_FOUND)
     message(FATAL_ERROR "Python 3 not found. Please install Python 3:\n"
@@ -32,7 +32,7 @@ set(tools_root ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/msg)
 
 # Generate uORB headers
 add_custom_command(OUTPUT ${uorb_headers}
-        COMMAND ${PYTHON_EXECUTABLE} ${tools_root}/tools/px_generate_uorb_topic_files.py
+        COMMAND ${Python3_EXECUTABLE} ${tools_root}/tools/px_generate_uorb_topic_files.py
         --headers
         -f ${msg_files}
         -i ${CMAKE_CURRENT_SOURCE_DIR}
@@ -51,7 +51,7 @@ add_custom_command(OUTPUT ${uorb_headers}
 
 # Generate uORB sources
 add_custom_command(OUTPUT ${uorb_sources}
-        COMMAND ${PYTHON_EXECUTABLE} ${tools_root}/tools/px_generate_uorb_topic_files.py
+        COMMAND ${Python3_EXECUTABLE} ${tools_root}/tools/px_generate_uorb_topic_files.py
         --sources
         -f ${msg_files}
         -i ${CMAKE_CURRENT_SOURCE_DIR}

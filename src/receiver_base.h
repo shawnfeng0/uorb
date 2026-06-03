@@ -5,7 +5,8 @@
 
 #include "base/intrusive_list/forward_list.h"
 
-namespace uorb::detail {
+namespace uorb {
+namespace detail {
 
 struct ReceiverBase {
   ReceiverBase() = default;
@@ -21,4 +22,5 @@ struct ReceiverBase {
   intrusive_list::forward_list_node receiver_node{};
 };
 
-}  // namespace uorb::detail
+}  // namespace detail
+}  // namespace uorb
