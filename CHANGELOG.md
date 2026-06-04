@@ -7,7 +7,33 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-[Unreleased]: https://github.com/ShawnFeng0/uorb/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/ShawnFeng0/uorb/compare/v0.5.0...HEAD
+
+## [0.5.0] - 2026-06-04
+[0.5.0]: https://github.com/ShawnFeng0/uorb/compare/v0.4.1...v0.5.0
+
+### Added
+
+- Add event poll and advanced C++ publish/subscribe examples.
+- Expand test coverage for uORB lifecycle, event handling, concurrency, and queued sample reads.
+
+### Changed
+
+- Remove `orb_errno` compatibility layer; use standard `errno` throughout.
+- Simplify version string generation via compile-time macro with fallback default.
+- Lower CMake minimum version to 3.10 for broader platform compatibility.
+- Move generated topic sources to build tree to avoid source directory pollution.
+- Simplify public C API and modernize header utilities.
+- Unify uORB template parameter names across wrappers.
+- Strengthen CI test and release workflows; align message generation tooling.
+- Refresh getting started docs and public API guidance.
+
+### Fixed
+
+- Set `errno` on event poll allocation failure.
+- Prevent `SubscriptionInterval` time underflow.
+- Synchronize uORB node access to avoid data races.
+- Harden event poll/loop handling and C API allocation/ownership semantics.
 
 ## [0.4.1] - 2026-05-28
 [0.4.1]: https://github.com/ShawnFeng0/uorb/compare/v0.4.0...v0.4.1
