@@ -18,11 +18,6 @@ include(cmake/git_version.cmake)
 set_git_version(UORB_GIT_TAG)
 message(STATUS "uORB version: ${UORB_GIT_TAG}")
 
-configure_file(
-        "src/git_version.cc.in"
-        "uorb_generated/git_version.cc"
-)
-
 add_compile_options(-Wextra -Wall)
 
 # uorb library
@@ -31,10 +26,10 @@ target_sources(uorb PRIVATE
         src/device_master.cc
         src/device_node.cc
         src/uorb.cc
-        ${CMAKE_CURRENT_BINARY_DIR}/uorb_generated/git_version.cc
         )
 target_include_directories(uorb PUBLIC include)
 target_include_directories(uorb PRIVATE src)
+target_compile_definitions(uorb PRIVATE UORB_GIT_TAG="${UORB_GIT_TAG}")
 target_link_libraries(uorb PRIVATE pthread)
 
 add_subdirectory(tools/uorb_tcp_topic_listener_lib EXCLUDE_FROM_ALL)

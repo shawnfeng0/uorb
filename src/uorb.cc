@@ -15,6 +15,10 @@
 
 using namespace uorb;
 
+#ifndef UORB_GIT_TAG
+#define UORB_GIT_TAG "v0.0.0-0-unknown"
+#endif
+
 #define ORB_CHECK_TRUE(condition, error_code, error_action) \
   ({                                                        \
     if (!static_cast<bool>(condition)) {                    \
@@ -260,3 +264,5 @@ bool orb_event_poll_quit(orb_event_poll_t *poll) {
   cpp_poll->Stop();
   return true;
 }
+
+const char *orb_version(void) { return UORB_GIT_TAG; }
