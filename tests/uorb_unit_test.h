@@ -86,7 +86,7 @@ void uORBTest::UnitTest::latency_test(const orb_metadata *T) {
 
   orb_publish(pfd0, &pub_data);
 
-  bool pub_sub_test_passed = false;
+  std::atomic<bool> pub_sub_test_passed{false};
 
   /* test pub / sub latency */
 
