@@ -243,7 +243,7 @@ bool orb_destroy_publication(orb_publication_t **handle_ptr);
  * @param handle  The handle returned from orb_create_publication().
  * @param data    A pointer to the data to be published.
  *                The length must correspond to the topic structure.
- * @return        true on success, false with orb_errno set accordingly.
+ * @return        true on success, false with errno set accordingly.
  */
 bool orb_publish(orb_publication_t *handle, const void *data);
 
@@ -346,7 +346,7 @@ bool orb_destroy_subscription(orb_subscription_t **handle_ptr);
  * @param handle  A handle returned from orb_create_subscription.
  * @param buffer  Pointer to the buffer receiving the data.
  *                The length must correspond to the topic structure.
- * @return    true on success, false otherwise with orb_errno set accordingly.
+ * @return    true on success, false otherwise with errno set accordingly.
  */
 bool orb_copy(orb_subscription_t *handle, void *buffer);
 
@@ -430,13 +430,13 @@ bool orb_get_topic_status(const struct orb_metadata *meta, unsigned int instance
  *
  * A subscription handle can be bound to at most one waiting notifier at a
  * time. Calling orb_poll() while any fd in fds is already bound by another
- * orb_poll()/orb_event_poll_wait() call fails with orb_errno = EBUSY.
+ * orb_poll()/orb_event_poll_wait() call fails with errno = EBUSY.
  *
  * @return  Upon successful completion, poll() shall return a
  * non-negative value. A positive value indicates the total number of
  * subscriptions that are ready. A value of 0 indicates that the call timed out
  * and no handle has been selected. Upon failure, poll() shall return
- * −1 and set orb_errno to indicate the error.
+ * −1 and set errno to indicate the error.
  */
 int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms);
 
@@ -474,7 +474,7 @@ bool orb_event_poll_destroy(orb_event_poll_t **handle_ptr);
  * @return true on success
  *
  * A subscription handle can only be added to one active event poll/waiter at
- * a time. If already bound elsewhere, this returns false and sets orb_errno to
+ * a time. If already bound elsewhere, this returns false and sets errno to
  * EBUSY.
  */
 bool orb_event_poll_add(orb_event_poll_t *poll, orb_subscription_t *sub);

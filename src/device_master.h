@@ -29,8 +29,8 @@ class uorb::DeviceMaster {
    * (0-based) of the publication. This is an output parameter and will be set
    * to the newly created instance, ie. 0 for the first advertiser, 1 for the
    * next and so on. If it is nullptr, it will only be created at 0.
-   * @return nullptr on error, and set errno to orb_errno. Otherwise returns a
-   * DeviceNode that can be used to publish to the topic.
+   * @return nullptr on error and set errno. Otherwise returns a DeviceNode that
+   * can be used to publish to the topic.
    */
   DeviceNode *CreateAdvertiser(const orb_metadata &meta, unsigned int *instance);
 

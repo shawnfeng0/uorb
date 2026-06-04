@@ -28,7 +28,6 @@ add_compile_options(-Wextra -Wall)
 # uorb library
 add_library(uorb)
 target_sources(uorb PRIVATE
-        src/base/orb_errno.cc
         src/device_master.cc
         src/device_node.cc
         src/uorb.cc

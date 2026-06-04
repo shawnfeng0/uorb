@@ -562,6 +562,10 @@ TEST_F(UnitTest, queue) {
 
   ASSERT_NE(sfd, nullptr) << "subscribe failed: " << errno;
 
+  while (orb_check_update(sfd)) {
+    ASSERT_TRUE(orb_copy(sfd, &sub_data)) << "drain stale sample failed: " << errno;
+  }
+
   const int queue_size = ORB_ID(orb_test_medium_queue)->o_queue_size;
   pub_data.val = 0;
   ptopic = orb_create_publication(ORB_ID(orb_test_medium_queue));
