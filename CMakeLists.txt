@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12...4.0)
+cmake_minimum_required(VERSION 3.10)
 
 # Set cmake_policies
 include(cmake/policy.cmake)
@@ -21,8 +21,7 @@ message(STATUS "uORB version: ${UORB_GIT_TAG}")
 add_compile_options(-Wextra -Wall)
 
 # uorb library
-add_library(uorb)
-target_sources(uorb PRIVATE
+add_library(uorb STATIC
         src/device_master.cc
         src/device_node.cc
         src/uorb.cc
