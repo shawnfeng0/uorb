@@ -1,8 +1,4 @@
 project(uorb_unittests_msgs LANGUAGES NONE)
-cmake_minimum_required(VERSION 3.12...4.0)
-
-# Support IN_LIST if() operator
-cmake_policy(SET CMP0057 NEW)
 
 find_package(Python3 COMPONENTS Interpreter Development)
 # We have a custom error message to tell users how to install python3.
