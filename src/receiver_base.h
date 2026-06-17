@@ -16,7 +16,7 @@ struct ReceiverBase {
   ReceiverBase &operator=(ReceiverBase &&) = delete;
   virtual ~ReceiverBase() = default;
 
-  virtual void notify_all() = 0;
+  virtual void on_publish(const void *data) = 0;
   bool operator==(const ReceiverBase& rhs) const { return &rhs == this; }
 
   intrusive_list::forward_list_node receiver_node{};

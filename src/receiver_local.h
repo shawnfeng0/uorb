@@ -16,7 +16,7 @@ class ReceiverLocal final : public detail::ReceiverBase {
     dev_.add_subscriber();
   }
 
-  void notify_all() override {
+  void on_publish(const void *) override {
     auto *notifier = notifier_.load(std::memory_order_acquire);
     if (notifier) {
       notifier->notify_all();

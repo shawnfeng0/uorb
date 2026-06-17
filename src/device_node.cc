@@ -90,7 +90,7 @@ bool uorb::DeviceNode::Publish(const void *data) {
   generation_++;
 
   for (auto &receiver : receiver_list_) {
-    receiver.notify_all();
+    receiver.on_publish(data);
   }
 
   return true;
