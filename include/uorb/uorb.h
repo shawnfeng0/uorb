@@ -146,7 +146,6 @@ extern "C" {
  * - Subscription: orb_create_subscription(),
  *   orb_create_subscription_multi(), orb_destroy_subscription(), orb_copy(),
  *   orb_copy_once(), orb_check_update(), orb_check_and_copy().
- * - Waiting: orb_poll().
  * - Event poll: orb_event_poll_create(), orb_event_poll_destroy(),
  *   orb_event_poll_add(), orb_event_poll_remove(), orb_event_poll_wait(),
  *   orb_event_poll_quit().
@@ -175,16 +174,6 @@ typedef struct orb_publication orb_publication_t;
  * implementation and avoid the implicit conversion of "void*" types.
  */
 typedef struct orb_subscription orb_subscription_t;
-
-/**
- * The auxiliary data structure used to use orb_poll.
- */
-struct orb_pollfd {
-  orb_subscription_t *fd;  // A handle returned from orb_create_subscription.
-  bool ready;              // Whether the subscription has data to read.
-};
-
-typedef struct orb_pollfd orb_pollfd_t;
 
 /**
  * Create a publication handle for topic instance 0.
@@ -294,7 +283,7 @@ orb_subscription_t *orb_create_subscription(const struct orb_metadata *meta);
 /**
  * Subscribe to a multi-instance of a topic.
  *
- * The returned value is a subscriber handle that can be passed to orb_poll()
+ * The returned value is a subscriber handle that can be passed to orb_event_poll_add()
  * in order to wait for updates to a topic, as well as orb_copy(),
  * orb_check_update().
  *
@@ -413,32 +402,6 @@ unsigned int orb_group_count(const struct orb_metadata *meta);
  * @return true on success.
  */
 bool orb_get_topic_status(const struct orb_metadata *meta, unsigned int instance, struct orb_status *status);
-
-/**
- * Wait for one or more subscriptions to receive new data.
- *
- * If no subscription is ready, orb_poll() shall wait at least timeout
- * milliseconds for data to arrive on any selected handle.
- *
- * @param fds       A set of subscriber handles. The ready field is set to true
- *                  for subscriptions that have data to read.
- * @param nfds      The number of orb_pollfd structures in the fds array.
- * @param timeout_ms   Maximum waiting time for poll.
- * If the value of timeout is 0, poll() shall return immediately.
- * If the value of timeout is < 0, poll() shall block until data arrives or
- * until the call is interrupted.
- *
- * A subscription handle can be bound to at most one waiting notifier at a
- * time. Calling orb_poll() while any fd in fds is already bound by another
- * orb_poll()/orb_event_poll_wait() call fails with errno = EBUSY.
- *
- * @return  Upon successful completion, poll() shall return a
- * non-negative value. A positive value indicates the total number of
- * subscriptions that are ready. A value of 0 indicates that the call timed out
- * and no handle has been selected. Upon failure, poll() shall return
- * −1 and set errno to indicate the error.
- */
-int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms);
 
 /**
  ** Event poll handle (opaque type for C API)

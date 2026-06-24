@@ -169,56 +169,6 @@ bool orb_get_topic_status(const struct orb_metadata *meta, unsigned int instance
   return master.GetTopicStatus(*meta, instance, status);
 }
 
-int orb_poll(struct orb_pollfd *fds, unsigned int nfds, int timeout_ms) {
-  ORB_CHECK_TRUE(fds && nfds, EINVAL, return -1);
-  for (unsigned i = 0; i < nfds; ++i) {
-    ORB_CHECK_TRUE(fds[i].fd != nullptr, EINVAL, return -1);
-  }
-
-  int number_of_new_data = 0;
-
-  auto CheckDataUpdate = [&] {
-    number_of_new_data = 0;
-    for (unsigned i = 0; i < nfds; ++i) {
-      fds[i].ready = false;
-      auto &item_sub = *reinterpret_cast<ReceiverLocal *>(fds[i].fd);
-      if (item_sub.is_ready()) {
-        fds[i].ready = true;
-        ++number_of_new_data;
-      }
-    }
-    return number_of_new_data > 0;
-  };
-
-  if (CheckDataUpdate()) return number_of_new_data;
-
-  uorb::base::LiteNotifier notifier;
-  unsigned registered = 0;
-  for (; registered < nfds; ++registered) {
-    auto &item_sub = *reinterpret_cast<ReceiverLocal *>(fds[registered].fd);
-    if (!item_sub.SetNotifier(&notifier)) {
-      for (unsigned j = 0; j < registered; ++j) {
-        auto &rollback_sub = *reinterpret_cast<ReceiverLocal *>(fds[j].fd);
-        rollback_sub.RemoveNotifier();
-      }
-      return -1;
-    }
-  }
-
-  if (timeout_ms > 0) {
-    notifier.wait_for(timeout_ms, CheckDataUpdate);
-  } else if (timeout_ms < 0) {
-    notifier.wait(CheckDataUpdate);
-  }
-
-  for (unsigned i = 0; i < registered; ++i) {
-    auto &item_sub = *reinterpret_cast<ReceiverLocal *>(fds[i].fd);
-    item_sub.RemoveNotifier();
-  }
-
-  return number_of_new_data;
-}
-
 
 orb_event_poll_t *orb_event_poll_create(void) {
   auto *cpp_poll = new (std::nothrow) uorb::EventPoll();

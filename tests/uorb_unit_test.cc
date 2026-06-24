@@ -109,7 +109,6 @@ TEST_F(UnitTest, subscription_multi_reports_einval_for_invalid_instance) {
 
 TEST_F(UnitTest, rejects_null_arguments) {
   orb_test_s msg{};
-  orb_pollfd_t fds[1]{};
 
   errno = 0;
   EXPECT_EQ(orb_create_publication(nullptr), nullptr);
@@ -186,18 +185,6 @@ TEST_F(UnitTest, rejects_null_arguments) {
 
   errno = 0;
   EXPECT_FALSE(orb_get_topic_status(nullptr, 0, nullptr));
-  EXPECT_EQ(errno, EINVAL);
-
-  errno = 0;
-  EXPECT_EQ(orb_poll(nullptr, 1, 0), -1);
-  EXPECT_EQ(errno, EINVAL);
-
-  errno = 0;
-  EXPECT_EQ(orb_poll(fds, 0, 0), -1);
-  EXPECT_EQ(errno, EINVAL);
-
-  errno = 0;
-  EXPECT_EQ(orb_poll(fds, 1, 0), -1);
   EXPECT_EQ(errno, EINVAL);
 
   EXPECT_TRUE(orb_destroy_subscription(&subscription));
@@ -787,11 +774,13 @@ TEST_F(UnitTest, queue_poll_notify) {
   }};
 
   int next_expected_val = 0;
-  orb_pollfd_t fds[1]{};
-  fds[0].fd = sfd;
+  orb_event_poll_t *poll = orb_event_poll_create();
+  ASSERT_NE(poll, nullptr);
+  ASSERT_TRUE(orb_event_poll_add(poll, sfd));
 
   while (!thread_should_exit.load()) {
-    int poll_ret = orb_poll(fds, 1, 500);
+    orb_subscription_t *ready[1] = {nullptr};
+    int poll_ret = orb_event_poll_wait(poll, ready, 1, 500);
     ASSERT_GE(poll_ret, 0) << "poll error (" << poll_ret << "," << errno << ")";
 
     if (thread_should_exit.load()) {
@@ -800,13 +789,15 @@ TEST_F(UnitTest, queue_poll_notify) {
 
     ASSERT_NE(poll_ret, 0) << "poll timeout";
 
-    if (fds[0].ready) {
+    if (poll_ret > 0 && ready[0] == sfd) {
       orb_copy(sfd, &t);
       ASSERT_EQ(next_expected_val, t.val) << "copy mismatch";
       ++next_expected_val;
     }
   }
 
+  ASSERT_TRUE(orb_event_poll_remove(poll, sfd));
+  ASSERT_TRUE(orb_event_poll_destroy(&poll));
   test_queue_thread.join();
 
   ASSERT_TRUE(orb_destroy_subscription(&sfd));
@@ -825,11 +816,14 @@ TEST_F(UnitTest, poll_timeout_semantics) {
     ASSERT_TRUE(orb_copy(sub, &drain));
   }
 
-  orb_pollfd_t fds[1]{};
-  fds[0].fd = sub;
+  orb_event_poll_t *poll = orb_event_poll_create();
+  ASSERT_NE(poll, nullptr);
+  ASSERT_TRUE(orb_event_poll_add(poll, sub));
+
+  orb_subscription_t *ready[1] = {nullptr};
 
   const auto zero_start = std::chrono::steady_clock::now();
-  EXPECT_EQ(orb_poll(fds, 1, 0), 0);
+  EXPECT_EQ(orb_event_poll_wait(poll, ready, 1, 0), 0);
   const auto zero_elapsed_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(
           std::chrono::steady_clock::now() - zero_start)
@@ -847,15 +841,17 @@ TEST_F(UnitTest, poll_timeout_semantics) {
   });
 
   const auto neg_start = std::chrono::steady_clock::now();
-  EXPECT_EQ(orb_poll(fds, 1, -5), 1);
+  EXPECT_EQ(orb_event_poll_wait(poll, ready, 1, -5), 1);
   const auto neg_elapsed_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(
           std::chrono::steady_clock::now() - neg_start)
           .count();
   EXPECT_GE(neg_elapsed_ms, 25);
-  EXPECT_TRUE(fds[0].ready);
+  EXPECT_EQ(ready[0], sub);
 
   publisher.join();
+  ASSERT_TRUE(orb_event_poll_remove(poll, sub));
+  ASSERT_TRUE(orb_event_poll_destroy(&poll));
   EXPECT_TRUE(orb_destroy_publication(&pub));
   EXPECT_TRUE(orb_destroy_subscription(&sub));
 }

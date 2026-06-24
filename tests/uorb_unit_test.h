@@ -98,8 +98,6 @@ void uORBTest::UnitTest::latency_test(const orb_metadata *T) {
     float latency_integral = 0.0f;
 
     /* wakeup source(s) */
-    orb_pollfd_t fds[3];
-
     auto test_multi_sub = orb_create_subscription(ORB_ID(orb_test));
     auto test_multi_sub_medium =
         orb_create_subscription(ORB_ID(orb_test_medium));
@@ -112,9 +110,10 @@ void uORBTest::UnitTest::latency_test(const orb_metadata *T) {
     orb_copy(test_multi_sub_medium, &pub_data_large);
     orb_copy(test_multi_sub_large, &pub_data_large);
 
-    fds[0].fd = test_multi_sub;
-    fds[1].fd = test_multi_sub_medium;
-    fds[2].fd = test_multi_sub_large;
+    orb_event_poll_t *poll = orb_event_poll_create();
+    orb_event_poll_add(poll, test_multi_sub);
+    orb_event_poll_add(poll, test_multi_sub_medium);
+    orb_event_poll_add(poll, test_multi_sub_large);
 
     const unsigned max_runs = 1000;
     int current_value = pub_data_large.val;
@@ -126,16 +125,19 @@ void uORBTest::UnitTest::latency_test(const orb_metadata *T) {
 
     for (unsigned i = 0; i < max_runs; i++) {
       /* wait for up to 500ms for data */
-      int pret = orb_poll(&fds[0], (sizeof(fds) / sizeof(fds[0])), 500);
+      orb_subscription_t *ready[3] = {nullptr};
+      int pret = orb_event_poll_wait(poll, ready, 3, 500);
 
-      if (fds[0].ready) {
-        orb_copy(test_multi_sub, &pub_data_large);
+      for (int j = 0; j < pret; ++j) {
+        if (ready[j] == test_multi_sub) {
+          orb_copy(test_multi_sub, &pub_data_large);
 
-      } else if (fds[1].ready) {
-        orb_copy(test_multi_sub_medium, &pub_data_large);
+        } else if (ready[j] == test_multi_sub_medium) {
+          orb_copy(test_multi_sub_medium, &pub_data_large);
 
-      } else if (fds[2].ready) {
-        orb_copy(test_multi_sub_large, &pub_data_large);
+        } else if (ready[j] == test_multi_sub_large) {
+          orb_copy(test_multi_sub_large, &pub_data_large);
+        }
       }
 
       if (pret < 0) {
@@ -158,6 +160,11 @@ void uORBTest::UnitTest::latency_test(const orb_metadata *T) {
         timing_min = elt;
       }
     }
+
+    orb_event_poll_remove(poll, test_multi_sub);
+    orb_event_poll_remove(poll, test_multi_sub_medium);
+    orb_event_poll_remove(poll, test_multi_sub_large);
+    orb_event_poll_destroy(&poll);
 
     orb_destroy_subscription(&test_multi_sub);
     orb_destroy_subscription(&test_multi_sub_medium);

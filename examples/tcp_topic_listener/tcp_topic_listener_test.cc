@@ -65,16 +65,14 @@ template <const orb_metadata &T>
 [[noreturn]] static void thread_subscriber() {
   uorb::SubscriptionData<T> subscription_data;
 
-#ifndef ARRAY_SIZE
-#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
-#endif
-
   int timeout_ms = 2000;
 
-  struct orb_pollfd poll_fds[] = {{.fd = subscription_data.handle()}};
+  orb_event_poll_t *poll = orb_event_poll_create();
+  orb_event_poll_add(poll, subscription_data.handle());
 
   while (true) {
-    if (0 < orb_poll(poll_fds, ARRAY_SIZE(poll_fds), timeout_ms)) {
+    orb_subscription_t *ready[1];
+    if (0 < orb_event_poll_wait(poll, ready, 1, timeout_ms)) {
       if (subscription_data.Update()) {
         //        auto data = sub_example_string.data();
         //        LOGGER_INFO("timestamp: %" PRIu64 "[us]", data.timestamp);

@@ -36,12 +36,14 @@ int main() {
   LOGGER_INFO("uORB version: %s", orb_version());
 
   uorb::SubscriptionInterval<uorb::msg::sensor_accel> subscription(500 * 1000);
-  orb_pollfd_t poll_fds[] = {{.fd = subscription.handle()}};
+  orb_event_poll_t *poll = orb_event_poll_create();
+  orb_event_poll_add(poll, subscription.handle());
 
   std::thread publisher(publish_accel_samples);
 
   for (;;) {
-    const int poll_result = orb_poll(poll_fds, 1, 1000);
+    orb_subscription_t *ready[1];
+    const int poll_result = orb_event_poll_wait(poll, ready, 1, 1000);
     if (poll_result <= 0) {
       break;
     }
@@ -55,5 +57,7 @@ int main() {
   }
 
   publisher.join();
+  orb_event_poll_remove(poll, subscription.handle());
+  orb_event_poll_destroy(&poll);
   return 0;
 }

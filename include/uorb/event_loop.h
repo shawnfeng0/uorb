@@ -12,10 +12,9 @@
 
 namespace uorb {
 
-// EventLoop: register callbacks on subscriptions and dispatch them when new
-// data becomes available. Prefer EventLoop when one thread needs to wait on
-// multiple subscriptions and dispatch type-safe callbacks instead of manually
-// managing orb_poll() loops.
+// EventLoop: callback-based dispatch loop built on top of the event poll API.
+// Register subscriptions with callbacks, then call Run() — EventLoop blocks
+// until data arrives, then dispatches the associated callback automatically.
 //
 // Thread-safety:
 //  - Quit() is thread-safe and may be called from any thread.
@@ -31,8 +30,8 @@ class EventLoop {
   EventLoop() : event_poll_(orb_event_poll_create()) {}
   ~EventLoop() {
     if (!event_poll_) return;
-    // orb_event_poll_destroy() also unbinds remaining notifiers, but we still
-    // remove each subscription here first: for owned subscriptions we need to
+    // orb_event_poll_destroy() also unbinds remaining subscriptions, but we
+    // still remove each one here first: for owned subscriptions we need to
     // detach them from the poll set before we call orb_destroy_subscription(),
     // otherwise the subscription would be freed while still linked.
     for (auto &kv : entries_) {
@@ -58,9 +57,9 @@ class EventLoop {
   // remain alive until either RemoveSubscription() is called or the EventLoop
   // is destroyed.
   //
-  // A subscription can be bound to only one active waiter/notifier at a time;
-  // registration also fails if the subscription is currently used by another
-  // EventLoop / orb_poll / orb_event_poll_wait call.
+  // A subscription can be bound to only one active event poll at a time;
+  // registration fails if the subscription is already used by another
+  // EventLoop or orb_event_poll_add() call.
   template <typename Sub, typename F>
   bool AddSubscription(Sub &sub_cpp, F &&cb) {
     using Msg = typename Sub::ValueType;
@@ -106,8 +105,8 @@ class EventLoop {
     return number_of_event;
   }
 
-  // Run the loop until Quit() is requested or a poll error occurs.
-  // Returns true if the loop exited because of Quit(), false on poll error
+  // Run the loop until Quit() is requested or an error occurs.
+  // Returns true if the loop exited because of Quit(), false on error
   // or if it was invoked on an invalid / empty EventLoop.
   bool Run() {
     // RunOnce(-1) blocks until either a subscription has data (returns > 0)

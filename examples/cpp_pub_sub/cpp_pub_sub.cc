@@ -39,26 +39,27 @@ void *thread_subscriber(void *unused) {
   (void)unused;
   uorb::SubscriptionData<uorb::msg::example_string> sub_example_string;
 
-#ifndef ARRAY_SIZE
-#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
-#endif
-
   int timeout_ms = 2000;
 
-  struct orb_pollfd poll_fds[] = {{.fd = sub_example_string.handle()}};
+  orb_event_poll_t *poll = orb_event_poll_create();
+  orb_event_poll_add(poll, sub_example_string.handle());
 
   while (true) {
-    if (0 < orb_poll(poll_fds, ARRAY_SIZE(poll_fds), timeout_ms)) {
+    orb_subscription_t *ready[1];
+    if (0 < orb_event_poll_wait(poll, ready, 1, timeout_ms)) {
       if (sub_example_string.Update()) {
         auto data = sub_example_string.data();
         LOGGER_INFO("timestamp: %" PRIu64 "[us], Receive msg: \"%s\"",
                     data.timestamp, data.str);
       }
     } else {
-      LOGGER_WARN("Got no data within %d milliseconds", 2000);
+      LOGGER_WARN("Got no data within %d milliseconds", timeout_ms);
       break;
     }
   }
+
+  orb_event_poll_remove(poll, sub_example_string.handle());
+  orb_event_poll_destroy(&poll);
 
   LOGGER_WARN("subscription over");
   return nullptr;

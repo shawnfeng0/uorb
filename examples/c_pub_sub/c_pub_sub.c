@@ -35,17 +35,15 @@ void *thread_subscriber(void *unused) {
   orb_subscription_t *sub_example_string =
       orb_create_subscription(ORB_ID(example_string));
 
-#ifndef ARRAY_SIZE
-#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
-#endif
-
-  struct orb_pollfd pollfds[] = {{.fd = sub_example_string}};
+  orb_event_poll_t *poll = orb_event_poll_create();
+  orb_event_poll_add(poll, sub_example_string);
   int timeout = 2000;
 
   while (true) {
-    if (0 < orb_poll(pollfds, ARRAY_SIZE(pollfds), timeout)) {
+    orb_subscription_t *ready[1];
+    if (0 < orb_event_poll_wait(poll, ready, 1, timeout)) {
       struct example_string_s example_string;
-      orb_copy(sub_example_string, &example_string);
+      orb_copy(ready[0], &example_string);
       LOGGER_INFO("Receive msg: \"%s\"", example_string.str);
     } else {
       LOGGER_WARN("Got no data within %d milliseconds", timeout);
@@ -53,6 +51,8 @@ void *thread_subscriber(void *unused) {
     }
   }
 
+  orb_event_poll_remove(poll, sub_example_string);
+  orb_event_poll_destroy(&poll);
   orb_destroy_subscription(&sub_example_string);
 
   LOGGER_WARN("subscription over");

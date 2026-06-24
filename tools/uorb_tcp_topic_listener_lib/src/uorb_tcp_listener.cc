@@ -60,14 +60,16 @@ static void CmdListener(uorb::listener::Fd &fd,
   auto sub = orb_create_subscription(meta);
   std::vector<uint8_t> data(meta->o_size);
 
-  orb_pollfd fds{.fd = sub};
+  orb_event_poll_t *poll = orb_event_poll_create();
+  orb_event_poll_add(poll, sub);
 
   uorb::listener::DataPrinter data_printer(*meta);
   orb_abstime_us last_write_timestamp{};
   const int timeout_ms = 1000;
   uint32_t current_timeout_ms = 0;
   do {
-    if (orb_poll(&fds, 1, timeout_ms) > 0) {
+    orb_subscription_t *ready[1];
+    if (orb_event_poll_wait(poll, ready, 1, timeout_ms) > 0) {
       if (orb_check_and_copy(sub, data.data())) {
         if (orb_elapsed_time_us(last_write_timestamp) > 100 * 1000) {
           last_write_timestamp = orb_absolute_time_us();
@@ -93,6 +95,8 @@ static void CmdListener(uorb::listener::Fd &fd,
     }
   } while (true);
 
+  orb_event_poll_remove(poll, sub);
+  orb_event_poll_destroy(&poll);
   orb_destroy_subscription(&sub);
 }
 

@@ -202,56 +202,6 @@ static void run_mixed(int num_threads, int duration_ms) {
   orb_destroy_publication(&pub);
 }
 
-// orb_poll throughput on many fds with timeout=0.
-static void run_orb_poll_many_fds(int num_fds, int duration_ms,
-                                  const char *label =
-                                      "orb_poll timeout=0 (many fds)") {
-  orb_publication_t *pub =
-      orb_create_publication_multi(ORB_ID(orb_test), nullptr);
-
-  std::vector<orb_subscription_t *> subs;
-  subs.reserve(num_fds);
-  std::vector<orb_pollfd_t> fds(num_fds);
-
-  for (int i = 0; i < num_fds; ++i) {
-    orb_subscription_t *sub =
-        orb_create_subscription_multi(ORB_ID(orb_test), 0);
-    subs.push_back(sub);
-    fds[i].fd = sub;
-  }
-
-  // Ensure at least one fd is ready so we measure scanning/marking cost.
-  orb_test_s msg{};
-  orb_publish(pub, &msg);
-
-  const auto t0 = std::chrono::steady_clock::now();
-  long long loops = 0;
-  long long ready_total = 0;
-  while (elapsed_ms(t0) < duration_ms) {
-    const int n = orb_poll(fds.data(), static_cast<unsigned>(fds.size()), 0);
-    if (n > 0) {
-      if (g_consume_all) {
-        for (int i = 0; i < n; ++i) {
-          orb_copy(fds[i].fd, &msg);
-        }
-      } else {
-        orb_copy(subs[0], &msg);
-      }
-      orb_publish(pub, &msg);
-      ++loops;
-      ready_total += n;
-    }
-  }
-
-  print_result(label, num_fds, loops, elapsed_ms(t0));
-  print_ready_hint(num_fds, loops, ready_total);
-
-  for (auto *sub : subs) {
-    orb_destroy_subscription(&sub);
-  }
-  orb_destroy_publication(&pub);
-}
-
 // orb_event_poll throughput on many subscriptions with timeout=0.
 static void run_event_poll_many_subs(
     int num_subs, int duration_ms,
@@ -301,63 +251,6 @@ static void run_event_poll_many_subs(
     orb_destroy_subscription(&sub);
   }
   orb_event_poll_destroy(&poll);
-  orb_destroy_publication(&pub);
-}
-
-// Blocking poll: publisher thread publishes, consumer blocks on orb_poll.
-static void run_orb_poll_blocking(int num_fds, int duration_ms) {
-  orb_publication_t *pub =
-      orb_create_publication_multi(ORB_ID(orb_test), nullptr);
-
-  std::vector<orb_subscription_t *> subs;
-  subs.reserve(num_fds);
-  std::vector<orb_pollfd_t> fds(num_fds);
-  for (int i = 0; i < num_fds; ++i) {
-    orb_subscription_t *sub =
-        orb_create_subscription_multi(ORB_ID(orb_test), 0);
-    subs.push_back(sub);
-    fds[i].fd = sub;
-  }
-
-  // Drain initial state.
-  orb_test_s msg{};
-  orb_publish(pub, &msg);
-  orb_poll(fds.data(), static_cast<unsigned>(fds.size()), 0);
-  for (auto *sub : subs) orb_copy(sub, &msg);
-
-  std::atomic<bool> running{true};
-  std::atomic<long long> pub_count{0};
-
-  // Publisher thread: publish as fast as consumer can keep up.
-  std::thread publisher([&]() {
-    orb_test_s m{};
-    while (running.load(std::memory_order_relaxed)) {
-      m.val++;
-      orb_publish(pub, &m);
-      pub_count.fetch_add(1, std::memory_order_relaxed);
-      // Yield to let consumer wake and process.
-      std::this_thread::yield();
-    }
-  });
-
-  const auto t0 = std::chrono::steady_clock::now();
-  long long loops = 0;
-  while (elapsed_ms(t0) < duration_ms) {
-    const int n = orb_poll(fds.data(), static_cast<unsigned>(fds.size()), 100);
-    if (n > 0) {
-      for (int i = 0; i < num_fds; ++i) {
-        if (fds[i].ready) orb_copy(fds[i].fd, &msg);
-      }
-      ++loops;
-    }
-  }
-
-  running = false;
-  publisher.join();
-  print_result("blocking orb_poll (pub+wait+copy)", num_fds, loops,
-               elapsed_ms(t0));
-
-  for (auto *sub : subs) orb_destroy_subscription(&sub);
   orb_destroy_publication(&pub);
 }
 
@@ -469,14 +362,6 @@ int main() {
     }
   }
 
-  if (mode_enabled(mode, "poll")) {
-    if (!g_csv_output) printf("\n");
-    print_header();
-    for (int fds : {1, 8, 32, 128}) {
-      run_orb_poll_many_fds(fds, duration_ms);
-    }
-  }
-
   if (mode_enabled(mode, "event_poll")) {
     if (!g_csv_output) printf("\n");
     print_header();
@@ -492,8 +377,6 @@ int main() {
     }
     print_header();
     for (int n : {1, 8, 32, 128}) {
-      run_orb_poll_many_fds(n, duration_ms,
-                            "compare_poll/orb_poll timeout=0");
       run_event_poll_many_subs(n, duration_ms,
                                "compare_poll/event_poll timeout=0");
     }
@@ -506,7 +389,6 @@ int main() {
     }
     print_header();
     for (int n : {1, 8, 32, 128}) {
-      run_orb_poll_blocking(n, duration_ms);
       run_event_poll_blocking(n, duration_ms);
     }
   }

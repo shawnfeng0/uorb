@@ -32,10 +32,12 @@ void publish_instance(const char *label) {
 
 void subscribe_instance(uint8_t instance) {
   uorb::SubscriptionData<uorb::msg::example_string> subscription(instance);
-  orb_pollfd_t poll_fds[] = {{.fd = subscription.handle()}};
+  orb_event_poll_t *poll = orb_event_poll_create();
+  orb_event_poll_add(poll, subscription.handle());
 
   for (;;) {
-    const int poll_result = orb_poll(poll_fds, 1, 1000);
+    orb_subscription_t *ready[1];
+    const int poll_result = orb_event_poll_wait(poll, ready, 1, 1000);
     if (poll_result <= 0) {
       break;
     }
@@ -46,6 +48,9 @@ void subscribe_instance(uint8_t instance) {
                   message.timestamp, message.str);
     }
   }
+
+  orb_event_poll_remove(poll, subscription.handle());
+  orb_event_poll_destroy(&poll);
 }
 
 int main() {
