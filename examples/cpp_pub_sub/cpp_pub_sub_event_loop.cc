@@ -2,10 +2,8 @@
 //
 // Demonstrates:
 //   * Subscribe<Topic>(cb)        -- EventLoop owns the subscription.
-//   * AddSubscription(sub, cb)   -- the caller owns the subscription.
 //   * Multiple publisher threads on different topics.
 //   * Quit() from another thread to stop the loop.
-//   * RemoveSubscription() on teardown.
 //
 // Copyright (c) 2021-2025 shawnfeng. All rights reserved.
 
@@ -17,7 +15,6 @@
 
 #include "uevent/uevent.h"
 #include "uorb/publication.h"
-#include "uorb/subscription.h"
 #include "uorb/topics/example_string.h"
 #include "uorb/topics/sensor_accel.h"
 #include "uorb/topics/sensor_gyro.h"
@@ -30,7 +27,7 @@ void thread_publisher_example_string() {
     data.timestamp = orb_absolute_time_us();
     snprintf(reinterpret_cast<char *>(data.str), example_string_s::STRING_LENGTH, "%d: %s", i,
              "This is a string message. ");
-    if (!pub_example_string.Publish()) {
+    if (pub_example_string.Publish() != ORB_OK) {
       printf("Publish example_string error\n");
     }
     usleep(2000 * 1000);  // 2 seconds
@@ -47,7 +44,7 @@ void thread_publisher_sensor_accel() {
     accel.y = i * 0.2f;
     accel.z = i * 0.3f;
     accel.temperature = 25.0f + i;
-    if (!pub_sensor_accel.Publish()) {
+    if (pub_sensor_accel.Publish() != ORB_OK) {
       printf("Publish sensor_accel error\n");
     }
     usleep(300 * 1000);  // 300 ms
@@ -64,7 +61,7 @@ void thread_publisher_sensor_gyro() {
     gyro.y = i * 1.2f;
     gyro.z = i * 1.3f;
     gyro.temperature = 30.0f + i;
-    if (!pub_sensor_gyro.Publish()) {
+    if (pub_sensor_gyro.Publish() != ORB_OK) {
       printf("Publish sensor_gyro error\n");
     }
     usleep(1000 * 1000);  // 1 second
@@ -88,11 +85,8 @@ int main() {
                 msg.y, msg.z, msg.temperature);
   });
 
-  // (2) User-owned subscription: create the Subscription*Data yourself, then
-  //     AddSubscription(). Ownership stays with the caller; it must outlive
-  //     the EventLoop (or be removed before destruction).
-  uorb::SubscriptionData<uorb::msg::sensor_gyro> sub_gyro;
-  loop.AddSubscription(sub_gyro, [](const sensor_gyro_s &msg) {
+  // (2) All subscriptions are loop-owned via Subscribe<Topic>(callback).
+  loop.Subscribe<uorb::msg::sensor_gyro>([](const sensor_gyro_s &msg) {
     printf("[sensor_gyro] timestamp: %" PRIu64 ", gyro: (%.2f, %.2f, %.2f), temp: %.2f\n", msg.timestamp, msg.x,
                 msg.y, msg.z, msg.temperature);
   });
@@ -111,11 +105,6 @@ int main() {
   // (3) Quit() is thread-safe: it wakes up Run() from outside.
   loop.Quit();
   loop_thread.join();
-
-  // Remove the externally owned subscription before it goes out of scope
-  // (optional here because the EventLoop will be destroyed next, but good
-  // practice in longer-lived programs).
-  loop.RemoveSubscription(sub_gyro);
 
   return 0;
 }

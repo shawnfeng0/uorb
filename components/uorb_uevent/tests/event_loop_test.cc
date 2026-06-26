@@ -71,55 +71,13 @@ TEST(EventLoopTest, SubscribeReceivesPublishedData) {
 
   uorb::PublicationData<uorb::msg::orb_test> pub;
   pub.data().val = 42;
-  ASSERT_TRUE(pub.Publish());
+  ASSERT_EQ(pub.Publish(), ORB_OK);
 
   // One message is pending; RunOnce should deliver it.
   const int n = loop.RunOnce(1000);
   EXPECT_EQ(n, 1);
   EXPECT_EQ(call_count.load(), 1);
   EXPECT_EQ(received_val.load(), 42);
-}
-
-// AddSubscription() binds a callback to a user-owned subscription and
-// RemoveSubscription() removes it.
-TEST(EventLoopTest, AddAndRemoveExternalSubscription) {
-  uorb::EventLoop loop;
-  ASSERT_TRUE(loop);
-
-  uorb::SubscriptionData<uorb::msg::orb_test_medium> sub;
-
-  std::atomic<int> received_val{-1};
-  ASSERT_TRUE(loop.AddSubscription(sub, [&](const orb_test_medium_s &msg) {
-    received_val = msg.val;
-  }));
-
-  // Drain any pre-existing updates.
-  DrainPendingEvents(loop);
-  received_val = -1;
-
-  // Adding the same subscription twice must be refused.
-  EXPECT_FALSE(loop.AddSubscription(
-      sub, [](const orb_test_medium_s &) {}));
-
-  uorb::PublicationData<uorb::msg::orb_test_medium> pub;
-  pub.data().val = 123;
-  ASSERT_TRUE(pub.Publish());
-
-  EXPECT_EQ(loop.RunOnce(1000), 1);
-  EXPECT_EQ(received_val.load(), 123);
-
-  // After removal, published data should no longer trigger the callback.
-  EXPECT_TRUE(loop.RemoveSubscription(sub));
-  // Second removal must return false (already removed).
-  EXPECT_FALSE(loop.RemoveSubscription(sub));
-
-  received_val = -1;
-  pub.data().val = 456;
-  ASSERT_TRUE(pub.Publish());
-
-  // No entries left; RunOnce returns 0 without waiting.
-  EXPECT_EQ(loop.RunOnce(50), 0);
-  EXPECT_EQ(received_val.load(), -1);
 }
 
 // RunOnce() with a timeout and no pending data returns 0.
@@ -165,15 +123,31 @@ TEST(EventLoopTest, QuitStopsLoopFromOtherThread) {
   EXPECT_EQ(loop.RunOnce(100), -1);
 }
 
-// Quit() before Run() starts must still cause Run() to return true (sticky).
-TEST(EventLoopTest, QuitBeforeLoopIsSticky) {
+// After Run() returns due to Quit(), calling Run() again resets quit_requested_
+// and the loop can be restarted.
+TEST(EventLoopTest, RunCanBeRestartedAfterQuit) {
   uorb::EventLoop loop;
   ASSERT_TRUE(loop);
   ASSERT_TRUE(loop.Subscribe<uorb::msg::orb_test>([](const orb_test_s &) {}));
 
-  loop.Quit();
+  // First cycle: start Run, quit from another thread.
+  std::thread quitter1([&] {
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    loop.Quit();
+  });
   EXPECT_TRUE(loop.Run());
+  quitter1.join();
+
+  // RunOnce is still -1 (quit_requested_ is sticky until next Run()).
   EXPECT_EQ(loop.RunOnce(0), -1);
+
+  // Second cycle: Run() resets quit_requested_, so the loop restarts.
+  std::thread quitter2([&] {
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    loop.Quit();
+  });
+  EXPECT_TRUE(loop.Run());
+  quitter2.join();
 }
 
 // Multiple subscribers on different topics each get their own callback.
@@ -198,9 +172,9 @@ TEST(EventLoopTest, MultipleSubscriptionsDispatchIndependently) {
   uorb::PublicationData<uorb::msg::orb_test_medium> pub_b;
 
   pub_a.data().val = 1;
-  ASSERT_TRUE(pub_a.Publish());
+  ASSERT_EQ(pub_a.Publish(), ORB_OK);
   pub_b.data().val = 2;
-  ASSERT_TRUE(pub_b.Publish());
+  ASSERT_EQ(pub_b.Publish(), ORB_OK);
 
   // Drain up to two events. A single RunOnce may return both, or we may need
   // two calls depending on scheduler behavior.
@@ -214,22 +188,19 @@ TEST(EventLoopTest, MultipleSubscriptionsDispatchIndependently) {
   EXPECT_EQ(b_calls.load(), 1);
 }
 
-// The EventLoop destructor must detach and destroy all owned subscriptions,
-// and detach (but not destroy) user-owned subscriptions. If this test leaks
-// or double-frees, sanitizers / later tests will catch it.
-TEST(EventLoopTest, DestructorCleansUpOwnedAndExternal) {
-  uorb::SubscriptionData<uorb::msg::orb_test> external_sub;
+// The EventLoop destructor must destroy all owned subscriptions.
+// If this test leaks or crashes, sanitizers / later tests will catch it.
+TEST(EventLoopTest, DestructorCleansUpOwnedSubscriptions) {
   {
     uorb::EventLoop loop;
     ASSERT_TRUE(loop);
     ASSERT_TRUE(loop.Subscribe<uorb::msg::orb_test_medium>(
         [](const orb_test_medium_s &) {}));
-    ASSERT_TRUE(
-        loop.AddSubscription(external_sub, [](const orb_test_s &) {}));
+    ASSERT_TRUE(loop.Subscribe<uorb::msg::orb_test>(
+        [](const orb_test_s &) {}));
     // Intentionally do not unregister: destructor should clean up.
   }
-  // The external subscription must still be usable after the loop is gone.
-  EXPECT_NE(external_sub.handle(), nullptr);
+  // If we reach here without crashing or leaking, the destructor worked.
 }
 
 TEST(EventLoopTest, CallbackCanQuitLoop) {
@@ -249,84 +220,11 @@ TEST(EventLoopTest, CallbackCanQuitLoop) {
 
   uorb::PublicationData<uorb::msg::orb_test_large> pub;
   pub.data().val = 808;
-  ASSERT_TRUE(pub.Publish());
+  ASSERT_EQ(pub.Publish(), ORB_OK);
 
   EXPECT_EQ(loop.RunOnce(1000), 1);
   EXPECT_EQ(call_count.load(), 1);
   EXPECT_EQ(loop.RunOnce(0), -1);
-}
-
-TEST(EventLoopTest, CallbackCanRemoveAnotherSubscription) {
-  uorb::EventLoop loop;
-  ASSERT_TRUE(loop);
-
-  uorb::SubscriptionData<uorb::msg::orb_test_large> first_sub;
-  uorb::SubscriptionData<uorb::msg::orb_test_medium> second_sub;
-  std::atomic<int> first_calls{0};
-  std::atomic<int> second_calls{0};
-  orb_test_large_s first_stale_msg{};
-  orb_test_medium_s second_stale_msg{};
-  first_sub.Copy(first_stale_msg);
-  second_sub.Copy(second_stale_msg);
-
-  ASSERT_TRUE(loop.AddSubscription(second_sub, [&](const orb_test_medium_s &) {
-    ++second_calls;
-  }));
-  ASSERT_TRUE(loop.AddSubscription(first_sub, [&](const orb_test_large_s &) {
-    ++first_calls;
-    EXPECT_TRUE(loop.RemoveSubscription(second_sub));
-  }));
-
-  uorb::PublicationData<uorb::msg::orb_test_large> first_pub;
-  first_pub.data().val = 11;
-  ASSERT_TRUE(first_pub.Publish());
-
-  EXPECT_EQ(loop.RunOnce(1000), 1);
-  EXPECT_EQ(first_calls.load(), 1);
-  EXPECT_EQ(second_calls.load(), 0);
-  EXPECT_FALSE(loop.RemoveSubscription(second_sub));
-  EXPECT_TRUE(loop.RemoveSubscription(first_sub));
-}
-
-TEST(EventLoopTest, CallbackCanAddSubscriptionForFutureEvents) {
-  uorb::EventLoop loop;
-  ASSERT_TRUE(loop);
-
-  uorb::SubscriptionData<uorb::msg::orb_test_large> first_sub;
-  uorb::SubscriptionData<uorb::msg::orb_test_medium> second_sub;
-  std::atomic<int> first_calls{0};
-  std::atomic<int> second_calls{0};
-  bool second_added = false;
-
-  ASSERT_TRUE(loop.AddSubscription(first_sub, [&](const orb_test_large_s &) {
-    ++first_calls;
-    if (!second_added) {
-      second_added = true;
-      EXPECT_TRUE(loop.AddSubscription(second_sub, [&](const orb_test_medium_s &) {
-        ++second_calls;
-      }));
-    }
-  }));
-
-  DrainPendingEvents(loop);
-  first_calls = 0;
-  second_calls = 0;
-
-  uorb::PublicationData<uorb::msg::orb_test_large> first_pub;
-  first_pub.data().val = 33;
-  ASSERT_TRUE(first_pub.Publish());
-  EXPECT_EQ(loop.RunOnce(1000), 1);
-  EXPECT_EQ(first_calls.load(), 1);
-  ASSERT_TRUE(second_added);
-
-  uorb::PublicationData<uorb::msg::orb_test_medium> second_pub;
-  second_pub.data().val = 44;
-  ASSERT_TRUE(second_pub.Publish());
-  EXPECT_EQ(loop.RunOnce(1000), 1);
-  EXPECT_EQ(second_calls.load(), 1);
-
-  EXPECT_TRUE(loop.RemoveSubscription(first_sub));
-  EXPECT_TRUE(loop.RemoveSubscription(second_sub));
 }
 
 TEST(EventLoopTest, SubscriptionCannotBindToMultipleEventPolls) {
@@ -381,7 +279,7 @@ TEST(EventLoopTest, RunOnceExceedsReadyCapacity) {
 
   uorb::PublicationData<uorb::msg::orb_test> pub;
   pub.data().val = 1;
-  ASSERT_TRUE(pub.Publish());
+  ASSERT_EQ(pub.Publish(), ORB_OK);
 
   // First RunOnce should return at most 32 (limited by ready[32]).
   int first = loop.RunOnce(100);
@@ -457,7 +355,7 @@ TEST(EventLoopTest, CallbackPublishesSameTopic) {
   // Publish initial message.
   uorb::PublicationData<uorb::msg::orb_test> pub;
   pub.data().val = 1;
-  ASSERT_TRUE(pub.Publish());
+  ASSERT_EQ(pub.Publish(), ORB_OK);
 
   // First RunOnce dispatches the callback (count=1, re-publishes).
   EXPECT_EQ(loop.RunOnce(1000), 1);
@@ -496,11 +394,11 @@ TEST(EventLoopTest, CallbackCallsRunOnce) {
   // Publish to both topics.
   uorb::PublicationData<uorb::msg::orb_test> pub_a;
   pub_a.data().val = 1;
-  ASSERT_TRUE(pub_a.Publish());
+  ASSERT_EQ(pub_a.Publish(), ORB_OK);
 
   uorb::PublicationData<uorb::msg::orb_test_medium> pub_b;
   pub_b.data().val = 2;
-  ASSERT_TRUE(pub_b.Publish());
+  ASSERT_EQ(pub_b.Publish(), ORB_OK);
 
   // RunOnce dispatches the first callback, which calls RunOnce(0) to
   // dispatch the second callback.
@@ -529,7 +427,7 @@ TEST(EventLoopTest, ManySubscriptionsStress) {
 
   uorb::PublicationData<uorb::msg::orb_test> pub;
   pub.data().val = 7;
-  ASSERT_TRUE(pub.Publish());
+  ASSERT_EQ(pub.Publish(), ORB_OK);
 
   // Repeatedly call RunOnce(0) until no more events are ready.
   for (int i = 0; i < 10; ++i) {
@@ -538,24 +436,6 @@ TEST(EventLoopTest, ManySubscriptionsStress) {
   }
 
   EXPECT_EQ(call_count.load(), kNumSubs);
-}
-
-// RemoveSubscription must return false for a subscription that was never
-// added to the loop.
-TEST(EventLoopTest, RemoveNonExistentSubscription) {
-  uorb::EventLoop loop;
-  ASSERT_TRUE(loop);
-
-  uorb::SubscriptionData<uorb::msg::orb_test> sub1;
-  uorb::SubscriptionData<uorb::msg::orb_test> sub2;
-
-  ASSERT_TRUE(loop.AddSubscription(sub1, [](const orb_test_s &) {}));
-
-  // sub2 was never added to the loop. Removing it should fail.
-  EXPECT_FALSE(loop.RemoveSubscription(sub2));
-
-  // Cleanup.
-  EXPECT_TRUE(loop.RemoveSubscription(sub1));
 }
 
 }  // namespace uORBTest

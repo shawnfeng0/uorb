@@ -59,9 +59,7 @@ class EventLoop {
     if (!base_._handle) return;
     for (auto &[key, entry] : entries_) {
       uevent_remove(&base_, &entry.source);
-      if (entry.owned) {
-        orb_subscriber_destroy(&entry.sub);
-      }
+      orb_subscriber_destroy(&entry.sub);
       uorb_subscriber_destroy_source(&entry.source);
     }
     uevent_destroy(&base_);
@@ -99,66 +97,8 @@ class EventLoop {
       }
     };
 
-    entries_.emplace(source._handle, Entry{sub, source, true, std::move(dispatch)});
+    entries_.emplace(source._handle, Entry{sub, source, std::move(dispatch)});
     return true;
-  }
-
-  template <typename Sub, typename Callback>
-  bool AddSubscription(Sub &sub, Callback &&cb) {
-    if (!base_._handle) return false;
-
-    orb_subscriber_t *handle = sub.handle();
-    if (!handle) return false;
-
-    // Reject if this subscriber is already registered in the event loop.
-    // Checking before creating a source prevents bridge_register/unregister
-    // side effects from clobbering an existing callback registration.
-    for (const auto &[key, entry] : entries_) {
-      if (entry.sub._handle == handle->_handle) {
-        errno = EBUSY;
-        return false;
-      }
-    }
-
-    uevent_source_t source = UEVENT_SOURCE_INITIALIZER;
-    if (uorb_subscriber_create_source(&source, handle) != 0) return false;
-
-    if (uevent_add(&base_, &source, 0) != 0) {
-      uorb_subscriber_destroy_source(&source);
-      return false;
-    }
-
-    using MsgType = typename Sub::ValueType;
-    auto dispatch = [handle, cb = std::forward<Callback>(cb)]() {
-      MsgType msg;
-      if (orb_subscriber_copy(handle, &msg) == ORB_OK) {
-        cb(msg);
-      }
-    };
-
-    entries_.emplace(source._handle, Entry{*handle, source, false, std::move(dispatch)});
-    return true;
-  }
-
-  template <typename Sub>
-  bool RemoveSubscription(Sub &sub) {
-    if (!base_._handle) return false;
-
-    orb_subscriber_t *handle = sub.handle();
-    if (!handle) return false;
-
-    for (auto it = entries_.begin(); it != entries_.end(); ++it) {
-      if (it->second.sub._handle == handle->_handle) {
-        uevent_remove(&base_, &it->second.source);
-        if (it->second.owned) {
-          orb_subscriber_destroy(&it->second.sub);
-        }
-        uorb_subscriber_destroy_source(&it->second.source);
-        entries_.erase(it);
-        return true;
-      }
-    }
-    return false;
   }
 
   int RunOnce(int timeout_ms = -1) {
@@ -177,7 +117,15 @@ class EventLoop {
     return n;
   }
 
+  /// Run the loop until Quit() is requested or an error occurs.
+  /// Returns true if the loop exited because of Quit(), false on error
+  /// or if it was invoked on an invalid / empty EventLoop.
+  /// Note: Run() returns false immediately if there are no subscriptions.
+  /// Callers should add subscriptions via Subscribe() before calling Run().
+  /// Run() resets quit_requested_ at the start, so it can be called again
+  /// after a previous Quit().
   bool Run() {
+    quit_requested_.store(false);
     while (!quit_requested_.load()) {
       if (entries_.empty()) {
         return false;
@@ -199,7 +147,6 @@ class EventLoop {
   struct Entry {
     orb_subscriber_t sub;
     uevent_source_t source;
-    bool owned;
     std::function<void()> dispatch;
   };
 
