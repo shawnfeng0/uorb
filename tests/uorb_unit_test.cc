@@ -217,6 +217,7 @@ TEST_F(UnitTest, uevent_poll_rejects_invalid_arguments) {
   EXPECT_EQ(errno, EINVAL);
 
   uevent_destroy(&base);
+  uorb_subscriber_destroy_source(&src);
   EXPECT_EQ(orb_subscriber_destroy(&subscription), ORB_OK);
 }
 
