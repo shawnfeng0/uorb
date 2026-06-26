@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.5)
 
 # Set cmake_policies
 include(cmake/policy.cmake)
@@ -40,13 +40,13 @@ add_subdirectory(components/uevent)
 add_subdirectory(components/uorb_uevent)
 
 # =============================================================================
-# Install
+# Install (disabled for embedded builds)
 # =============================================================================
-install(TARGETS uorb uevent uorb_uevent
-        ARCHIVE DESTINATION lib)
-install(DIRECTORY include/uorb DESTINATION include)
-install(DIRECTORY components/uevent/include/uevent DESTINATION include)
-install(DIRECTORY components/uorb_uevent/include/uorb_uevent DESTINATION include)
+# install(TARGETS uorb uevent uorb_uevent
+#         ARCHIVE DESTINATION lib)
+# install(DIRECTORY include/uorb DESTINATION include)
+# install(DIRECTORY components/uevent/include/uevent DESTINATION include)
+# install(DIRECTORY components/uorb_uevent/include/uorb_uevent DESTINATION include)
 
 # =============================================================================
 # Examples

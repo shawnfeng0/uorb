@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.5)
 project(uevent C CXX)
 
 # uevent library - generic event loop, independent of uORB
@@ -15,4 +15,5 @@ target_include_directories(uevent
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-target_compile_features(uevent PUBLIC cxx_std_11)
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)

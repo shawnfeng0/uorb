@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.5)
 project(uorb_uevent C CXX)
 
 # uorb_uevent library - bridge between uORB and uevent
@@ -19,4 +19,5 @@ target_link_libraries(uorb_uevent
         uorb
 )
 
-target_compile_features(uorb_uevent PUBLIC cxx_std_11)
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
