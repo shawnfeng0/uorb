@@ -74,10 +74,9 @@ class EventPoll {
       return -1;
     }
 
-    mu_.lock();
+    base::UniqueLock<base::Mutex> lk(mu_);
     if (stop_) {
       stop_ = false;
-      mu_.unlock();
       return -1;
     }
 
@@ -120,16 +119,13 @@ class EventPoll {
       }
 
       if (count > 0) {
-        mu_.unlock();
         return count;
       }
       if (stop_) {
         stop_ = false;
-        mu_.unlock();
         return -1;
       }
       if (timeout_ms == 0) {
-        mu_.unlock();
         return 0;
       }
 
@@ -137,7 +133,6 @@ class EventPoll {
       if (has_loop_deadline) {
         now = cv_.get_now();
         if (cv_.timespec_ge(now, loop_deadline)) {
-          mu_.unlock();
           return 0;
         }
       }
@@ -172,7 +167,6 @@ class EventPoll {
 
       if (stop_) {
         stop_ = false;
-        mu_.unlock();
         return -1;
       }
     }

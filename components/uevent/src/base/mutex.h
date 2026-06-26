@@ -61,6 +61,51 @@ class LockGuard {
   MutexType &mutex_;
 };
 
+/**
+ * @brief A movable scoped lock with manual unlock support.
+ *
+ * Like std::unique_lock, allows explicit unlock() before scope exit.
+ * Destructor releases the lock if still held. Used by EventPoll::Wait()
+ * where the lock must be held across condition variable waits but
+ * released before early returns.
+ */
+template <typename MutexType = Mutex>
+class UniqueLock {
+ public:
+  explicit UniqueLock(MutexType &m) : mutex_(&m), owns_(true) { m.lock(); }
+  UniqueLock(MutexType &m, bool defer_lock) : mutex_(&m), owns_(false) {
+    if (!defer_lock) {
+      m.lock();
+      owns_ = true;
+    }
+  }
+  ~UniqueLock() {
+    if (owns_) mutex_->unlock();
+  }
+
+  UniqueLock(const UniqueLock &) = delete;
+  UniqueLock &operator=(const UniqueLock &) = delete;
+
+  void lock() {
+    mutex_->lock();
+    owns_ = true;
+  }
+
+  void unlock() {
+    if (owns_) {
+      owns_ = false;
+      mutex_->unlock();
+    }
+  }
+
+  bool owns_lock() const { return owns_; }
+  MutexType *mutex() { return mutex_; }
+
+ private:
+  MutexType *mutex_;
+  bool owns_;
+};
+
 }  // namespace base
 }  // namespace uevent
 
