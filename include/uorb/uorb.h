@@ -422,8 +422,13 @@ typedef void (*orb_subscriber_callback_fn)(const void *msg, orb_callback_ctx ctx
  * Registering a second callback while one is already registered will
  * fail with ORB_ERR_BUSY.
  *
+ * Thread safety: orb_subscriber_set_callback(), orb_subscriber_clear_callback(),
+ * and orb_subscriber_destroy() on the same subscriber handle must not be called
+ * concurrently with each other. The callback itself is invoked from the
+ * publisher's thread and may safely call orb_subscriber_copy().
+ *
  * @param sub subscription handle
- * @param cb  callback function
+ * @param cb  callback function (must not be NULL)
  * @param ctx user context (pointer or integer) passed to cb
  * @return ORB_OK on success, error code otherwise
  */

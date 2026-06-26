@@ -57,10 +57,10 @@ class EventLoop {
   EventLoop() { uevent_create(&base_); }
   ~EventLoop() {
     if (!base_._handle) return;
-    for (auto &[key, entry] : entries_) {
-      uevent_remove(&base_, &entry.source);
-      orb_subscriber_destroy(&entry.sub);
-      uorb_subscriber_destroy_source(&entry.source);
+    for (auto &kv : entries_) {
+      uevent_remove(&base_, &kv.second.source);
+      orb_subscriber_destroy(&kv.second.sub);
+      uorb_subscriber_destroy_source(&kv.second.source);
     }
     uevent_destroy(&base_);
   }

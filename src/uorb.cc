@@ -137,10 +137,10 @@ orb_err orb_subscriber_destroy(orb_subscriber_t *sub) {
 
   auto *r = reinterpret_cast<ReceiverLocal *>(sub->_handle);
 
-  // Remove callback if registered
-  if (r->publish_cb) {
-    r->dev.UnregisterCallback(&r->callback_entry);
-  }
+  // Always unregister — safe even if not in the list (forward_list::remove is a no-op).
+  // This avoids a race where clear_callback sets publish_cb=nullptr before destroy
+  // checks it, which would skip UnregisterCallback and leave a dangling entry.
+  r->dev.UnregisterCallback(&r->callback_entry);
   delete r;
   sub->_handle = nullptr;
   return ORB_OK;
@@ -186,6 +186,9 @@ bool orb_subscriber_check_update(orb_subscriber_t *sub) {
 orb_err orb_subscriber_set_callback(orb_subscriber_t *sub, orb_subscriber_callback_fn cb,
                                     orb_callback_ctx ctx) {
   if (!sub || !sub->_handle) {
+    return ORB_ERR_INVALID;
+  }
+  if (!cb) {
     return ORB_ERR_INVALID;
   }
   auto *r = reinterpret_cast<ReceiverLocal *>(sub->_handle);
