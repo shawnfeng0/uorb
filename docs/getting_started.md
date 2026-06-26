@@ -216,16 +216,27 @@ if (sub_example_string.Update()) {
 }
 ```
 
-Or use `orb_poll()`, which is a function similar to `poll()`(Recommend this usage):
+Or use `uevent` API with `uorb_subscription_create_source()`, which provides event-driven dispatch (Recommend this usage):
 
 ```c++
-struct orb_pollfd pollfds[] = {{.fd = sub_example_string.handle()}};
+#include <uevent/uevent.h>
+#include <uorb_uevent/uorb_uevent.h>
 
-if (0 < orb_poll(pollfds, ARRAY_SIZE(pollfds), timeout_ms)) {
-  if (pollfds[0].ready && sub_example_string.Update()) {
+uevent_t *base = uevent_create();
+uevent_source_t *src = uorb_subscription_create_source(sub_example_string.handle());
+uevent_add(base, src, 0);
+
+uevent_source_t *ready[1];
+if (0 < uevent_loop(base, ready, 1, timeout_ms)) {
+  if (sub_example_string.Update()) {
     // Data processing...
   }
 }
+
+// Cleanup
+uevent_remove(base, src);
+uorb_subscription_destroy_source(src);
+uevent_destroy(base);
 ```
 
 Get updated data and processing:
@@ -240,12 +251,12 @@ Please refer to the complete routine: [examples/cpp_pub_sub/cpp_pub_sub.cc](../e
 
 ## Callback-based subscription with `EventLoop`
 
-In addition to manual polling / `orb_poll()`, uORB ships a small C++ event loop, `uorb::EventLoop`, that wraps "wait on many subscriptions" + "run a callback per subscription" behind a simple API. It fits well on a dedicated worker thread that only runs subscription callbacks.
+In addition to manual polling / `uevent` API, uORB ships a small C++ event loop, `uorb::EventLoop`, that wraps "wait on many subscriptions" + "run a callback per subscription" behind a simple API. It fits well on a dedicated worker thread that only runs subscription callbacks.
 
 Include the header:
 
 ```c++
-#include "uorb/event_loop.h"
+#include "uorb_uevent/uorb_uevent.h"
 ```
 
 ### Two ways to register a callback
@@ -288,6 +299,6 @@ See [examples/cpp_pub_sub/cpp_pub_sub_event_loop.cc](../examples/cpp_pub_sub/cpp
 
 ## Additional examples
 
-* [C event poll](../examples/c_pub_sub/c_event_poll.c): waits on multiple C subscriptions with `orb_event_poll_*`.
+* [C event poll](../examples/c_pub_sub/c_event_poll.c): waits on multiple C subscriptions with `uevent_*` API.
 * [C++ multi-instance publishing](../examples/cpp_pub_sub/cpp_pub_sub_multi.cc): publishes the same topic type on independent instances.
 * [C++ subscription interval](../examples/cpp_pub_sub/cpp_subscription_interval.cc): throttles a fast publisher with `SubscriptionInterval`.

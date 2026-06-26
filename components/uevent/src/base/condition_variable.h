@@ -7,12 +7,9 @@
 #include <stdint.h>
 #include <time.h>
 
-#include <atomic>
-#include <chrono>
-
 #include "base/mutex.h"
 
-namespace uorb {
+namespace uevent {
 namespace base {
 
 class ConditionVariableTest;
@@ -40,10 +37,7 @@ class ConditionVariable {
   }
 
   ~ConditionVariable() noexcept {
-    // https://chromium.googlesource.com/v8/v8/+/refs/tags/11.5.129/src/base/platform/condition-variable.cc#42
 #ifdef __APPLE__
-    // This hack is necessary to avoid a fatal pthreads subsystem bug in the
-    // Darwin kernel. http://crbug.com/517681.
     {
       Mutex lock;
       LockGuard<Mutex> l(lock);
@@ -69,44 +63,28 @@ class ConditionVariable {
     while (!p()) wait(lock);
   }
 
-  // Return true if successful
   bool wait_for(Mutex &lock, uint32_t time_ms) {  // NOLINT
 #ifdef __APPLE__
     struct timespec rel_ts = {.tv_sec = time_ms / 1000,
                               .tv_nsec = (time_ms % 1000) * 1000000};
-    // OS X do support waiting on a condition variable with a relative timeout.
-    auto ret = pthread_cond_timedwait_relative_np(&cond_, lock.native_handle(),
-                                                  &rel_ts) == 0;
-    return ret;
+    return pthread_cond_timedwait_relative_np(&cond_, lock.native_handle(),
+                                               &rel_ts) == 0;
 #else
-    struct timespec until_time = timespec_get_after(get_now_time(), time_ms);
-    auto ret =
-        pthread_cond_timedwait(&cond_, lock.native_handle(), &until_time) == 0;
-    return ret;
+    struct timespec until_time = timespec_add_ms(get_now(), time_ms);
+    return pthread_cond_timedwait(&cond_, lock.native_handle(), &until_time) == 0;
 #endif
   }
 
-  // Return true if successful
   template <typename Predicate>
   bool wait_for(Mutex &lock, uint32_t time_ms, Predicate p) {  // NOLINT
-    const auto deadline = std::chrono::steady_clock::now() +
-                          std::chrono::milliseconds(time_ms);
-
+    struct timespec deadline = timespec_add_ms(get_now(), time_ms);
     while (!p()) {
-      const auto now = std::chrono::steady_clock::now();
-      if (now >= deadline) {
+      struct timespec now = get_now();
+      if (timespec_ge(now, deadline)) {
         return p();
       }
-
-      const auto remaining_ns =
-          std::chrono::duration_cast<std::chrono::nanoseconds>(deadline - now)
-              .count();
-      uint32_t remaining_ms =
-          static_cast<uint32_t>((remaining_ns + 999999) / 1000000);
-      if (remaining_ms == 0) {
-        remaining_ms = 1;
-      }
-
+      uint32_t remaining_ms = timespec_diff_ms(now, deadline);
+      if (remaining_ms == 0) remaining_ms = 1;
       if (!wait_for(lock, remaining_ms)) {
         return p();
       }
@@ -116,37 +94,45 @@ class ConditionVariable {
 
   pthread_cond_t *native_handle() { return &cond_; }
 
- private:
-  friend class ConditionVariableTest;
-
-  static inline struct timespec get_now_time() {
-    struct timespec result{};
-    clock_gettime(kWhichClock, &result);
-    return result;
+  // Utility: get current monotonic time
+  static struct timespec get_now() {
+    struct timespec ts{};
+    clock_gettime(kWhichClock, &ts);
+    return ts;
   }
-  static inline struct timespec timespec_get_after(const struct timespec &now,
-                                                   uint32_t time_ms) {
-    static const auto kNSecPerS = 1000 * 1000 * 1000;
 
-    struct timespec result = now;
-
-    result.tv_sec += time_ms / 1000;
-    result.tv_nsec += (time_ms % 1000) * 1000 * 1000;
-
+  // Utility: add milliseconds to a timespec
+  static struct timespec timespec_add_ms(const struct timespec &ts, uint32_t ms) {
+    static const int64_t kNSecPerS = 1000000000LL;
+    struct timespec result = ts;
+    result.tv_sec += ms / 1000;
+    result.tv_nsec += (ms % 1000) * 1000000LL;
     if (result.tv_nsec >= kNSecPerS) {
       result.tv_sec += result.tv_nsec / kNSecPerS;
       result.tv_nsec %= kNSecPerS;
     }
-
     return result;
   }
 
-  pthread_cond_t cond_{};
+  // Utility: compare two timespecs (a >= b)
+  static bool timespec_ge(const struct timespec &a, const struct timespec &b) {
+    if (a.tv_sec != b.tv_sec) return a.tv_sec > b.tv_sec;
+    return a.tv_nsec >= b.tv_nsec;
+  }
 
-  // The C++ specification defines std::condition_variable::wait_for in terms of
-  // std::chrono::steady_clock, which is closest to CLOCK_MONOTONIC.
+  // Utility: difference in ms (b - a), clamped to uint32_t
+  static uint32_t timespec_diff_ms(const struct timespec &a, const struct timespec &b) {
+    int64_t diff_ns = (int64_t)(b.tv_sec - a.tv_sec) * 1000000000LL +
+                       (b.tv_nsec - a.tv_nsec);
+    if (diff_ns <= 0) return 0;
+    return (uint32_t)((diff_ns + 999999) / 1000000);
+  }
+
+ private:
+  friend class ConditionVariableTest;
+  pthread_cond_t cond_{};
   static const clockid_t kWhichClock = CLOCK_MONOTONIC;
 };
 
 }  // namespace base
-}  // namespace uorb
+}  // namespace uevent

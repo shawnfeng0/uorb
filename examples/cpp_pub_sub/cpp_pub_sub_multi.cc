@@ -6,10 +6,11 @@
 #include <cstdio>
 #include <thread>
 
-#include "slog.h"
+#include "uevent/uevent.h"
 #include "uorb/publication_multi.h"
 #include "uorb/subscription.h"
 #include "uorb/topics/example_string.h"
+#include "uorb_uevent/uorb_uevent.h"
 
 void publish_instance(const char *label) {
   uorb::PublicationMultiData<uorb::msg::example_string> publisher;
@@ -21,40 +22,42 @@ void publish_instance(const char *label) {
              "%s message %d", label, message_index);
 
     if (!publisher.Publish()) {
-      LOGGER_ERROR("Publish %s failed", label);
+      printf("Publish %s failed\n", label );
       return;
     }
 
-    LOGGER_INFO("Published %s on instance %u", label, publisher.instance());
+    printf("Published %s on instance %u\n", label, publisher.instance() );
     usleep(200 * 1000);
   }
 }
 
 void subscribe_instance(uint8_t instance) {
   uorb::SubscriptionData<uorb::msg::example_string> subscription(instance);
-  orb_event_poll_t *poll = orb_event_poll_create();
-  orb_event_poll_add(poll, subscription.handle());
+  uevent_t *poll = uevent_create();
+  uevent_source_t *src = uorb_subscription_create_source(subscription.handle());
+  uevent_add(poll, src, 0);
 
   for (;;) {
-    orb_subscription_t *ready[1];
-    const int poll_result = orb_event_poll_wait(poll, ready, 1, 1000);
+    uevent_source_t *ready[1];
+    const int poll_result = uevent_loop(poll, ready, 1, 1000);
     if (poll_result <= 0) {
       break;
     }
 
     if (subscription.Update()) {
       const auto &message = subscription.data();
-      LOGGER_INFO("instance %u timestamp: %" PRIu64 ", msg: %s", instance,
+      printf("instance %u timestamp: %" PRIu64 ", msg: %s\n", instance,
                   message.timestamp, message.str);
     }
   }
 
-  orb_event_poll_remove(poll, subscription.handle());
-  orb_event_poll_destroy(&poll);
+  uevent_remove(poll, src);
+  uorb_subscription_destroy_source(src);
+  uevent_destroy(poll);
 }
 
 int main() {
-  LOGGER_INFO("uORB version: %s", orb_version());
+  printf("uORB version: %s\n", orb_version() );
 
   std::thread first_subscriber(subscribe_instance, 0);
   std::thread second_subscriber(subscribe_instance, 1);

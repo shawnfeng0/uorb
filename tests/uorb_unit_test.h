@@ -35,11 +35,13 @@
 
 #include <gtest/gtest.h>
 #include <unistd.h>
+#include <uevent/uevent.h>
 #include <uorb/topics/orb_test.h>
 #include <uorb/topics/orb_test_large.h>
 #include <uorb/topics/orb_test_medium.h>
 #include <uorb/topics/orb_test_queue_poll.h>
 #include <uorb/uorb.h>
+#include <uorb_uevent/uorb_uevent.h>
 
 #include <cerrno>
 #include <cmath>
@@ -47,11 +49,10 @@
 
 #include "device_master.h"
 #include "device_node.h"
-#include "slog.h"
 
-#define ORB_DEBUG LOGGER_INFO
-#define ORB_INFO LOGGER_INFO
-#define ORB_ERROR LOGGER_ERROR
+#define ORB_DEBUG(fmt, ...) printf("[DEBUG] " fmt "\n", ##__VA_ARGS__)
+#define ORB_INFO(fmt, ...) printf("[INFO] " fmt "\n", ##__VA_ARGS__)
+#define ORB_ERROR(fmt, ...) printf("[ERROR] " fmt "\n", ##__VA_ARGS__)
 
 namespace uORBTest {
 class UnitTest;
@@ -87,6 +88,7 @@ void uORBTest::UnitTest::latency_test(const orb_metadata *T) {
   orb_publish(pfd0, &pub_data);
 
   std::atomic<bool> pub_sub_test_passed{false};
+  std::atomic<float> mean_latency{0.0f};
 
   /* test pub / sub latency */
 
@@ -110,10 +112,13 @@ void uORBTest::UnitTest::latency_test(const orb_metadata *T) {
     orb_copy(test_multi_sub_medium, &pub_data_large);
     orb_copy(test_multi_sub_large, &pub_data_large);
 
-    orb_event_poll_t *poll = orb_event_poll_create();
-    orb_event_poll_add(poll, test_multi_sub);
-    orb_event_poll_add(poll, test_multi_sub_medium);
-    orb_event_poll_add(poll, test_multi_sub_large);
+    uevent_t *poll = uevent_create();
+    uevent_source_t *src1 = uorb_subscription_create_source(test_multi_sub);
+    uevent_source_t *src2 = uorb_subscription_create_source(test_multi_sub_medium);
+    uevent_source_t *src3 = uorb_subscription_create_source(test_multi_sub_large);
+    uevent_add(poll, src1, 0);
+    uevent_add(poll, src2, 0);
+    uevent_add(poll, src3, 0);
 
     const unsigned max_runs = 1000;
     int current_value = pub_data_large.val;
@@ -125,17 +130,17 @@ void uORBTest::UnitTest::latency_test(const orb_metadata *T) {
 
     for (unsigned i = 0; i < max_runs; i++) {
       /* wait for up to 500ms for data */
-      orb_subscription_t *ready[3] = {nullptr};
-      int pret = orb_event_poll_wait(poll, ready, 3, 500);
+      uevent_source_t *ready[3] = {nullptr};
+      int pret = uevent_loop(poll, ready, 3, 500);
 
       for (int j = 0; j < pret; ++j) {
-        if (ready[j] == test_multi_sub) {
+        if (ready[j] == src1) {
           orb_copy(test_multi_sub, &pub_data_large);
 
-        } else if (ready[j] == test_multi_sub_medium) {
+        } else if (ready[j] == src2) {
           orb_copy(test_multi_sub_medium, &pub_data_large);
 
-        } else if (ready[j] == test_multi_sub_large) {
+        } else if (ready[j] == src3) {
           orb_copy(test_multi_sub_large, &pub_data_large);
         }
       }
@@ -161,10 +166,13 @@ void uORBTest::UnitTest::latency_test(const orb_metadata *T) {
       }
     }
 
-    orb_event_poll_remove(poll, test_multi_sub);
-    orb_event_poll_remove(poll, test_multi_sub_medium);
-    orb_event_poll_remove(poll, test_multi_sub_large);
-    orb_event_poll_destroy(&poll);
+    uevent_remove(poll, src1);
+    uevent_remove(poll, src2);
+    uevent_remove(poll, src3);
+    uorb_subscription_destroy_source(src1);
+    uorb_subscription_destroy_source(src2);
+    uorb_subscription_destroy_source(src3);
+    uevent_destroy(poll);
 
     orb_destroy_subscription(&test_multi_sub);
     orb_destroy_subscription(&test_multi_sub_medium);
@@ -190,7 +198,7 @@ void uORBTest::UnitTest::latency_test(const orb_metadata *T) {
 
     pub_sub_test_passed = true;
 
-    ASSERT_LT(static_cast<float>(latency_integral / max_runs), 200.0f);
+    mean_latency = static_cast<float>(latency_integral / max_runs);
   }};
   /* give the test task some data */
   while (!pub_sub_test_passed) {
@@ -206,4 +214,6 @@ void uORBTest::UnitTest::latency_test(const orb_metadata *T) {
   orb_destroy_publication(&pfd0);
 
   pub_sub_latency_thread.join();
+
+  ASSERT_LT(mean_latency.load(), 200.0f);
 }

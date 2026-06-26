@@ -215,16 +215,27 @@ if (sub_example_string.Update()) {
 }
 ```
 
-或使用`orb_poll()`，该函数类似于`poll()`（推荐此用法）：
+或使用 `uevent` API 配合 `uorb_subscription_create_source()`，提供事件驱动的调度（推荐此用法）：
 
 ```c++
-struct orb_pollfd pollfds[] = {{.fd = sub_example_string.handle()}};
+#include <uevent/uevent.h>
+#include <uorb_uevent/uorb_uevent.h>
 
-if (0 < orb_poll(pollfds, ARRAY_SIZE(pollfds), timeout_ms)) {
-  if (pollfds[0].ready && sub_example_string.Update()) {
-    // Data processing...
+uevent_t *base = uevent_create();
+uevent_source_t *src = uorb_subscription_create_source(sub_example_string.handle());
+uevent_add(base, src, 0);
+
+uevent_source_t *ready[1];
+if (0 < uevent_loop(base, ready, 1, timeout_ms)) {
+  if (sub_example_string.Update()) {
+    // 数据处理...
   }
 }
+
+// 清理
+uevent_remove(base, src);
+uorb_subscription_destroy_source(src);
+uevent_destroy(base);
 ```
 
 获取更新的数据和处理：
@@ -239,12 +250,12 @@ printf("timestamp: %" PRIu64 "[us], Receive msg: \"%s\"\n", data.timestamp,
 
 ## 使用 EventLoop 进行基于回调的订阅
 
-除了手动轮询 / `orb_poll()`，uORB 还提供了一个 C++ 事件循环 `uorb::EventLoop`。它把"等待多个订阅" + "对每个订阅执行回调"这两件事包装成一个简单的 API，非常适合用在专门跑订阅回调的工作线程里。
+除了手动轮询 / `uevent` API，uORB 还提供了一个 C++ 事件循环 `uorb::EventLoop`。它把"等待多个订阅" + "对每个订阅执行回调"这两件事包装成一个简单的 API，非常适合用在专门跑订阅回调的工作线程里。
 
 包含头文件：
 
 ```c++
-#include "uorb/event_loop.h"
+#include "uorb_uevent/uorb_uevent.h"
 ```
 
 ### 两种注册回调的方式
@@ -287,7 +298,7 @@ printf("timestamp: %" PRIu64 "[us], Receive msg: \"%s\"\n", data.timestamp,
 
 ## 其它示例
 
-* [C event poll](../examples/c_pub_sub/c_event_poll.c)：使用 `orb_event_poll_*` 等待多个 C 订阅。
+* [C event poll](../examples/c_pub_sub/c_event_poll.c)：使用 `uevent_*` API 等待多个 C 订阅。
 * [C++ multi-instance publishing](../examples/cpp_pub_sub/cpp_pub_sub_multi.cc)：在独立实例上发布同一话题类型。
 * [C++ subscription interval](../examples/cpp_pub_sub/cpp_subscription_interval.cc)：使用 `SubscriptionInterval` 对高频发布者限频消费。
 

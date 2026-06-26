@@ -5,6 +5,8 @@
 #include "uorb_tcp_listener.h"
 
 #include <uorb/uorb.h>
+#include <uevent/uevent.h>
+#include <uorb_uevent/uorb_uevent.h>
 
 #include <csignal>
 #include <thread>
@@ -60,16 +62,17 @@ static void CmdListener(uorb::listener::Fd &fd,
   auto sub = orb_create_subscription(meta);
   std::vector<uint8_t> data(meta->o_size);
 
-  orb_event_poll_t *poll = orb_event_poll_create();
-  orb_event_poll_add(poll, sub);
+  uevent_t *poll = uevent_create();
+  uevent_source_t *source = uorb_subscription_create_source(sub);
+  uevent_add(poll, source, 0);
 
   uorb::listener::DataPrinter data_printer(*meta);
   orb_abstime_us last_write_timestamp{};
   const int timeout_ms = 1000;
   uint32_t current_timeout_ms = 0;
   do {
-    orb_subscription_t *ready[1];
-    if (orb_event_poll_wait(poll, ready, 1, timeout_ms) > 0) {
+    uevent_source_t *ready[1];
+    if (uevent_loop(poll, ready, 1, timeout_ms) > 0) {
       if (orb_check_and_copy(sub, data.data())) {
         if (orb_elapsed_time_us(last_write_timestamp) > 100 * 1000) {
           last_write_timestamp = orb_absolute_time_us();
@@ -95,8 +98,9 @@ static void CmdListener(uorb::listener::Fd &fd,
     }
   } while (true);
 
-  orb_event_poll_remove(poll, sub);
-  orb_event_poll_destroy(&poll);
+  uevent_remove(poll, source);
+  uorb_subscription_destroy_source(source);
+  uevent_destroy(poll);
   orb_destroy_subscription(&sub);
 }
 

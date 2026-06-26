@@ -1,9 +1,5 @@
 project(uorb_examples)
 
-# Common header: slog.h
-add_library(slog INTERFACE)
-target_include_directories(slog INTERFACE common)
-
 # Generate orb message
 add_subdirectory(msg)
 

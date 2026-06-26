@@ -21,7 +21,7 @@
 struct orb_metadata {
   const char *o_name;               /**< unique object name */
   const uint16_t o_size;            /**< object size */
-  const uint16_t o_size_no_padding; /**< object size w/o padding at the end (for logger) */
+  const uint16_t o_size_no_padding; /**< object size w/o padding (external logger contract, not used by library) */
   const char *o_fields;             /**< semicolon separated list of fields (with type) */
   uint16_t o_queue_size;            /**< maximum number of queued samples */
 };
@@ -146,9 +146,8 @@ extern "C" {
  * - Subscription: orb_create_subscription(),
  *   orb_create_subscription_multi(), orb_destroy_subscription(), orb_copy(),
  *   orb_copy_once(), orb_check_update(), orb_check_and_copy().
- * - Event poll: orb_event_poll_create(), orb_event_poll_destroy(),
- *   orb_event_poll_add(), orb_event_poll_remove(), orb_event_poll_wait(),
- *   orb_event_poll_quit().
+ * - Publish callback: orb_subscription_set_callback(),
+ *   orb_subscription_clear_callback().
  * - Introspection: orb_exists(), orb_group_count(),
  *   orb_get_topic_status(), orb_version().
  * - Time: orb_absolute_time_us(), orb_elapsed_time_us().
@@ -283,7 +282,8 @@ orb_subscription_t *orb_create_subscription(const struct orb_metadata *meta);
 /**
  * Subscribe to a multi-instance of a topic.
  *
- * The returned value is a subscriber handle that can be passed to orb_event_poll_add()
+ * The returned value is a subscriber handle that can be passed to
+ * orb_subscription_set_callback() to receive publish notifications.
  * in order to wait for updates to a topic, as well as orb_copy(),
  * orb_check_update().
  *
@@ -369,6 +369,42 @@ bool orb_copy_once(const struct orb_metadata *meta, void *buffer);
 bool orb_check_update(orb_subscription_t *handle);
 
 /**
+ * Callback type for publish notifications.
+ *
+ * Invoked when new data is published to the subscription's topic.
+ * Use this to integrate with external event loops (see uorb_uevent/uorb_uevent.h).
+ *
+ * Note: The callback must not call back into the same DeviceNode (e.g., by
+ * calling orb_publish() or orb_copy() on the same topic) as this would cause
+ * a deadlock. The callback is invoked while the DeviceNode's lock is held.
+ *
+ * @param ctx user context pointer passed to orb_subscription_set_callback()
+ */
+typedef void (*orb_publish_callback_fn)(void *ctx);
+
+/**
+ * Register a callback to be invoked when new data is published.
+ *
+ * Only one callback can be registered per subscription at a time.
+ * Registering a second callback while one is already registered will
+ * fail with errno = EBUSY.
+ *
+ * @param sub subscription handle
+ * @param cb  callback function
+ * @param ctx user context pointer passed to cb
+ * @return true on success, false on error
+ */
+bool orb_subscription_set_callback(orb_subscription_t *sub, orb_publish_callback_fn cb, void *ctx);
+
+/**
+ * Remove a previously registered publish callback.
+ *
+ * @param sub subscription handle
+ * @return true on success, false on error
+ */
+bool orb_subscription_clear_callback(orb_subscription_t *sub);
+
+/**
  * If the message is updated, copy the message.
  * See orb_check_update() and orb_copy().
  */
@@ -402,70 +438,6 @@ unsigned int orb_group_count(const struct orb_metadata *meta);
  * @return true on success.
  */
 bool orb_get_topic_status(const struct orb_metadata *meta, unsigned int instance, struct orb_status *status);
-
-/**
- ** Event poll handle (opaque type for C API)
- *
- * Thread-safety contract:
- *  - orb_event_poll_quit() is thread-safe and may be called from any thread.
- *  - orb_event_poll_add(), orb_event_poll_remove(), orb_event_poll_wait() must
- *    be called from a single thread and must not run concurrently.
- *
- * Lifetime contract:
- *  - Quit is sticky: after orb_event_poll_quit(), all subsequent
- *    orb_event_poll_wait() calls return -1 until the poll object is destroyed.
- */
-typedef struct orb_event_poll orb_event_poll_t;
-
-/**
- * Create an event poll object.
- * @return event poll handle, or NULL on error
- */
-orb_event_poll_t *orb_event_poll_create(void);
-
-/**
- * Destroy an event poll object.
- * @param handle_ptr pointer to event poll handle, will be set to NULL
- * @return true on success
- */
-bool orb_event_poll_destroy(orb_event_poll_t **handle_ptr);
-
-/**
- * Add a subscription to the event poll.
- * @param poll event poll handle
- * @param sub subscription handle (orb_subscription_t*)
- * @return true on success
- *
- * A subscription handle can only be added to one active event poll/waiter at
- * a time. If already bound elsewhere, this returns false and sets errno to
- * EBUSY.
- */
-bool orb_event_poll_add(orb_event_poll_t *poll, orb_subscription_t *sub);
-
-/**
- * Remove a subscription from the event poll.
- * @param poll event poll handle
- * @param sub subscription handle (orb_subscription_t*)
- * @return true on success
- */
-bool orb_event_poll_remove(orb_event_poll_t *poll, orb_subscription_t *sub);
-
-/**
- * Wait for events on the event poll.
- * @param poll event poll handle
- * @param subs output array of subscription handles (orb_subscription_t*)
- * @param max_subs max number of output handles
- * @param timeout_ms timeout in ms (0: return immediately, <0: block)
- * @return number of ready subscriptions, or -1 on error
- */
-int orb_event_poll_wait(orb_event_poll_t *poll, orb_subscription_t *subs[], int max_subs, int timeout_ms);
-
-/**
- * Quit the event poll loop (for use with orb_event_poll_wait).
- * @param poll event poll handle
- * @return true on success, false if poll is NULL
- */
-bool orb_event_poll_quit(orb_event_poll_t *poll);
 
 /**
  * Get orb version string

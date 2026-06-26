@@ -69,13 +69,7 @@ bool uorb::DeviceMaster::GetTopicStatus(const orb_metadata &meta, uint8_t instan
   }
 
   if (status) {
-    const auto snapshot = device_node->GetStatusSnapshot();
-    status->queue_size = snapshot.queue_size;
-    status->subscriber_count = snapshot.subscriber_count;
-    status->has_untracked_subscriber = snapshot.has_untracked_subscriber;
-    status->publisher_count = snapshot.publisher_count;
-    status->has_untracked_publisher = snapshot.has_untracked_publisher;
-    status->latest_data_index = snapshot.latest_data_index;
+    device_node->FillStatus(status);
   }
 
   return true;

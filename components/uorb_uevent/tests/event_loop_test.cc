@@ -5,8 +5,9 @@
  ****************************************************************************/
 
 #include <gtest/gtest.h>
-#include <uorb/event_loop.h>
+#include <uevent/uevent.h>
 #include <uorb/publication.h>
+#include <uorb_uevent/uorb_uevent.h>
 #include <uorb/subscription.h>
 #include <uorb/topics/orb_test.h>
 #include <uorb/topics/orb_test_large.h>
@@ -242,6 +243,10 @@ TEST(EventLoopTest, CallbackCanQuitLoop) {
         loop.Quit();
       }));
 
+  // Drain any stale data from previous tests
+  DrainPendingEvents(loop);
+  call_count = 0;
+
   uorb::PublicationData<uorb::msg::orb_test_large> pub;
   pub.data().val = 808;
   ASSERT_TRUE(pub.Publish());
@@ -327,23 +332,27 @@ TEST(EventLoopTest, CallbackCanAddSubscriptionForFutureEvents) {
 TEST(EventLoopTest, SubscriptionCannotBindToMultipleEventPolls) {
   uorb::SubscriptionData<uorb::msg::orb_test> sub;
 
-  orb_event_poll_t *poll_a = orb_event_poll_create();
-  orb_event_poll_t *poll_b = orb_event_poll_create();
-  ASSERT_NE(poll_a, nullptr);
-  ASSERT_NE(poll_b, nullptr);
+  uevent_t *base_a = uevent_create();
+  uevent_t *base_b = uevent_create();
+  ASSERT_NE(base_a, nullptr);
+  ASSERT_NE(base_b, nullptr);
 
-  ASSERT_TRUE(orb_event_poll_add(poll_a, sub.handle()));
+  uevent_source_t *source = uorb_subscription_create_source(sub.handle());
+  ASSERT_NE(source, nullptr);
+
+  ASSERT_EQ(uevent_add(base_a, source, 0), 0);
 
   errno = 0;
-  EXPECT_FALSE(orb_event_poll_add(poll_b, sub.handle()));
+  EXPECT_EQ(uevent_add(base_b, source, 0), -1);
   EXPECT_EQ(errno, EBUSY);
 
-  EXPECT_TRUE(orb_event_poll_remove(poll_a, sub.handle()));
-  EXPECT_TRUE(orb_event_poll_add(poll_b, sub.handle()));
-  EXPECT_TRUE(orb_event_poll_remove(poll_b, sub.handle()));
+  EXPECT_EQ(uevent_remove(base_a, source), 0);
+  EXPECT_EQ(uevent_add(base_b, source, 0), 0);
+  EXPECT_EQ(uevent_remove(base_b, source), 0);
 
-  EXPECT_TRUE(orb_event_poll_destroy(&poll_a));
-  EXPECT_TRUE(orb_event_poll_destroy(&poll_b));
+  uorb_subscription_destroy_source(source);
+  uevent_destroy(base_a);
+  uevent_destroy(base_b);
 }
 
 }  // namespace uORBTest

@@ -8,7 +8,7 @@
 #include <sstream>
 #include <thread>
 
-#include "slog.h"
+#include "uevent/uevent.h"
 #include "uorb/publication.h"
 #include "uorb/publication_multi.h"
 #include "uorb/subscription.h"
@@ -18,6 +18,7 @@
 #include "uorb/topics/sensor_accel.h"
 #include "uorb/topics/sensor_gyro.h"
 #include "uorb/topics/uorb_topics.h"
+#include "uorb_uevent/uorb_uevent.h"
 #include "uorb_tcp_listener.h"
 
 template <const orb_metadata &T>
@@ -30,12 +31,12 @@ template <const orb_metadata &T>
     data.timestamp = orb_absolute_time_us();
 
     if (!publication_data.Publish()) {
-      LOGGER_ERROR("Publish error");
+      printf("Publish error\n");
     }
 
     usleep(1 * 1000 * 1000);
   }
-  LOGGER_WARN("Publication over.");
+  printf("Publication over.\n");
 }
 
 [[noreturn]] static void thread_publisher_sensor_accel() {
@@ -53,12 +54,12 @@ template <const orb_metadata &T>
     data.temperature += 4;
 
     if (!publication_data.Publish()) {
-      LOGGER_ERROR("Publish error");
+      printf("Publish error\n");
     }
 
     usleep(1 * 1000);
   }
-  LOGGER_WARN("Publication over.");
+  printf("Publication over.\n");
 }
 
 template <const orb_metadata &T>
@@ -67,22 +68,23 @@ template <const orb_metadata &T>
 
   int timeout_ms = 2000;
 
-  orb_event_poll_t *poll = orb_event_poll_create();
-  orb_event_poll_add(poll, subscription_data.handle());
+  uevent_t *poll = uevent_create();
+  uevent_source_t *src = uorb_subscription_create_source(subscription_data.handle());
+  uevent_add(poll, src, 0);
 
   while (true) {
-    orb_subscription_t *ready[1];
-    if (0 < orb_event_poll_wait(poll, ready, 1, timeout_ms)) {
+    uevent_source_t *ready[1];
+    if (0 < uevent_loop(poll, ready, 1, timeout_ms)) {
       if (subscription_data.Update()) {
         //        auto data = sub_example_string.data();
-        //        LOGGER_INFO("timestamp: %" PRIu64 "[us]", data.timestamp);
+        //        printf("timestamp: %" PRIu64 "[us]", data.timestamp "\n");
       }
     }
   }
 }
 
 int main(int, char *[]) {
-  LOGGER_INFO("uORB version: %s", orb_version());
+  printf("uORB version: %s\n", orb_version() );
 
   std::thread{thread_publisher_sensor_accel}.detach();
 

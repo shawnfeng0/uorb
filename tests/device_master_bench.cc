@@ -8,8 +8,10 @@
 // Run:    cmake --build <bld> --target uorb_bench && <bld>/tests/uorb_bench
 //         Optional: BENCH_THREADS=8 <bld>/tests/uorb_bench
 
+#include <uevent/uevent.h>
 #include <uorb/topics/orb_test.h>
 #include <uorb/uorb.h>
+#include <uorb_uevent/uorb_uevent.h>
 
 #include <atomic>
 #include <chrono>
@@ -202,40 +204,44 @@ static void run_mixed(int num_threads, int duration_ms) {
   orb_destroy_publication(&pub);
 }
 
-// orb_event_poll throughput on many subscriptions with timeout=0.
-static void run_event_poll_many_subs(
+// orb_uevent_base throughput on many subscriptions with timeout=0.
+static void run_uevent_poll_many_subs(
     int num_subs, int duration_ms,
-    const char *label = "event_poll timeout=0 (many subs)") {
+    const char *label = "uevent_poll timeout=0 (many subs)") {
   orb_publication_t *pub =
       orb_create_publication_multi(ORB_ID(orb_test), nullptr);
-  orb_event_poll_t *poll = orb_event_poll_create();
+  uevent_t *poll = uevent_create();
 
   std::vector<orb_subscription_t *> subs;
+  std::vector<uevent_source_t *> sources;
   subs.reserve(num_subs);
+  sources.reserve(num_subs);
 
   for (int i = 0; i < num_subs; ++i) {
     orb_subscription_t *sub =
         orb_create_subscription_multi(ORB_ID(orb_test), 0);
     subs.push_back(sub);
-    orb_event_poll_add(poll, sub);
+    uevent_source_t *src = uorb_subscription_create_source(sub);
+    sources.push_back(src);
+    uevent_add(poll, src, 0);
   }
 
   orb_test_s msg{};
   orb_publish(pub, &msg);
 
-  std::vector<orb_subscription_t *> ready(static_cast<size_t>(num_subs));
+  std::vector<uevent_source_t *> ready(static_cast<size_t>(num_subs));
   const auto t0 = std::chrono::steady_clock::now();
   long long loops = 0;
   long long ready_total = 0;
   while (elapsed_ms(t0) < duration_ms) {
-    const int n = orb_event_poll_wait(poll, ready.data(), num_subs, 0);
+    const int n = uevent_loop(poll, ready.data(), num_subs, 0);
     if (n > 0) {
       if (g_consume_all) {
         for (int i = 0; i < n; ++i) {
-          orb_copy(ready[i], &msg);
+          orb_copy(subs[i], &msg);
         }
       } else {
-        orb_copy(ready[0], &msg);
+        orb_copy(subs[0], &msg);
       }
       orb_publish(pub, &msg);
       ++loops;
@@ -246,34 +252,39 @@ static void run_event_poll_many_subs(
   print_result(label, num_subs, loops, elapsed_ms(t0));
   print_ready_hint(num_subs, loops, ready_total);
 
-  for (auto *sub : subs) {
-    orb_event_poll_remove(poll, sub);
-    orb_destroy_subscription(&sub);
+  for (size_t i = 0; i < num_subs; ++i) {
+    uevent_remove(poll, sources[i]);
+    uorb_subscription_destroy_source(sources[i]);
+    orb_destroy_subscription(&subs[i]);
   }
-  orb_event_poll_destroy(&poll);
+  uevent_destroy(poll);
   orb_destroy_publication(&pub);
 }
 
-// Blocking event_poll: publisher thread publishes, consumer blocks on wait.
-static void run_event_poll_blocking(int num_subs, int duration_ms) {
+// Blocking uevent_poll: publisher thread publishes, consumer blocks on wait.
+static void run_uevent_poll_blocking(int num_subs, int duration_ms) {
   orb_publication_t *pub =
       orb_create_publication_multi(ORB_ID(orb_test), nullptr);
-  orb_event_poll_t *poll = orb_event_poll_create();
+  uevent_t *poll = uevent_create();
 
   std::vector<orb_subscription_t *> subs;
+  std::vector<uevent_source_t *> sources;
   subs.reserve(num_subs);
+  sources.reserve(num_subs);
   for (int i = 0; i < num_subs; ++i) {
     orb_subscription_t *sub =
         orb_create_subscription_multi(ORB_ID(orb_test), 0);
     subs.push_back(sub);
-    orb_event_poll_add(poll, sub);
+    uevent_source_t *src = uorb_subscription_create_source(sub);
+    sources.push_back(src);
+    uevent_add(poll, src, 0);
   }
 
   // Drain initial state.
   orb_test_s msg{};
   orb_publish(pub, &msg);
-  std::vector<orb_subscription_t *> ready(static_cast<size_t>(num_subs));
-  orb_event_poll_wait(poll, ready.data(), num_subs, 0);
+  std::vector<uevent_source_t *> ready(static_cast<size_t>(num_subs));
+  uevent_loop(poll, ready.data(), num_subs, 0);
   for (auto *sub : subs) orb_copy(sub, &msg);
 
   std::atomic<bool> running{true};
@@ -290,23 +301,24 @@ static void run_event_poll_blocking(int num_subs, int duration_ms) {
   const auto t0 = std::chrono::steady_clock::now();
   long long loops = 0;
   while (elapsed_ms(t0) < duration_ms) {
-    const int n = orb_event_poll_wait(poll, ready.data(), num_subs, 100);
+    const int n = uevent_loop(poll, ready.data(), num_subs, 100);
     if (n > 0) {
-      for (int i = 0; i < n; ++i) orb_copy(ready[i], &msg);
+      for (int i = 0; i < n; ++i) orb_copy(subs[i], &msg);
       ++loops;
     }
   }
 
   running = false;
   publisher.join();
-  print_result("blocking event_poll (pub+wait+copy)", num_subs, loops,
+  print_result("blocking uevent_poll (pub+wait+copy)", num_subs, loops,
                elapsed_ms(t0));
 
-  for (auto *sub : subs) {
-    orb_event_poll_remove(poll, sub);
-    orb_destroy_subscription(&sub);
+  for (size_t i = 0; i < num_subs; ++i) {
+    uevent_remove(poll, sources[i]);
+    uorb_subscription_destroy_source(sources[i]);
+    orb_destroy_subscription(&subs[i]);
   }
-  orb_event_poll_destroy(&poll);
+  uevent_destroy(poll);
   orb_destroy_publication(&pub);
 }
 
@@ -362,11 +374,11 @@ int main() {
     }
   }
 
-  if (mode_enabled(mode, "event_poll")) {
+  if (mode_enabled(mode, "uevent_poll")) {
     if (!g_csv_output) printf("\n");
     print_header();
     for (int subs : {1, 8, 32, 128}) {
-      run_event_poll_many_subs(subs, duration_ms);
+      run_uevent_poll_many_subs(subs, duration_ms);
     }
   }
 
@@ -377,8 +389,8 @@ int main() {
     }
     print_header();
     for (int n : {1, 8, 32, 128}) {
-      run_event_poll_many_subs(n, duration_ms,
-                               "compare_poll/event_poll timeout=0");
+      run_uevent_poll_many_subs(n, duration_ms,
+                               "compare_poll/uevent_poll timeout=0");
     }
   }
 
@@ -389,7 +401,7 @@ int main() {
     }
     print_header();
     for (int n : {1, 8, 32, 128}) {
-      run_event_poll_blocking(n, duration_ms);
+      run_uevent_poll_blocking(n, duration_ms);
     }
   }
 

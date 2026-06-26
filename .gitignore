@@ -538,3 +538,5 @@ MigrationBackup/
 
 # End of https://www.gitignore.io/api/c,c++,cmake,clion+all,visualstudio,visualstudiocode
 build*
+cmake-build-*
+.qoder

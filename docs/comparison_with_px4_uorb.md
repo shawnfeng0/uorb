@@ -7,8 +7,8 @@ The main difference lies in the implementation of the bottom layer, and the appl
 * Unified publication and subscription type: `orb_publication_t*` and `orb_subscription_t*`
 * Pass pointers when unpublishing and unsubscribing to avoid wild pointers(Reference from zmq)
 * Use ``bool`` type (include in ``<stdbool.h>``) to indicate whether the operation is successful
-* Add independent ``orb_poll`` function, instead of ``px4_poll`` in PX4 Autopilot
-* Add EventLoop/EventPoll APIs (`uorb/event_loop.h`, `orb_event_poll_*`) for callback/event-loop style dispatch
+* Add independent `uevent` event loop library (`uevent/uevent.h`, `uevent_*` APIs), instead of `px4_poll` in PX4 Autopilot
+* Add EventLoop/EventPoll APIs (`uorb_uevent/uorb_uevent.h`, `uorb_subscription_create_source`) for callback/event-loop style dispatch
 * Configure the topic's queue size in the topic's metadata, not at the time of publishing, which is good for a single topic with multiple publishers.
 
 | PX4 uORB                                                     | Current uORB                                                 |
@@ -26,7 +26,7 @@ The main difference lies in the implementation of the bottom layer, and the appl
 | **int** orb_check(**int handle** ~~, bool \*updated~~)       | **bool** orb_check_update(**orb_subscription_t *handle**)    |
 | ~~int orb_set_interval(int handle, unsigned interval)~~      |                                                              |
 | ~~int orb_get_interval(int handle, unsigned \*interval)~~    |                                                              |
-| int px4_poll(**px4_pollfd_struct_t** \*fds, unsigned int nfds, int timeout) | int orb_poll(**struct orb_pollfd** \*fds, unsigned int nfds, int timeout_ms) |
+| int px4_poll(**px4_pollfd_struct_t** \*fds, unsigned int nfds, int timeout) | uevent_* APIs (`uevent_create`, `uevent_add`, `uevent_loop`, etc.) |
 
 ## Difference in implementation
 

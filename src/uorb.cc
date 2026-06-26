@@ -10,10 +10,38 @@
 
 #include "device_master.h"
 #include "device_node.h"
-#include "event_poll.h"
-#include "receiver_local.h"
 
 using namespace uorb;
+
+// ReceiverLocal: internal struct representing a uORB subscription.
+// Stores DeviceNode reference, generation tracking, and an optional
+// publish callback (set by the bridge library via orb_subscription_set_callback).
+struct ReceiverLocal {
+  DeviceNode &dev;
+  unsigned last_generation;
+  orb_publish_callback_fn publish_cb;
+  void *publish_cb_ctx;
+  detail::CallbackEntry callback_entry;
+
+  explicit ReceiverLocal(DeviceNode &device_node) : dev(device_node) {
+    last_generation = device_node.initial_generation();
+    device_node.add_subscriber();
+    publish_cb = nullptr;
+    publish_cb_ctx = nullptr;
+    callback_entry.on_publish = [](void *ctx) {
+      auto *self = static_cast<ReceiverLocal *>(ctx);
+      if (self->publish_cb) self->publish_cb(self->publish_cb_ctx);
+    };
+    callback_entry.ctx = this;
+  }
+
+  ~ReceiverLocal() {
+    dev.remove_subscriber();
+  }
+
+  bool Copy(void *buffer) { return dev.Copy(buffer, &last_generation); }
+  unsigned updates_available() const { return dev.updates_available(last_generation); }
+};
 
 #ifndef UORB_GIT_TAG
 #define UORB_GIT_TAG "v0.0.0-0-unknown"
@@ -102,13 +130,14 @@ orb_subscription_t *orb_create_subscription_multi(const struct orb_metadata *met
 bool orb_destroy_subscription(orb_subscription_t **handle_ptr) {
   ORB_CHECK_TRUE(handle_ptr && *handle_ptr, EINVAL, return false);
 
-  auto &subscription_handle = *handle_ptr;
-  auto *receiver = reinterpret_cast<ReceiverLocal *>(subscription_handle);
-  ORB_CHECK_TRUE(!receiver->HasNotifier(), EBUSY, return false);
+  auto *r = reinterpret_cast<ReceiverLocal *>(*handle_ptr);
 
-  delete receiver;
-  subscription_handle = nullptr;  // Set the original pointer to null
-
+  // Remove callback if registered
+  if (r->publish_cb) {
+    r->dev.UnregisterCallback(&r->callback_entry);
+  }
+  delete r;
+  *handle_ptr = nullptr;
   return true;
 }
 
@@ -142,6 +171,36 @@ bool orb_check_update(orb_subscription_t *handle) {
   return sub.updates_available();
 }
 
+bool orb_subscription_set_callback(orb_subscription_t *sub, orb_publish_callback_fn cb, void *ctx) {
+  if (!sub) {
+    errno = EINVAL;
+    return false;
+  }
+  auto *r = reinterpret_cast<ReceiverLocal *>(sub);
+  if (r->publish_cb) {
+    errno = EBUSY;
+    return false;
+  }
+  r->publish_cb = cb;
+  r->publish_cb_ctx = ctx;
+  return r->dev.RegisterCallback(&r->callback_entry);
+}
+
+bool orb_subscription_clear_callback(orb_subscription_t *sub) {
+  if (!sub) {
+    errno = EINVAL;
+    return false;
+  }
+  auto *r = reinterpret_cast<ReceiverLocal *>(sub);
+  if (!r->publish_cb) return true;
+  bool ok = r->dev.UnregisterCallback(&r->callback_entry);
+  if (ok) {
+    r->publish_cb = nullptr;
+    r->publish_cb_ctx = nullptr;
+  }
+  return ok;
+}
+
 bool orb_exists(const struct orb_metadata *meta, unsigned int instance) {
   ORB_CHECK_TRUE(meta, EINVAL, return false);
 
@@ -167,52 +226,6 @@ bool orb_get_topic_status(const struct orb_metadata *meta, unsigned int instance
 
   auto &master = DeviceMaster::get_instance();
   return master.GetTopicStatus(*meta, instance, status);
-}
-
-
-orb_event_poll_t *orb_event_poll_create(void) {
-  auto *cpp_poll = new (std::nothrow) uorb::EventPoll();
-  if (!cpp_poll) {
-    errno = ENOMEM;
-    return nullptr;
-  }
-
-  return reinterpret_cast<orb_event_poll_t *>(cpp_poll);
-}
-
-bool orb_event_poll_destroy(orb_event_poll_t **handle_ptr) {
-  ORB_CHECK_TRUE(handle_ptr && *handle_ptr, EINVAL, return false);
-  auto *cpp_poll = reinterpret_cast<uorb::EventPoll *>(*handle_ptr);
-  delete cpp_poll;
-  *handle_ptr = nullptr;
-  return true;
-}
-
-bool orb_event_poll_add(orb_event_poll_t *poll, orb_subscription_t *sub) {
-  ORB_CHECK_TRUE(poll && sub, EINVAL, return false);
-  auto *cpp_poll = reinterpret_cast<uorb::EventPoll *>(poll);
-  auto *receiver = reinterpret_cast<uorb::ReceiverLocal *>(sub);
-  return cpp_poll->AddReceiver(*receiver);
-}
-
-bool orb_event_poll_remove(orb_event_poll_t *poll, orb_subscription_t *sub) {
-  ORB_CHECK_TRUE(poll && sub, EINVAL, return false);
-  auto *cpp_poll = reinterpret_cast<uorb::EventPoll *>(poll);
-  auto *receiver = reinterpret_cast<uorb::ReceiverLocal *>(sub);
-  return cpp_poll->RemoveReceiver(*receiver);
-}
-
-int orb_event_poll_wait(orb_event_poll_t *poll, orb_subscription_t *subs[], int max_subs, int timeout_ms) {
-  ORB_CHECK_TRUE(poll && subs && max_subs > 0, EINVAL, return -1);
-  auto *cpp_poll = reinterpret_cast<uorb::EventPoll *>(poll);
-  return cpp_poll->Wait(reinterpret_cast<uorb::ReceiverLocal **>(subs), max_subs, timeout_ms);
-}
-
-bool orb_event_poll_quit(orb_event_poll_t *poll) {
-  ORB_CHECK_TRUE(poll, EINVAL, return false);
-  auto *cpp_poll = reinterpret_cast<uorb::EventPoll *>(poll);
-  cpp_poll->Stop();
-  return true;
 }
 
 const char *orb_version(void) { return UORB_GIT_TAG; }

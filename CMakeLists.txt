@@ -20,7 +20,9 @@ message(STATUS "uORB version: ${UORB_GIT_TAG}")
 
 add_compile_options(-Wextra -Wall)
 
-# uorb library
+# =============================================================================
+# Library 1: uorb (pub/sub only)
+# =============================================================================
 add_library(uorb STATIC
         src/device_master.cc
         src/device_node.cc
@@ -31,17 +33,32 @@ target_include_directories(uorb PRIVATE src)
 target_compile_definitions(uorb PRIVATE UORB_GIT_TAG="${UORB_GIT_TAG}")
 target_link_libraries(uorb PRIVATE pthread)
 
-add_subdirectory(tools/uorb_tcp_topic_listener_lib EXCLUDE_FROM_ALL)
+# =============================================================================
+# Component libraries (uevent and bridge)
+# =============================================================================
+add_subdirectory(components/uevent)
+add_subdirectory(components/uorb_uevent)
 
-# install uorb
-install(TARGETS uorb
+# =============================================================================
+# Install
+# =============================================================================
+install(TARGETS uorb uevent uorb_uevent
         ARCHIVE DESTINATION lib)
 install(DIRECTORY include/uorb DESTINATION include)
+install(DIRECTORY components/uevent/include/uevent DESTINATION include)
+install(DIRECTORY components/uorb_uevent/include/uorb_uevent DESTINATION include)
 
+# =============================================================================
+# Examples
+# =============================================================================
 if (UORB_BUILD_EXAMPLES)
+    add_subdirectory(tools/uorb_tcp_topic_listener_lib)
     add_subdirectory(examples)
 endif ()
 
+# =============================================================================
+# Tests
+# =============================================================================
 if (UORB_BUILD_TESTS)
     include(cmake/googletest.cmake)
     enable_testing()
@@ -52,6 +69,12 @@ if (UORB_BUILD_TESTS)
     target_include_directories(uorb_unittest PRIVATE src)
     add_test(uorb_unittest uorb_unittest)
 
-    # For uorb library interface test
+    # uorb pub/sub tests
     add_subdirectory(tests)
+
+    # uevent library tests (independent of uORB)
+    add_subdirectory(components/uevent/tests)
+
+    # uorb_uevent bridge tests
+    add_subdirectory(components/uorb_uevent/tests)
 endif ()

@@ -5,12 +5,13 @@
 #include <pthread.h>
 #include <unistd.h>
 
-#include "slog.h"
+#include "uevent/uevent.h"
 #include "uorb/publication.h"
 #include "uorb/publication_multi.h"
 #include "uorb/subscription.h"
 #include "uorb/subscription_interval.h"
 #include "uorb/topics/example_string.h"
+#include "uorb_uevent/uorb_uevent.h"
 
 void *thread_publisher(void *unused) {
   (void)unused;
@@ -25,12 +26,12 @@ void *thread_publisher(void *unused) {
              "This is a string message.");
 
     if (!pub_example_string.Publish()) {
-      LOGGER_ERROR("Publish error");
+      printf("Publish error\n");
     }
 
     usleep(1 * 1000 * 1000);
   }
-  LOGGER_WARN("Publication over.");
+  printf("Publication over.\n");
 
   return nullptr;
 }
@@ -41,32 +42,34 @@ void *thread_subscriber(void *unused) {
 
   int timeout_ms = 2000;
 
-  orb_event_poll_t *poll = orb_event_poll_create();
-  orb_event_poll_add(poll, sub_example_string.handle());
+  uevent_t *poll = uevent_create();
+  uevent_source_t *src = uorb_subscription_create_source(sub_example_string.handle());
+  uevent_add(poll, src, 0);
 
   while (true) {
-    orb_subscription_t *ready[1];
-    if (0 < orb_event_poll_wait(poll, ready, 1, timeout_ms)) {
+    uevent_source_t *ready[1];
+    if (0 < uevent_loop(poll, ready, 1, timeout_ms)) {
       if (sub_example_string.Update()) {
         auto data = sub_example_string.data();
-        LOGGER_INFO("timestamp: %" PRIu64 "[us], Receive msg: \"%s\"",
+        printf("timestamp: %" PRIu64 "[us], Receive msg: \"%s\"\n",
                     data.timestamp, data.str);
       }
     } else {
-      LOGGER_WARN("Got no data within %d milliseconds", timeout_ms);
+      printf("Got no data within %d milliseconds\n", timeout_ms );
       break;
     }
   }
 
-  orb_event_poll_remove(poll, sub_example_string.handle());
-  orb_event_poll_destroy(&poll);
+  uevent_remove(poll, src);
+  uorb_subscription_destroy_source(src);
+  uevent_destroy(poll);
 
-  LOGGER_WARN("subscription over");
+  printf("subscription over\n");
   return nullptr;
 }
 
 int main(int, char *[]) {
-  LOGGER_INFO("uORB version: %s", orb_version());
+  printf("uORB version: %s\n", orb_version() );
 
   // One publishing thread, three subscription threads
   pthread_t pthread_id;

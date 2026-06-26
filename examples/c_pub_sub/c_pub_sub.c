@@ -1,3 +1,4 @@
+#include <stdio.h>
 //
 // Created by fs on 2020-01-15.
 //
@@ -5,8 +6,9 @@
 #include <pthread.h>
 #include <unistd.h>
 
-#include "slog.h"
+#include "uevent/uevent.h"
 #include "uorb/topics/example_string.h"
+#include "uorb_uevent/uorb_uevent.h"
 
 void *thread_publisher(void *arg) {
   (void)arg;
@@ -19,13 +21,13 @@ void *thread_publisher(void *arg) {
              i, "This is a string message.");
 
     if (!orb_publish(pub_example_string, &example_string)) {
-      LOGGER_ERROR("Publish error");
+      printf("Publish error\n");
     }
     usleep(1 * 1000 * 1000);
   }
 
   orb_destroy_publication(&pub_example_string);
-  LOGGER_WARN("Publication over.");
+  printf("Publication over.\n");
 
   return NULL;
 }
@@ -35,40 +37,48 @@ void *thread_subscriber(void *unused) {
   orb_subscription_t *sub_example_string =
       orb_create_subscription(ORB_ID(example_string));
 
-  orb_event_poll_t *poll = orb_event_poll_create();
-  orb_event_poll_add(poll, sub_example_string);
+  uevent_t *poll = uevent_create();
+  uevent_source_t *src = uorb_subscription_create_source(sub_example_string);
+  uevent_add(poll, src, 0);
   int timeout = 2000;
 
   while (true) {
-    orb_subscription_t *ready[1];
-    if (0 < orb_event_poll_wait(poll, ready, 1, timeout)) {
+    uevent_source_t *ready[1];
+    if (0 < uevent_loop(poll, ready, 1, timeout)) {
       struct example_string_s example_string;
-      orb_copy(ready[0], &example_string);
-      LOGGER_INFO("Receive msg: \"%s\"", example_string.str);
+      orb_copy(sub_example_string, &example_string);
+      printf("Receive msg: \"%s\"\n", example_string.str);
     } else {
-      LOGGER_WARN("Got no data within %d milliseconds", timeout);
+      printf("Got no data within %d milliseconds\n", timeout);
       break;
     }
   }
 
-  orb_event_poll_remove(poll, sub_example_string);
-  orb_event_poll_destroy(&poll);
+  uevent_remove(poll, src);
+  uorb_subscription_destroy_source(src);
+  uevent_destroy(poll);
   orb_destroy_subscription(&sub_example_string);
 
-  LOGGER_WARN("subscription over");
+  printf("subscription over\n");
   return NULL;
 }
 
 int main() {
-  LOGGER_INFO("uORB version: %s", orb_version());
+  printf("uORB version: %s\n", orb_version());
 
   // One publishing thread, three subscription threads
   pthread_t pthread_id;
   pthread_create(&pthread_id, NULL, thread_publisher, NULL);
+  pthread_detach(pthread_id);
   pthread_create(&pthread_id, NULL, thread_subscriber, NULL);
+  pthread_detach(pthread_id);
   pthread_create(&pthread_id, NULL, thread_subscriber, NULL);
+  pthread_detach(pthread_id);
   pthread_create(&pthread_id, NULL, thread_subscriber, NULL);
+  pthread_detach(pthread_id);
 
-  // Wait for all threads to finish
+  // Detached threads will exit when they complete their work.
+  // pthread_exit(NULL) exits the calling thread (main), allowing
+  // the detached threads to continue running until they finish.
   pthread_exit(NULL);
 }

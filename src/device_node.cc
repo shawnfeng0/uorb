@@ -89,8 +89,8 @@ bool uorb::DeviceNode::Publish(const void *data) {
 
   generation_++;
 
-  for (auto &receiver : receiver_list_) {
-    receiver.on_publish(data);
+  for (auto &entry : receiver_list_) {
+    entry.on_publish(entry.ctx);
   }
 
   return true;
@@ -141,12 +141,12 @@ void uorb::DeviceNode::mark_untracked_publisher() {
   has_untracked_publisher_ = true;
 }
 
-uorb::DeviceNode::StatusSnapshot uorb::DeviceNode::GetStatusSnapshot() const {
+void uorb::DeviceNode::FillStatus(orb_status *status) const {
   base::LockGuard<base::Mutex> lg(lock_);
-  return StatusSnapshot{queue_size_,
-                        subscriber_count_,
-                        has_untracked_subscriber_,
-                        publisher_count_,
-                        has_untracked_publisher_,
-                        generation_.load()};
+  status->queue_size = queue_size_;
+  status->subscriber_count = subscriber_count_;
+  status->has_untracked_subscriber = has_untracked_subscriber_;
+  status->publisher_count = publisher_count_;
+  status->has_untracked_publisher = has_untracked_publisher_;
+  status->latest_data_index = generation_.load();
 }

@@ -1,11 +1,13 @@
-// Demonstrates the C orb_event_poll_* API with two subscriptions.
+#include <stdio.h>
+// Demonstrates the C uevent_* API with two subscriptions.
 
 #include <pthread.h>
 #include <unistd.h>
 
-#include "slog.h"
+#include "uevent/uevent.h"
 #include "uorb/topics/example_string.h"
 #include "uorb/topics/sensor_accel.h"
+#include "uorb_uevent/uorb_uevent.h"
 
 static void *publish_example_string(void *unused) {
   (void)unused;
@@ -45,22 +47,40 @@ static void *publish_sensor_accel(void *unused) {
 }
 
 int main(void) {
-  LOGGER_INFO("uORB version: %s", orb_version());
+  printf("uORB version: %s\n", orb_version() );
 
   orb_subscription_t *string_sub = orb_create_subscription(ORB_ID(example_string));
   orb_subscription_t *accel_sub = orb_create_subscription(ORB_ID(sensor_accel));
-  orb_event_poll_t *poll = orb_event_poll_create();
+  uevent_t *base = uevent_create();
 
-  if (!string_sub || !accel_sub || !poll) {
-    LOGGER_ERROR("Failed to create subscriptions or event poll");
+  if (!string_sub || !accel_sub || !base) {
+    printf("Failed to create subscriptions or event base\n");
     orb_destroy_subscription(&string_sub);
     orb_destroy_subscription(&accel_sub);
-    orb_event_poll_destroy(&poll);
+    uevent_destroy(base);
     return 1;
   }
 
-  orb_event_poll_add(poll, string_sub);
-  orb_event_poll_add(poll, accel_sub);
+  uevent_source_t *string_src = uorb_subscription_create_source(string_sub);
+  uevent_source_t *accel_src = uorb_subscription_create_source(accel_sub);
+  if (!string_src || !accel_src) {
+    printf("Failed to create event sources\n");
+    if (string_src) uorb_subscription_destroy_source(string_src);
+    if (accel_src) uorb_subscription_destroy_source(accel_src);
+    uevent_destroy(base);
+    orb_destroy_subscription(&string_sub);
+    orb_destroy_subscription(&accel_sub);
+    return 1;
+  }
+  if (uevent_add(base, string_src, 0) != 0 || uevent_add(base, accel_src, 0) != 0) {
+    printf("Failed to add event sources\n");
+    uorb_subscription_destroy_source(string_src);
+    uorb_subscription_destroy_source(accel_src);
+    uevent_destroy(base);
+    orb_destroy_subscription(&string_sub);
+    orb_destroy_subscription(&accel_sub);
+    return 1;
+  }
 
   pthread_t string_publisher;
   pthread_t accel_publisher;
@@ -68,22 +88,24 @@ int main(void) {
   pthread_create(&accel_publisher, NULL, publish_sensor_accel, NULL);
 
   for (;;) {
-    orb_subscription_t *ready[2] = {NULL, NULL};
-    const int ready_count = orb_event_poll_wait(poll, ready, 2, 1000);
+    uevent_source_t *ready[2] = {NULL, NULL};
+    const int ready_count = uevent_loop(base, ready, 2, 1000);
     if (ready_count <= 0) {
       break;
     }
 
     for (int ready_index = 0; ready_index < ready_count; ++ready_index) {
-      if (ready[ready_index] == string_sub) {
-        struct example_string_s message;
-        orb_copy(string_sub, &message);
-        LOGGER_INFO("example_string: %s", message.str);
-      } else if (ready[ready_index] == accel_sub) {
-        struct sensor_accel_s sample;
-        orb_copy(accel_sub, &sample);
-        LOGGER_INFO("sensor_accel: (%.2f, %.2f, %.2f), temp: %.2f", sample.x,
-                    sample.y, sample.z, sample.temperature);
+      if (ready[ready_index] == string_src) {
+        struct example_string_s message = {0};
+        if (orb_copy(string_sub, &message)) {
+          printf("example_string: %s\n", message.str );
+        }
+      } else if (ready[ready_index] == accel_src) {
+        struct sensor_accel_s sample = {0};
+        if (orb_copy(accel_sub, &sample)) {
+          printf("sensor_accel: (%.2f, %.2f, %.2f), temp: %.2f\n", sample.x,
+                      sample.y, sample.z, sample.temperature);
+        }
       }
     }
   }
@@ -91,9 +113,11 @@ int main(void) {
   pthread_join(string_publisher, NULL);
   pthread_join(accel_publisher, NULL);
 
-  orb_event_poll_remove(poll, string_sub);
-  orb_event_poll_remove(poll, accel_sub);
-  orb_event_poll_destroy(&poll);
+  uevent_remove(base, string_src);
+  uevent_remove(base, accel_src);
+  uorb_subscription_destroy_source(string_src);
+  uorb_subscription_destroy_source(accel_src);
+  uevent_destroy(base);
   orb_destroy_subscription(&string_sub);
   orb_destroy_subscription(&accel_sub);
   return 0;

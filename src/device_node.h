@@ -2,18 +2,29 @@
 
 #include <uorb/uorb.h>
 
+#include <atomic>
 #include <cerrno>
 
-#include "base/condition_variable.h"
 #include "base/intrusive_list/forward_list.h"
 #include "base/mutex.h"
-#include "receiver_base.h"
 
 namespace uORBTest {
 class UnitTest;
 }
 
 namespace uorb {
+namespace detail {
+
+// Function-pointer based callback entry for DeviceNode's publish notification.
+// Replaces the old virtual ReceiverBase — simpler, no inheritance needed.
+struct CallbackEntry {
+  void (*on_publish)(void *ctx);
+  void *ctx;
+  intrusive_list::forward_list_node node{};
+};
+
+}  // namespace detail
+
 class DeviceMaster;
 
 /**
@@ -31,14 +42,7 @@ class DeviceNode {
   // Publish data to this node.
   bool Publish(const void *data);
 
-  struct StatusSnapshot {
-    uint16_t queue_size;
-    uint8_t subscriber_count;
-    bool has_untracked_subscriber;
-    uint8_t publisher_count;
-    bool has_untracked_publisher;
-    unsigned latest_data_index;
-  };
+  void FillStatus(orb_status *status) const;
 
   void add_subscriber();
   void remove_subscriber();
@@ -50,8 +54,6 @@ class DeviceNode {
   uint16_t publisher_count() const { return publisher_count_; }
   void mark_untracked_publisher();
 
-  StatusSnapshot GetStatusSnapshot() const;
-
   // Whether meta and instance are the same as the current one
   inline bool IsSameWith(const orb_metadata &meta, uint8_t instance) const {
     return IsSameWith(meta) && (instance_ == instance);
@@ -60,21 +62,20 @@ class DeviceNode {
   inline bool IsSameWith(const orb_metadata &meta) const { return &meta_ == &meta; }
 
   // add item to list of work items to schedule on node update
-  bool RegisterCallback(detail::ReceiverBase *callback) {
-    if (!callback) {
+  bool RegisterCallback(detail::CallbackEntry *entry) {
+    if (!entry) {
       errno = EINVAL;
       return false;
     }
 
     base::LockGuard<base::Mutex> lg(lock_);
-    receiver_list_.push_front(*callback);
+    receiver_list_.push_front(*entry);
     return true;
   }
 
-  // remove item from list of work items
-  bool UnregisterCallback(const detail::ReceiverBase *callback) {
+  bool UnregisterCallback(const detail::CallbackEntry *entry) {
     base::LockGuard<base::Mutex> lg(lock_);
-    return receiver_list_.remove(*callback);
+    return receiver_list_.remove(*entry);
   }
 
   // Returns the number of updated data relative to the parameter 'generation'
@@ -109,7 +110,7 @@ class DeviceNode {
 
   mutable base::Mutex lock_{};
 
-  intrusive_list::forward_list<detail::ReceiverBase, &detail::ReceiverBase::receiver_node> receiver_list_;
+  intrusive_list::forward_list<detail::CallbackEntry, &detail::CallbackEntry::node> receiver_list_;
   intrusive_list::forward_list_node device_list_node_{};
 
   std::atomic_uint32_t generation_{0}; /**< object generation count */

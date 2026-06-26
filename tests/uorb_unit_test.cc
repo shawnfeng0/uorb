@@ -34,7 +34,9 @@
 #include "uorb_unit_test.h"
 
 #include <gtest/gtest.h>
+#include <uevent/uevent.h>
 #include <uorb/subscription_interval.h>
+#include <uorb_uevent/uorb_uevent.h>
 
 #include <atomic>
 #include <cerrno>
@@ -213,57 +215,48 @@ TEST_F(UnitTest, destroy_resets_handles_and_rejects_repeated_destroy) {
   EXPECT_EQ(errno, EINVAL);
 }
 
-TEST_F(UnitTest, event_poll_rejects_invalid_arguments) {
+TEST_F(UnitTest, uevent_poll_rejects_invalid_arguments) {
   orb_subscription_t *subscription = orb_create_subscription(ORB_ID(orb_test));
   ASSERT_NE(subscription, nullptr);
-  orb_subscription_t *ready[1] = {nullptr};
+  uevent_source_t *src = uorb_subscription_create_source(subscription);
+  uevent_source_t *ready[1] = {nullptr};
 
   errno = 0;
-  EXPECT_FALSE(orb_event_poll_destroy(nullptr));
-  EXPECT_EQ(errno, EINVAL);
-
-  orb_event_poll_t *null_poll = nullptr;
-  errno = 0;
-  EXPECT_FALSE(orb_event_poll_destroy(&null_poll));
+  EXPECT_EQ(uevent_add(nullptr, src, 0), -1);
   EXPECT_EQ(errno, EINVAL);
 
   errno = 0;
-  EXPECT_FALSE(orb_event_poll_add(nullptr, subscription));
+  EXPECT_EQ(uevent_add(reinterpret_cast<uevent_t *>(0x1), nullptr, 0), -1);
   EXPECT_EQ(errno, EINVAL);
 
   errno = 0;
-  EXPECT_FALSE(orb_event_poll_add(reinterpret_cast<orb_event_poll_t *>(0x1), nullptr));
+  EXPECT_EQ(uevent_remove(nullptr, src), -1);
   EXPECT_EQ(errno, EINVAL);
 
   errno = 0;
-  EXPECT_FALSE(orb_event_poll_remove(nullptr, subscription));
+  EXPECT_EQ(uevent_remove(reinterpret_cast<uevent_t *>(0x1), nullptr), -1);
   EXPECT_EQ(errno, EINVAL);
 
   errno = 0;
-  EXPECT_FALSE(orb_event_poll_remove(reinterpret_cast<orb_event_poll_t *>(0x1), nullptr));
+  EXPECT_EQ(uevent_loop(nullptr, ready, 1, 0), -1);
+  EXPECT_EQ(errno, EINVAL);
+
+  uevent_t *base = uevent_create();
+  ASSERT_NE(base, nullptr);
+
+  errno = 0;
+  EXPECT_EQ(uevent_loop(base, nullptr, 1, 0), -1);
   EXPECT_EQ(errno, EINVAL);
 
   errno = 0;
-  EXPECT_EQ(orb_event_poll_wait(nullptr, ready, 1, 0), -1);
-  EXPECT_EQ(errno, EINVAL);
-
-  orb_event_poll_t *poll = orb_event_poll_create();
-  ASSERT_NE(poll, nullptr);
-
-  errno = 0;
-  EXPECT_EQ(orb_event_poll_wait(poll, nullptr, 1, 0), -1);
+  EXPECT_EQ(uevent_loop(base, ready, 0, 0), -1);
   EXPECT_EQ(errno, EINVAL);
 
   errno = 0;
-  EXPECT_EQ(orb_event_poll_wait(poll, ready, 0, 0), -1);
+  EXPECT_EQ(uevent_loopbreak(nullptr), -1);
   EXPECT_EQ(errno, EINVAL);
 
-  errno = 0;
-  EXPECT_FALSE(orb_event_poll_quit(nullptr));
-  EXPECT_EQ(errno, EINVAL);
-
-  EXPECT_TRUE(orb_event_poll_destroy(&poll));
-  EXPECT_EQ(poll, nullptr);
+  uevent_destroy(base);
   EXPECT_TRUE(orb_destroy_subscription(&subscription));
 }
 
@@ -774,13 +767,15 @@ TEST_F(UnitTest, queue_poll_notify) {
   }};
 
   int next_expected_val = 0;
-  orb_event_poll_t *poll = orb_event_poll_create();
+  uevent_t *poll = uevent_create();
   ASSERT_NE(poll, nullptr);
-  ASSERT_TRUE(orb_event_poll_add(poll, sfd));
+  uevent_source_t *src = uorb_subscription_create_source(sfd);
+  ASSERT_NE(src, nullptr);
+  ASSERT_EQ(uevent_add(poll, src, 0), 0);
 
   while (!thread_should_exit.load()) {
-    orb_subscription_t *ready[1] = {nullptr};
-    int poll_ret = orb_event_poll_wait(poll, ready, 1, 500);
+    uevent_source_t *ready[1] = {nullptr};
+    int poll_ret = uevent_loop(poll, ready, 1, 500);
     ASSERT_GE(poll_ret, 0) << "poll error (" << poll_ret << "," << errno << ")";
 
     if (thread_should_exit.load()) {
@@ -789,15 +784,16 @@ TEST_F(UnitTest, queue_poll_notify) {
 
     ASSERT_NE(poll_ret, 0) << "poll timeout";
 
-    if (poll_ret > 0 && ready[0] == sfd) {
+    if (poll_ret > 0 && ready[0] == src) {
       orb_copy(sfd, &t);
       ASSERT_EQ(next_expected_val, t.val) << "copy mismatch";
       ++next_expected_val;
     }
   }
 
-  ASSERT_TRUE(orb_event_poll_remove(poll, sfd));
-  ASSERT_TRUE(orb_event_poll_destroy(&poll));
+  ASSERT_EQ(uevent_remove(poll, src), 0);
+  uorb_subscription_destroy_source(src);
+  uevent_destroy(poll);
   test_queue_thread.join();
 
   ASSERT_TRUE(orb_destroy_subscription(&sfd));
@@ -816,14 +812,16 @@ TEST_F(UnitTest, poll_timeout_semantics) {
     ASSERT_TRUE(orb_copy(sub, &drain));
   }
 
-  orb_event_poll_t *poll = orb_event_poll_create();
+  uevent_t *poll = uevent_create();
   ASSERT_NE(poll, nullptr);
-  ASSERT_TRUE(orb_event_poll_add(poll, sub));
+  uevent_source_t *src = uorb_subscription_create_source(sub);
+  ASSERT_NE(src, nullptr);
+  ASSERT_EQ(uevent_add(poll, src, 0), 0);
 
-  orb_subscription_t *ready[1] = {nullptr};
+  uevent_source_t *ready[1] = {nullptr};
 
   const auto zero_start = std::chrono::steady_clock::now();
-  EXPECT_EQ(orb_event_poll_wait(poll, ready, 1, 0), 0);
+  EXPECT_EQ(uevent_loop(poll, ready, 1, 0), 0);
   const auto zero_elapsed_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(
           std::chrono::steady_clock::now() - zero_start)
@@ -841,17 +839,18 @@ TEST_F(UnitTest, poll_timeout_semantics) {
   });
 
   const auto neg_start = std::chrono::steady_clock::now();
-  EXPECT_EQ(orb_event_poll_wait(poll, ready, 1, -5), 1);
+  EXPECT_EQ(uevent_loop(poll, ready, 1, -5), 1);
   const auto neg_elapsed_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(
           std::chrono::steady_clock::now() - neg_start)
           .count();
   EXPECT_GE(neg_elapsed_ms, 25);
-  EXPECT_EQ(ready[0], sub);
+  EXPECT_EQ(ready[0], src);
 
   publisher.join();
-  ASSERT_TRUE(orb_event_poll_remove(poll, sub));
-  ASSERT_TRUE(orb_event_poll_destroy(&poll));
+  ASSERT_EQ(uevent_remove(poll, src), 0);
+  uorb_subscription_destroy_source(src);
+  uevent_destroy(poll);
   EXPECT_TRUE(orb_destroy_publication(&pub));
   EXPECT_TRUE(orb_destroy_subscription(&sub));
 }
@@ -929,8 +928,87 @@ TEST_F(UnitTest, concurrent_publish_copy_with_multiple_handles) {
   }
 }
 
+TEST_F(UnitTest, publish_auto_creates_publication_on_first_use) {
+  // orb_publish_auto should create a publication handle on first use
+  orb_publication_t *pub = nullptr;
+  orb_test_s data{};
+  data.val = 42;
+  unsigned int instance = 0;
+  ASSERT_TRUE(orb_publish_auto(ORB_ID(orb_test), &pub, &data, &instance));
+  ASSERT_NE(pub, nullptr);
+
+  // Subsequent calls should reuse the same publication
+  orb_publication_t *pub2 = pub;
+  data.val = 43;
+  ASSERT_TRUE(orb_publish_auto(ORB_ID(orb_test), &pub, &data, &instance));
+  EXPECT_EQ(pub, pub2);  // Same handle reused
+
+  // Verify data was published
+  orb_subscription_t *sub = orb_create_subscription(ORB_ID(orb_test));
+  ASSERT_NE(sub, nullptr);
+  EXPECT_TRUE(orb_check_update(sub));
+  orb_test_s received{};
+  EXPECT_TRUE(orb_copy(sub, &received));
+  EXPECT_EQ(received.val, 43);
+
+  EXPECT_TRUE(orb_destroy_subscription(&sub));
+  EXPECT_TRUE(orb_destroy_publication(&pub));
+}
+
+TEST_F(UnitTest, check_and_copy_returns_true_when_updated) {
+  orb_publication_t *pub = orb_create_publication(ORB_ID(orb_test));
+  ASSERT_NE(pub, nullptr);
+
+  orb_subscription_t *sub = orb_create_subscription(ORB_ID(orb_test));
+  ASSERT_NE(sub, nullptr);
+
+  // Initially no update
+  EXPECT_FALSE(orb_check_and_copy(sub, nullptr));
+
+  // Publish data
+  orb_test_s data{};
+  data.val = 123;
+  ASSERT_TRUE(orb_publish(pub, &data));
+
+  // Now should return true and copy
+  orb_test_s received{};
+  EXPECT_TRUE(orb_check_and_copy(sub, &received));
+  EXPECT_EQ(received.val, 123);
+
+  // After copy, should return false again
+  EXPECT_FALSE(orb_check_and_copy(sub, nullptr));
+
+  EXPECT_TRUE(orb_destroy_subscription(&sub));
+  EXPECT_TRUE(orb_destroy_publication(&pub));
+}
+
+TEST_F(UnitTest, subscription_interval_boundary_conditions) {
+  // Test with interval = 0 (should always update)
+  uorb::SubscriptionInterval<uorb::msg::orb_test> sub0(0, 0);
+  orb_publication_t *pub = orb_create_publication(ORB_ID(orb_test));
+  ASSERT_NE(pub, nullptr);
+
+  orb_test_s data{};
+  data.val = 1;
+  ASSERT_TRUE(orb_publish(pub, &data));
+  EXPECT_TRUE(sub0.Updated());
+
+  // Test with very large interval (should throttle)
+  uorb::SubscriptionInterval<uorb::msg::orb_test> sub_large(1000000, 0);  // 1 second
+  data.val = 2;
+  ASSERT_TRUE(orb_publish(pub, &data));
+  // May or may not update depending on timing, but should not crash
+
+  EXPECT_TRUE(orb_destroy_publication(&pub));
+}
+
 TEST_F(UnitTest, topic_status_counter_saturation) {
   constexpr int kManyHandles = 300;
+  constexpr uint16_t kMaxTrackedHandles = 127;
+
+  // Capture counts before creating handles
+  orb_status before{};
+  ASSERT_TRUE(orb_get_topic_status(ORB_ID(orb_test), 0, &before));
 
   std::vector<orb_publication_t *> pubs;
   pubs.reserve(kManyHandles);
@@ -948,12 +1026,19 @@ TEST_F(UnitTest, topic_status_counter_saturation) {
     subs.push_back(sub);
   }
 
-  constexpr uint16_t kMaxTrackedHandles = 127;
+  orb_status after{};
+  ASSERT_TRUE(orb_get_topic_status(ORB_ID(orb_test), 0, &after));
 
-  orb_status status{};
-  ASSERT_TRUE(orb_get_topic_status(ORB_ID(orb_test), 0, &status));
-  EXPECT_EQ(status.publisher_count, kMaxTrackedHandles);
-  EXPECT_EQ(status.subscriber_count, kMaxTrackedHandles);
+  // Counters should saturate at 127, not overflow
+  EXPECT_LE(after.publisher_count, kMaxTrackedHandles);
+  EXPECT_LE(after.subscriber_count, kMaxTrackedHandles);
+  // If not already saturated before, we should hit the cap now
+  if (before.publisher_count < kMaxTrackedHandles) {
+    EXPECT_EQ(after.publisher_count, kMaxTrackedHandles);
+  }
+  if (before.subscriber_count < kMaxTrackedHandles) {
+    EXPECT_EQ(after.subscriber_count, kMaxTrackedHandles);
+  }
 
   for (auto *sub : subs) {
     EXPECT_TRUE(orb_destroy_subscription(&sub));

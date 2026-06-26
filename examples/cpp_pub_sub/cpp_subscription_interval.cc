@@ -5,10 +5,11 @@
 
 #include <thread>
 
-#include "slog.h"
+#include "uevent/uevent.h"
 #include "uorb/publication.h"
 #include "uorb/subscription_interval.h"
 #include "uorb/topics/sensor_accel.h"
+#include "uorb_uevent/uorb_uevent.h"
 
 void publish_accel_samples() {
   uorb::PublicationData<uorb::msg::sensor_accel> publisher;
@@ -24,7 +25,7 @@ void publish_accel_samples() {
     sample.temperature = 25.0f + sample_index;
 
     if (!publisher.Publish()) {
-      LOGGER_ERROR("Publish sensor_accel failed");
+      printf("Publish sensor_accel failed\n");
       return;
     }
 
@@ -33,31 +34,33 @@ void publish_accel_samples() {
 }
 
 int main() {
-  LOGGER_INFO("uORB version: %s", orb_version());
+  printf("uORB version: %s\n", orb_version() );
 
   uorb::SubscriptionInterval<uorb::msg::sensor_accel> subscription(500 * 1000);
-  orb_event_poll_t *poll = orb_event_poll_create();
-  orb_event_poll_add(poll, subscription.handle());
+  uevent_t *poll = uevent_create();
+  uevent_source_t *src = uorb_subscription_create_source(subscription.handle());
+  uevent_add(poll, src, 0);
 
   std::thread publisher(publish_accel_samples);
 
   for (;;) {
-    orb_subscription_t *ready[1];
-    const int poll_result = orb_event_poll_wait(poll, ready, 1, 1000);
+    uevent_source_t *ready[1];
+    const int poll_result = uevent_loop(poll, ready, 1, 1000);
     if (poll_result <= 0) {
       break;
     }
 
     sensor_accel_s sample{};
     if (subscription.Update(sample)) {
-      LOGGER_INFO("timestamp: %" PRIu64 ", accel: (%.2f, %.2f, %.2f), temp: %.2f",
+      printf("timestamp: %" PRIu64 ", accel: (%.2f, %.2f, %.2f), temp: %.2f\n",
                   sample.timestamp, sample.x, sample.y, sample.z,
                   sample.temperature);
     }
   }
 
   publisher.join();
-  orb_event_poll_remove(poll, subscription.handle());
-  orb_event_poll_destroy(&poll);
+  uevent_remove(poll, src);
+  uorb_subscription_destroy_source(src);
+  uevent_destroy(poll);
   return 0;
 }
