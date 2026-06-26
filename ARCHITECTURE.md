@@ -31,7 +31,7 @@ The library is organized into three independent components:
 │            uorb_uevent (Bridge Library)                  │
 │  ┌─────────────────────────────────────────────────┐     │
 │  │  EventLoop (C++ wrapper)                        │     │
-│  │  uorb_subscription_get_event_source() (C API)   │     │
+│  │  uorb_subscriber_create_source() (C API)          │     │
 │  └─────────────────────────────────────────────────┘     │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -117,7 +117,7 @@ A bridge library that connects uORB subscriptions with the uevent event loop. Th
 - uevent (event loop library)
 
 **Key features:**
-- `uorb_subscription_get_event_source()` - Creates an event source that wraps a uORB subscription
+- `uorb_subscriber_create_source()` - Creates an event source that wraps a uORB subscription
 - `EventLoop` C++ class - High-level wrapper providing type-safe callback dispatch for uORB subscriptions
 
 **API:**
@@ -137,12 +137,6 @@ class EventLoop {
   template <const orb_metadata &meta, typename Callback>
   bool Subscribe(Callback &&cb);
   
-  template <typename Sub, typename Callback>
-  bool AddSubscription(Sub &sub, Callback &&cb);
-  
-  template <typename Sub>
-  bool RemoveSubscription(Sub &sub);
-  
   int RunOnce(int timeout_ms = -1);
   bool Run();
   void Quit();
@@ -152,19 +146,18 @@ class EventLoop {
 ## Dependency Graph
 
 ```
-                    ┌─────────┐
-                    │  uorb   │  (Core pub/sub library)
-                    └────┬────┘
-                         │
-                         │
-                    ┌────┴────┐
-                    │ uevent  │  (Generic event loop library)
-                    └────┬────┘
-                         │
-                         │
-                    ┌────┴────┐
-                    │uorb_uevent│  (Bridge library)
-                    └─────────┘
+    ┌─────────┐     ┌─────────┐
+    │  uorb   │     │ uevent  │
+    │ (Core   │     │ (Event  │
+    │  pub/sub)│    │  loop)  │
+    └────┬────┘     └────┬────┘
+         │               │
+         │               │
+         └───────┬───────┘
+                 │
+            ┌────┴──────┐
+            │uorb_uevent │  (Bridge library)
+            └───────────┘
 ```
 
 **Key principles:**
@@ -265,19 +258,21 @@ Users can choose which components to use:
 #include <uorb/uorb.h>
 
 // Create a publication
-orb_publisher_t *pub = orb_publisher_create(ORB_ID(orb_test));
+orb_publisher_t pub;
+orb_publisher_create(&pub, ORB_ID(orb_test));
 
 // Create a subscription
-orb_subscriber_t *sub = orb_subscriber_create(ORB_ID(orb_test));
+orb_subscriber_t sub;
+orb_subscriber_create(&sub, ORB_ID(orb_test));
 
 // Publish data
 orb_test_t data = { .val = 42 };
-orb_publisher_publish(pub, &data);
+orb_publisher_publish(&pub, &data);
 
 // Check for updates
-if (orb_subscriber_check_update(sub)) {
+if (orb_subscriber_check_update(&sub)) {
     orb_test_t received;
-    orb_subscriber_copy(sub, &received);
+    orb_subscriber_copy(&sub, &received);
     printf("Received: %d\n", received.val);
 }
 

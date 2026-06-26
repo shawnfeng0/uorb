@@ -261,43 +261,32 @@ Include the header:
 #include "uorb_uevent/uorb_uevent.h"
 ```
 
-### Two ways to register a callback
+### Registering a callback
 
-1. **`EventLoop` owns the subscription** — use `Subscribe<Topic>(callback)`. The `EventLoop` creates and holds the subscription internally, and destroys it when the loop is destroyed.
+Use `Subscribe<Topic>(callback)`. The `EventLoop` creates and holds the subscription internally, and destroys it when the loop is destroyed.
 
-   ```c++
-   uorb::EventLoop loop;
-   loop.Subscribe<uorb::msg::example_string>(
-       [](const example_string_s &msg) {
-         // handle message
-       });
-   ```
-
-2. **Caller owns the subscription** — build your own `uorb::SubscriptionData` and register it with `AddSubscription(sub, cb)`. The caller must keep the subscription alive at least as long as the `EventLoop`, or call `RemoveSubscription(sub)` before the loop is destroyed.
-
-   ```c++
-   uorb::SubscriptionData<uorb::msg::sensor_accel> sub_accel;
-   loop.AddSubscription(sub_accel, [](const sensor_accel_s &msg) {
-     // handle message
-   });
-   // ... later ...
-   loop.RemoveSubscription(sub_accel);
-   ```
+```c++
+uorb::EventLoop loop;
+loop.Subscribe<uorb::msg::example_string>(
+    [](const example_string_s &msg) {
+      // handle message
+    });
+```
 
 ### Driving the loop
 
 * `RunOnce(timeout_ms)` blocks for at most `timeout_ms` milliseconds and dispatches the ready callbacks once; `timeout_ms = -1` blocks until either an event arrives or `Quit()` is called. Returns the number of events dispatched; `-1` on error or when `Quit()` has been requested; `0` when there are no registered subscriptions.
 * `Run()` calls `RunOnce(-1)` in a loop until `Quit()` is requested (returns `true`) or it sees an error / an empty loop (returns `false`).
-* `Quit()` is **thread-safe** and may be called from any thread to request loop shutdown. It is *sticky*: once called, subsequent `RunOnce()` calls return `-1` immediately and the `EventLoop` cannot be restarted.
+* `Quit()` is **thread-safe** and may be called from any thread to request loop shutdown. It is not permanent: `Run()` resets the quit flag at the start of each invocation, so the `EventLoop` can be restarted by calling `Run()` again after `Quit()`.
 
 ### Threading model
 
 * `Quit()` may be called from any thread.
-* All other member functions (`AddSubscription` / `RemoveSubscription` / `Subscribe` / `RunOnce` / `Run`) must be invoked from a single thread — typically the thread that runs the loop.
+* All other member functions (`Subscribe` / `RunOnce` / `Run`) must be invoked from a single thread — typically the thread that runs the loop.
 
 ### Full examples
 
-See [examples/cpp_pub_sub/cpp_pub_sub_event_loop.cc](../examples/cpp_pub_sub/cpp_pub_sub_event_loop.cc) for a runnable example covering both loop-owned `Subscribe<>()` and user-owned `AddSubscription()`, multi-threaded publishers, and a cross-thread `Quit()`.
+See [examples/cpp_pub_sub/cpp_pub_sub_event_loop.cc](../examples/cpp_pub_sub/cpp_pub_sub_event_loop.cc) for a runnable example covering `Subscribe<>()`, multi-threaded publishers, and a cross-thread `Quit()`.
 
 ## Additional examples
 
