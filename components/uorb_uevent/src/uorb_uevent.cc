@@ -11,28 +11,28 @@
 namespace {
 
 struct UorbEventBridge {
-  orb_subscription_t *sub;
-  uevent_source_t *source;
+  orb_subscriber_t sub;
+  uevent_source_t source;
 };
 
 static bool bridge_is_ready(void *ctx) {
   auto *bridge = static_cast<UorbEventBridge *>(ctx);
-  return orb_check_update(bridge->sub);
+  return orb_subscriber_check_update(&bridge->sub);
 }
 
 static void bridge_on_publish(void *ctx) {
   auto *bridge = static_cast<UorbEventBridge *>(ctx);
-  uevent_source_notify(bridge->source);
+  uevent_source_notify(&bridge->source);
 }
 
 static bool bridge_register(void *ctx) {
   auto *bridge = static_cast<UorbEventBridge *>(ctx);
-  return orb_subscription_set_callback(bridge->sub, bridge_on_publish, bridge);
+  return orb_subscriber_set_callback(&bridge->sub, bridge_on_publish, bridge) == ORB_OK;
 }
 
 static bool bridge_unregister(void *ctx) {
   auto *bridge = static_cast<UorbEventBridge *>(ctx);
-  return orb_subscription_clear_callback(bridge->sub);
+  return orb_subscriber_clear_callback(&bridge->sub) == ORB_OK;
 }
 
 static void bridge_ctx_destroy(void *ctx) {
@@ -41,36 +41,38 @@ static void bridge_ctx_destroy(void *ctx) {
 
 }  // anonymous namespace
 
-uevent_source_t *uorb_subscription_create_source(orb_subscription_t *sub) {
-  if (!sub) {
+int uorb_subscriber_create_source(uevent_source_t *src, orb_subscriber_t *sub) {
+  if (!src || !sub) {
     errno = EINVAL;
-    return nullptr;
+    return -1;
   }
 
   auto *bridge = static_cast<UorbEventBridge *>(std::malloc(sizeof(UorbEventBridge)));
   if (!bridge) {
     errno = ENOMEM;
-    return nullptr;
+    return -1;
   }
 
-  bridge->sub = sub;
-  bridge->source = uevent_source_create(
+  bridge->sub = *sub;
+
+  int ret = uevent_source_create(
+      src,
       bridge_is_ready,
       bridge_register,
       bridge_unregister,
       bridge_ctx_destroy,
       bridge);
 
-  if (!bridge->source) {
+  if (ret != 0) {
     std::free(bridge);
-    return nullptr;
+    return -1;
   }
 
-  return bridge->source;
+  bridge->source = *src;
+  return 0;
 }
 
-void uorb_subscription_destroy_source(uevent_source_t *source) {
-  if (!source) return;
-  // The CEventSource destructor calls bridge_ctx_destroy which frees the bridge.
-  uevent_source_destroy(source);
+void uorb_subscriber_destroy_source(uevent_source_t *src) {
+  if (!src) return;
+  uevent_source_destroy(src);
 }

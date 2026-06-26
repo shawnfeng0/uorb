@@ -32,21 +32,21 @@ class Subscription {
    */
   explicit Subscription(uint8_t instance = 0) noexcept : instance_(instance) {}
 
-  virtual ~Subscription() { handle_ &&orb_destroy_subscription(&handle_); }
+  virtual ~Subscription() { if (handle_._handle) orb_subscriber_destroy(&handle_); }
 
   bool Subscribe() {
-    if (handle_) {
+    if (handle_._handle) {
       return true;
     }
-    return (handle_ = orb_create_subscription_multi(&meta, instance_));
+    return orb_subscriber_create_multi(&handle_, &meta, instance_) == ORB_OK;
   }
 
-  orb_subscription_t *handle() { return Subscribe() ? handle_ : nullptr; }
+  orb_subscriber_t *handle() { return Subscribe() ? &handle_ : nullptr; }
 
   /**
    * Check if there is a new update.
    */
-  virtual bool Updated() { return Subscribe() && orb_check_update(handle_); }
+  virtual bool Updated() { return Subscribe() && orb_subscriber_check_update(&handle_); }
 
   /**
    * Update the struct
@@ -59,12 +59,12 @@ class Subscription {
    * Copy the struct
    * @param data The uORB message struct we are updating.
    */
-  virtual bool Copy(ValueType *dst) { return Subscribe() && orb_copy(handle_, dst); }
+  virtual bool Copy(ValueType *dst) { return Subscribe() && orb_subscriber_copy(&handle_, dst) == ORB_OK; }
   virtual bool Copy(ValueType &dst) { return Copy(&dst); }
 
  protected:
   const uint8_t instance_{0};
-  orb_subscription_t *handle_{nullptr};
+  orb_subscriber_t handle_ = ORB_SUBSCRIBER_INITIALIZER;
 };
 
 /**

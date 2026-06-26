@@ -21,24 +21,24 @@ class PublicationMulti {
   PublicationMulti(PublicationMulti &&) = delete;
   PublicationMulti &operator=(const PublicationMulti &) = delete;
   PublicationMulti &operator=(PublicationMulti &&) = delete;
-  ~PublicationMulti() { handle_ &&orb_destroy_publication(&handle_); }
+  ~PublicationMulti() { if (handle_._handle) orb_publisher_destroy(&handle_); }
 
   /**
    * Publish the struct
    * @param data The uORB message struct we are updating.
    */
   bool Publish(const Type &data) {
-    if (!handle_) {
-      handle_ = orb_create_publication_multi(&meta, &instance_);
+    if (!handle_._handle) {
+      orb_publisher_create_multi(&handle_, &meta, &instance_);
     }
 
-    return handle_ && orb_publish(handle_, &data);
+    return handle_._handle && orb_publisher_publish(&handle_, &data) == ORB_OK;
   }
 
   unsigned instance() const { return instance_; }
 
  private:
-  orb_publication_t *handle_{nullptr};
+  orb_publisher_t handle_ = ORB_PUBLISHER_INITIALIZER;
   unsigned instance_{0};
 };
 

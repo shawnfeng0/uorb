@@ -88,13 +88,13 @@ A generic event loop library, completely independent of uORB. Can be used with a
 **API:**
 ```c
 // Event base management
-uevent_t *uevent_create(void);
+int uevent_create(uevent_t *base);
 void uevent_destroy(uevent_t *base);
-int uevent_loop(uevent_t *base, uevent_source_t *ready[], int max_ready, int timeout_ms);
+int uevent_loop(uevent_t *base, uevent_source_t *ready, int max_ready, int timeout_ms);
 int uevent_loopbreak(uevent_t *base);
 
 // Event source management
-uevent_source_t *uevent_source_create(uevent_ready_fn ready_fn, uevent_register_fn register_fn, uevent_unregister_fn unregister_fn, uevent_ctx_destroy_fn ctx_destroy_fn, void *ctx);
+int uevent_source_create(uevent_source_t *src, uevent_ready_fn ready_fn, uevent_register_fn register_fn, uevent_unregister_fn unregister_fn, uevent_ctx_destroy_fn ctx_destroy_fn, void *ctx);
 void uevent_source_destroy(uevent_source_t *source);
 void uevent_source_notify(uevent_source_t *source);
 int uevent_add(uevent_t *base, uevent_source_t *source, int timeout_ms);
@@ -123,8 +123,8 @@ A bridge library that connects uORB subscriptions with the uevent event loop. Th
 **API:**
 ```c
 // Bridge C API
-uevent_source_t *uorb_subscription_create_source(orb_subscription_t *sub);
-void uorb_subscription_destroy_source(uevent_source_t *source);
+int uorb_subscriber_create_source(uevent_source_t *src, orb_subscriber_t *sub);
+void uorb_subscriber_destroy_source(uevent_source_t *source);
 ```
 
 ```cpp
@@ -265,25 +265,25 @@ Users can choose which components to use:
 #include <uorb/uorb.h>
 
 // Create a publication
-orb_publication_t *pub = orb_create_publication(ORB_ID(orb_test));
+orb_publisher_t *pub = orb_publisher_create(ORB_ID(orb_test));
 
 // Create a subscription
-orb_subscription_t *sub = orb_create_subscription(ORB_ID(orb_test));
+orb_subscriber_t *sub = orb_subscriber_create(ORB_ID(orb_test));
 
 // Publish data
 orb_test_t data = { .val = 42 };
-orb_publish(pub, &data);
+orb_publisher_publish(pub, &data);
 
 // Check for updates
-if (orb_check_update(sub)) {
+if (orb_subscriber_check_update(sub)) {
     orb_test_t received;
-    orb_copy(sub, &received);
+    orb_subscriber_copy(sub, &received);
     printf("Received: %d\n", received.val);
 }
 
 // Cleanup
-orb_destroy_subscription(&sub);
-orb_destroy_publication(&pub);
+orb_subscriber_destroy(&sub);
+orb_publisher_destroy(&pub);
 ```
 
 ### Using only uevent (event loop)
@@ -292,22 +292,24 @@ orb_destroy_publication(&pub);
 #include <uevent/uevent.h>
 
 // Create an event base
-uevent_t *base = uevent_create();
+uevent_t base = UEVENT_INITIALIZER;
+uevent_create(&base);
 
 // Create a custom event source
-uevent_source_t *source = uevent_source_create(my_ready_fn, my_register_fn, my_unregister_fn, my_ctx_destroy_fn, my_ctx);
+uevent_source_t source = UEVENT_SOURCE_INITIALIZER;
+uevent_source_create(&source, my_ready_fn, my_register_fn, my_unregister_fn, my_ctx_destroy_fn, my_ctx);
 
 // Add to event base
-uevent_add(base, source, 0);
+uevent_add(&base, &source, 0);
 
 // Wait for events
-uevent_source_t *ready[10];
-int n = uevent_loop(base, ready, 10, 1000);
+uevent_source_t ready[10] = {UEVENT_SOURCE_INITIALIZER};
+int n = uevent_loop(&base, ready, 10, 1000);
 
 // Cleanup
-uevent_remove(base, source);
-uevent_source_destroy(source);
-uevent_destroy(base);
+uevent_remove(&base, &source);
+uevent_source_destroy(&source);
+uevent_destroy(&base);
 ```
 
 ### Using uorb_uevent (integrated pub/sub with event loop)

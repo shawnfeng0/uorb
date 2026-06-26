@@ -66,116 +66,80 @@ TEST_F(UnitTest, subscription_interval_handles_initial_time_less_than_interval) 
 
 TEST_F(UnitTest, unadvertise) {
   // try to advertise and see whether we get the right instance
-  orb_publication_t *pfd[4]{};  ///< used for test_multi and test_multi_reversed
+  orb_publisher_t pfd[4] = {ORB_PUBLISHER_INITIALIZER, ORB_PUBLISHER_INITIALIZER,
+                               ORB_PUBLISHER_INITIALIZER, ORB_PUBLISHER_INITIALIZER};
   unsigned instance_test[4]{};
   orb_test_s t{};
 
   for (int i = 0; i < 4; ++i) {
-    pfd[i] =
-        orb_create_publication_multi(ORB_ID(orb_multitest), &instance_test[i]);
+    EXPECT_EQ(orb_publisher_create_multi(&pfd[i], ORB_ID(orb_multitest), &instance_test[i]), ORB_OK);
     EXPECT_EQ(instance_test[i], i) << "got wrong instance";
-    orb_publish(pfd[i], &t);
+    orb_publisher_publish(&pfd[i], &t);
   }
 
   for (auto &i : pfd) {
-    EXPECT_TRUE(orb_destroy_publication(&i));
+    EXPECT_EQ(orb_publisher_destroy(&i), ORB_OK);
   }
 }
 
 TEST_F(UnitTest, publication_multi_reports_eexist_when_instances_are_full) {
-  orb_publication_t *publications[ORB_MULTI_MAX_INSTANCES]{};
+  orb_publisher_t publications[ORB_MULTI_MAX_INSTANCES] = {};
   unsigned instances[ORB_MULTI_MAX_INSTANCES]{};
 
   for (unsigned index = 0; index < ORB_MULTI_MAX_INSTANCES; ++index) {
-    publications[index] = orb_create_publication_multi(ORB_ID(orb_test_medium), &instances[index]);
-    ASSERT_NE(publications[index], nullptr);
+    EXPECT_EQ(orb_publisher_create_multi(&publications[index], ORB_ID(orb_test_medium), &instances[index]), ORB_OK);
+    EXPECT_NE(publications[index]._handle, nullptr);
     EXPECT_EQ(instances[index], index);
   }
 
   unsigned extra_instance = 0;
-  errno = 0;
-  EXPECT_EQ(orb_create_publication_multi(ORB_ID(orb_test_medium), &extra_instance), nullptr);
-  EXPECT_EQ(errno, EEXIST);
+  orb_publisher_t extra_pub = ORB_PUBLISHER_INITIALIZER;
+  EXPECT_EQ(orb_publisher_create_multi(&extra_pub, ORB_ID(orb_test_medium), &extra_instance), ORB_ERR_EXIST);
 
-  for (auto *publication : publications) {
-    EXPECT_TRUE(orb_destroy_publication(&publication));
+  for (auto &publication : publications) {
+    EXPECT_EQ(orb_publisher_destroy(&publication), ORB_OK);
   }
 }
 
 TEST_F(UnitTest, subscription_multi_reports_einval_for_invalid_instance) {
-  errno = 0;
-  orb_subscription_t *subscription = orb_create_subscription_multi(ORB_ID(orb_test), ORB_MULTI_MAX_INSTANCES);
-  EXPECT_EQ(subscription, nullptr);
-  EXPECT_EQ(errno, EINVAL);
+  orb_subscriber_t subscription = ORB_SUBSCRIBER_INITIALIZER;
+  EXPECT_EQ(orb_subscriber_create_multi(&subscription, ORB_ID(orb_test), ORB_MULTI_MAX_INSTANCES), ORB_ERR_INVALID);
 }
 
 TEST_F(UnitTest, rejects_null_arguments) {
   orb_test_s msg{};
 
-  errno = 0;
-  EXPECT_EQ(orb_create_publication(nullptr), nullptr);
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(orb_publisher_create(nullptr, ORB_ID(orb_test)), ORB_ERR_INVALID);
+  EXPECT_EQ(orb_publisher_create_multi(nullptr, ORB_ID(orb_test), nullptr), ORB_ERR_INVALID);
+  EXPECT_EQ(orb_subscriber_create(nullptr, ORB_ID(orb_test)), ORB_ERR_INVALID);
+  EXPECT_EQ(orb_subscriber_create_multi(nullptr, ORB_ID(orb_test), 0), ORB_ERR_INVALID);
 
-  errno = 0;
-  EXPECT_EQ(orb_create_publication_multi(nullptr, nullptr), nullptr);
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(orb_publisher_destroy(nullptr), ORB_ERR_INVALID);
+  EXPECT_EQ(orb_subscriber_destroy(nullptr), ORB_ERR_INVALID);
 
-  errno = 0;
-  EXPECT_EQ(orb_create_subscription(nullptr), nullptr);
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(orb_publisher_publish(nullptr, &msg), ORB_ERR_INVALID);
 
-  errno = 0;
-  EXPECT_EQ(orb_create_subscription_multi(nullptr, 0), nullptr);
-  EXPECT_EQ(errno, EINVAL);
+  orb_publisher_t publication = ORB_PUBLISHER_INITIALIZER;
+  EXPECT_EQ(orb_publisher_create(&publication, ORB_ID(orb_test)), ORB_OK);
+  ASSERT_NE(publication._handle, nullptr);
 
-  errno = 0;
-  EXPECT_FALSE(orb_destroy_publication(nullptr));
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(orb_publisher_publish(&publication, nullptr), ORB_ERR_INVALID);
 
-  errno = 0;
-  EXPECT_FALSE(orb_destroy_subscription(nullptr));
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(orb_publisher_publish_once(nullptr, &msg), ORB_ERR_INVALID);
+  EXPECT_EQ(orb_publisher_publish_once(ORB_ID(orb_test), nullptr), ORB_ERR_INVALID);
 
-  errno = 0;
-  EXPECT_FALSE(orb_publish(nullptr, &msg));
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(orb_subscriber_copy(nullptr, &msg), ORB_ERR_INVALID);
 
-  auto *publication = orb_create_publication(ORB_ID(orb_test));
-  ASSERT_NE(publication, nullptr);
+  orb_subscriber_t subscription = ORB_SUBSCRIBER_INITIALIZER;
+  EXPECT_EQ(orb_subscriber_create(&subscription, ORB_ID(orb_test)), ORB_OK);
+  ASSERT_NE(subscription._handle, nullptr);
 
-  errno = 0;
-  EXPECT_FALSE(orb_publish(publication, nullptr));
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(orb_subscriber_copy(&subscription, nullptr), ORB_ERR_INVALID);
 
-  errno = 0;
-  EXPECT_FALSE(orb_publish_once(nullptr, &msg));
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(orb_subscriber_copy_once(nullptr, &msg), ORB_ERR_INVALID);
+  EXPECT_EQ(orb_subscriber_copy_once(ORB_ID(orb_test), nullptr), ORB_ERR_INVALID);
 
-  errno = 0;
-  EXPECT_FALSE(orb_publish_once(ORB_ID(orb_test), nullptr));
-  EXPECT_EQ(errno, EFAULT);
-
-  errno = 0;
-  EXPECT_FALSE(orb_copy(nullptr, &msg));
-  EXPECT_EQ(errno, EINVAL);
-
-  auto *subscription = orb_create_subscription(ORB_ID(orb_test));
-  ASSERT_NE(subscription, nullptr);
-
-  errno = 0;
-  EXPECT_FALSE(orb_copy(subscription, nullptr));
-  EXPECT_EQ(errno, EINVAL);
-
-  errno = 0;
-  EXPECT_FALSE(orb_copy_once(nullptr, &msg));
-  EXPECT_EQ(errno, EINVAL);
-
-  errno = 0;
-  EXPECT_FALSE(orb_copy_once(ORB_ID(orb_test), nullptr));
-
-  errno = 0;
-  EXPECT_FALSE(orb_check_update(nullptr));
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_FALSE(orb_subscriber_check_update(nullptr));
 
   errno = 0;
   EXPECT_FALSE(orb_exists(nullptr, 0));
@@ -185,148 +149,149 @@ TEST_F(UnitTest, rejects_null_arguments) {
   EXPECT_EQ(orb_group_count(nullptr), 0U);
   EXPECT_EQ(errno, EINVAL);
 
-  errno = 0;
-  EXPECT_FALSE(orb_get_topic_status(nullptr, 0, nullptr));
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(orb_get_topic_status(nullptr, 0, nullptr), ORB_ERR_INVALID);
 
-  EXPECT_TRUE(orb_destroy_subscription(&subscription));
-  EXPECT_TRUE(orb_destroy_publication(&publication));
+  EXPECT_EQ(orb_subscriber_destroy(&subscription), ORB_OK);
+  EXPECT_EQ(orb_publisher_destroy(&publication), ORB_OK);
 }
 
 TEST_F(UnitTest, destroy_resets_handles_and_rejects_repeated_destroy) {
-  auto *publication = orb_create_publication(ORB_ID(orb_test));
-  ASSERT_NE(publication, nullptr);
+  orb_publisher_t publication = ORB_PUBLISHER_INITIALIZER;
+  EXPECT_EQ(orb_publisher_create(&publication, ORB_ID(orb_test)), ORB_OK);
+  ASSERT_NE(publication._handle, nullptr);
 
-  EXPECT_TRUE(orb_destroy_publication(&publication));
-  EXPECT_EQ(publication, nullptr);
+  EXPECT_EQ(orb_publisher_destroy(&publication), ORB_OK);
+  EXPECT_EQ(publication._handle, nullptr);
 
-  errno = 0;
-  EXPECT_FALSE(orb_destroy_publication(&publication));
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(orb_publisher_destroy(&publication), ORB_ERR_INVALID);
 
-  auto *subscription = orb_create_subscription(ORB_ID(orb_test));
-  ASSERT_NE(subscription, nullptr);
+  orb_subscriber_t subscription = ORB_SUBSCRIBER_INITIALIZER;
+  EXPECT_EQ(orb_subscriber_create(&subscription, ORB_ID(orb_test)), ORB_OK);
+  ASSERT_NE(subscription._handle, nullptr);
 
-  EXPECT_TRUE(orb_destroy_subscription(&subscription));
-  EXPECT_EQ(subscription, nullptr);
+  EXPECT_EQ(orb_subscriber_destroy(&subscription), ORB_OK);
+  EXPECT_EQ(subscription._handle, nullptr);
 
-  errno = 0;
-  EXPECT_FALSE(orb_destroy_subscription(&subscription));
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(orb_subscriber_destroy(&subscription), ORB_ERR_INVALID);
 }
 
 TEST_F(UnitTest, uevent_poll_rejects_invalid_arguments) {
-  orb_subscription_t *subscription = orb_create_subscription(ORB_ID(orb_test));
-  ASSERT_NE(subscription, nullptr);
-  uevent_source_t *src = uorb_subscription_create_source(subscription);
-  uevent_source_t *ready[1] = {nullptr};
+  orb_subscriber_t subscription = ORB_SUBSCRIBER_INITIALIZER;
+  EXPECT_EQ(orb_subscriber_create(&subscription, ORB_ID(orb_test)), ORB_OK);
+  ASSERT_NE(subscription._handle, nullptr);
+  uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
+  uorb_subscriber_create_source(&src, &subscription);
+  uevent_source_t ready[1] = {UEVENT_SOURCE_INITIALIZER};
 
   errno = 0;
-  EXPECT_EQ(uevent_add(nullptr, src, 0), -1);
+  EXPECT_EQ(uevent_add(nullptr, &src, 0), -1);
   EXPECT_EQ(errno, EINVAL);
 
   errno = 0;
-  EXPECT_EQ(uevent_add(reinterpret_cast<uevent_t *>(0x1), nullptr, 0), -1);
+  uevent_t fake_base = {reinterpret_cast<void *>(0x1)};
+  EXPECT_EQ(uevent_add(&fake_base, nullptr, 0), -1);
   EXPECT_EQ(errno, EINVAL);
 
   errno = 0;
-  EXPECT_EQ(uevent_remove(nullptr, src), -1);
+  EXPECT_EQ(uevent_remove(nullptr, &src), -1);
   EXPECT_EQ(errno, EINVAL);
 
   errno = 0;
-  EXPECT_EQ(uevent_remove(reinterpret_cast<uevent_t *>(0x1), nullptr), -1);
+  EXPECT_EQ(uevent_remove(&fake_base, nullptr), -1);
   EXPECT_EQ(errno, EINVAL);
 
   errno = 0;
   EXPECT_EQ(uevent_loop(nullptr, ready, 1, 0), -1);
   EXPECT_EQ(errno, EINVAL);
 
-  uevent_t *base = uevent_create();
-  ASSERT_NE(base, nullptr);
+  uevent_t base = UEVENT_INITIALIZER;
+  uevent_create(&base);
+  ASSERT_NE(base._handle, nullptr);
 
   errno = 0;
-  EXPECT_EQ(uevent_loop(base, nullptr, 1, 0), -1);
+  EXPECT_EQ(uevent_loop(&base, nullptr, 1, 0), -1);
   EXPECT_EQ(errno, EINVAL);
 
   errno = 0;
-  EXPECT_EQ(uevent_loop(base, ready, 0, 0), -1);
+  EXPECT_EQ(uevent_loop(&base, ready, 0, 0), -1);
   EXPECT_EQ(errno, EINVAL);
 
   errno = 0;
   EXPECT_EQ(uevent_loopbreak(nullptr), -1);
   EXPECT_EQ(errno, EINVAL);
 
-  uevent_destroy(base);
-  EXPECT_TRUE(orb_destroy_subscription(&subscription));
+  uevent_destroy(&base);
+  EXPECT_EQ(orb_subscriber_destroy(&subscription), ORB_OK);
 }
 
 TEST_F(UnitTest, single_topic) {
   orb_test_s t{};
   orb_test_s u{};
-  orb_publication_t *ptopic{};
+  orb_publisher_t ptopic = ORB_PUBLISHER_INITIALIZER;
 
   t.val = 0;
-  ptopic = orb_create_publication_multi(ORB_ID(orb_test), nullptr);
+  EXPECT_EQ(orb_publisher_create_multi(&ptopic, ORB_ID(orb_test), nullptr), ORB_OK);
 
-  ASSERT_NE(ptopic, nullptr) << "advertise failed:" << errno;
+  ASSERT_NE(ptopic._handle, nullptr) << "advertise failed:" << errno;
 
-  orb_publish(ptopic, &t);
+  orb_publisher_publish(&ptopic, &t);
 
-  auto sfd = orb_create_subscription_multi(ORB_ID(orb_test), 0);
+  orb_subscriber_t sfd = ORB_SUBSCRIBER_INITIALIZER;
+  EXPECT_EQ(orb_subscriber_create_multi(&sfd, ORB_ID(orb_test), 0), ORB_OK);
 
-  ASSERT_NE(sfd, nullptr) << "subscribe failed: " << errno;
+  ASSERT_NE(sfd._handle, nullptr) << "subscribe failed: " << errno;
 
   u.val = 1;
 
-  ASSERT_TRUE(orb_copy(sfd, &u)) << "copy(1) failed: " << errno;
+  ASSERT_EQ(orb_subscriber_copy(&sfd, &u), ORB_OK) << "copy(1) failed: " << errno;
 
   ASSERT_EQ(u.val, t.val) << "copy(1) mismatch";
 
-  ASSERT_FALSE(orb_check_update(sfd)) << "spurious updated flag";
+  ASSERT_FALSE(orb_subscriber_check_update(&sfd)) << "spurious updated flag";
 
   t.val = 2;
 
-  ASSERT_TRUE(orb_publish(ptopic, &t)) << "publish failed";
+  ASSERT_EQ(orb_publisher_publish(&ptopic, &t), ORB_OK) << "publish failed";
 
-  ASSERT_TRUE(orb_check_update(sfd)) << "missing updated flag";
-  ASSERT_TRUE(orb_copy(sfd, &u)) << "copy(2) failed: " << errno;
+  ASSERT_TRUE(orb_subscriber_check_update(&sfd)) << "missing updated flag";
+  ASSERT_EQ(orb_subscriber_copy(&sfd, &u), ORB_OK) << "copy(2) failed: " << errno;
 
   ASSERT_EQ(u.val, t.val) << "copy(2) mismatch";
 
   // Publish twice
-  ASSERT_TRUE(orb_publish(ptopic, &t)) << "publish failed";
-  ASSERT_TRUE(orb_publish(ptopic, &t)) << "publish failed";
+  ASSERT_EQ(orb_publisher_publish(&ptopic, &t), ORB_OK) << "publish failed";
+  ASSERT_EQ(orb_publisher_publish(&ptopic, &t), ORB_OK) << "publish failed";
 
-  ASSERT_TRUE(orb_check_update(sfd)) << "missing updated flag";
-  ASSERT_TRUE(orb_copy(sfd, &u)) << "copy failed";
+  ASSERT_TRUE(orb_subscriber_check_update(&sfd)) << "missing updated flag";
+  ASSERT_EQ(orb_subscriber_copy(&sfd, &u), ORB_OK) << "copy failed";
 
-  ASSERT_FALSE(orb_check_update(sfd)) << "need to fail this time";
-  ASSERT_TRUE(orb_copy(sfd, &u)) << "copy failed";
+  ASSERT_FALSE(orb_subscriber_check_update(&sfd)) << "need to fail this time";
+  ASSERT_EQ(orb_subscriber_copy(&sfd, &u), ORB_OK) << "copy failed";
 
-  ASSERT_TRUE(orb_destroy_subscription(&sfd));
+  ASSERT_EQ(orb_subscriber_destroy(&sfd), ORB_OK);
 
-  ASSERT_TRUE(orb_destroy_publication(&ptopic));
+  ASSERT_EQ(orb_publisher_destroy(&ptopic), ORB_OK);
 }
 
 TEST_F(UnitTest, once_pub_sub) {
   orb_test_s pub_data{};
 
-  ASSERT_TRUE(orb_publish_once(ORB_ID(orb_test), &pub_data))
+  ASSERT_EQ(orb_publisher_publish_once(ORB_ID(orb_test), &pub_data), ORB_OK)
       << "publish(1) failed: " << errno;
 
   orb_test_s sub_data{};
   sub_data.val = 1;
 
-  ASSERT_TRUE(orb_copy_once(ORB_ID(orb_test), &sub_data))
+  ASSERT_EQ(orb_subscriber_copy_once(ORB_ID(orb_test), &sub_data), ORB_OK)
       << "copy(1) failed: " << errno;
 
   ASSERT_EQ(sub_data.val, pub_data.val) << "copy(1) mismatch";
 
   pub_data.val = 2;
-  ASSERT_TRUE(orb_publish_once(ORB_ID(orb_test), &pub_data))
+  ASSERT_EQ(orb_publisher_publish_once(ORB_ID(orb_test), &pub_data), ORB_OK)
       << "publish(2) failed" << errno;
 
-  ASSERT_TRUE(orb_copy_once(ORB_ID(orb_test), &sub_data))
+  ASSERT_EQ(orb_subscriber_copy_once(ORB_ID(orb_test), &sub_data), ORB_OK)
       << "copy(2) failed: " << errno;
 
   ASSERT_EQ(sub_data.val, pub_data.val) << "copy(2) mismatch";
@@ -334,26 +299,28 @@ TEST_F(UnitTest, once_pub_sub) {
 
 TEST_F(UnitTest, orb_copy_once_reads_latest_queued_sample) {
   orb_test_medium_s pub_data{};
-  auto *publication = orb_create_publication(ORB_ID(orb_test_medium_queue));
-  ASSERT_NE(publication, nullptr) << "advertise failed: " << errno;
+  orb_publisher_t publication = ORB_PUBLISHER_INITIALIZER;
+  EXPECT_EQ(orb_publisher_create(&publication, ORB_ID(orb_test_medium_queue)), ORB_OK);
+  ASSERT_NE(publication._handle, nullptr) << "advertise failed: " << errno;
 
   const int queue_size = ORB_ID(orb_test_medium_queue)->o_queue_size;
   const int last_value = queue_size * 2 + 3;
 
   for (int value = 0; value <= last_value; ++value) {
     pub_data.val = value;
-    ASSERT_TRUE(orb_publish(publication, &pub_data)) << "publish failed: " << errno;
+    ASSERT_EQ(orb_publisher_publish(&publication, &pub_data), ORB_OK) << "publish failed: " << errno;
   }
 
   orb_test_medium_s sub_data{};
-  ASSERT_TRUE(orb_copy_once(ORB_ID(orb_test_medium_queue), &sub_data)) << "copy failed: " << errno;
+  ASSERT_EQ(orb_subscriber_copy_once(ORB_ID(orb_test_medium_queue), &sub_data), ORB_OK) << "copy failed: " << errno;
   EXPECT_EQ(sub_data.val, last_value);
 
-  EXPECT_TRUE(orb_destroy_publication(&publication));
+  EXPECT_EQ(orb_publisher_destroy(&publication), ORB_OK);
 }
 
 TEST_F(UnitTest, multi_topic) {
-  orb_publication_t *pfd[4]{};  ///< used for test_multi and test_multi_reversed
+  orb_publisher_t pfd[4] = {ORB_PUBLISHER_INITIALIZER, ORB_PUBLISHER_INITIALIZER,
+                               ORB_PUBLISHER_INITIALIZER, ORB_PUBLISHER_INITIALIZER};
 
   /* this routine tests the multi-topic support */
   {
@@ -361,10 +328,10 @@ TEST_F(UnitTest, multi_topic) {
     orb_test_s sub_data{};
 
     unsigned instance0;
-    pfd[0] = orb_create_publication_multi(ORB_ID(orb_multitest), &instance0);
+    EXPECT_EQ(orb_publisher_create_multi(&pfd[0], ORB_ID(orb_multitest), &instance0), ORB_OK);
 
     unsigned instance1;
-    pfd[1] = orb_create_publication_multi(ORB_ID(orb_multitest), &instance1);
+    EXPECT_EQ(orb_publisher_create_multi(&pfd[1], ORB_ID(orb_multitest), &instance1), ORB_OK);
 
     ASSERT_EQ(instance0, 0) << "mult. id0: " << instance0;
 
@@ -372,29 +339,31 @@ TEST_F(UnitTest, multi_topic) {
 
     pub_data.val = 103;
 
-    ASSERT_TRUE(orb_publish(pfd[0], &pub_data)) << "mult. pub0 fail";
+    ASSERT_EQ(orb_publisher_publish(&pfd[0], &pub_data), ORB_OK) << "mult. pub0 fail";
 
     pub_data.val = 203;
 
-    ASSERT_TRUE(orb_publish(pfd[1], &pub_data)) << "mult. pub1 fail";
+    ASSERT_EQ(orb_publisher_publish(&pfd[1], &pub_data), ORB_OK) << "mult. pub1 fail";
 
     /* subscribe to both topics and ensure valid data is received */
-    auto sfd0 = orb_create_subscription_multi(ORB_ID(orb_multitest), 0);
+    orb_subscriber_t sfd0 = ORB_SUBSCRIBER_INITIALIZER;
+    EXPECT_EQ(orb_subscriber_create_multi(&sfd0, ORB_ID(orb_multitest), 0), ORB_OK);
 
-    ASSERT_TRUE(orb_copy(sfd0, &sub_data)) << "sub #0 copy failed: " << errno;
+    ASSERT_EQ(orb_subscriber_copy(&sfd0, &sub_data), ORB_OK) << "sub #0 copy failed: " << errno;
 
     ASSERT_EQ(sub_data.val, 103) << "sub #0 val. mismatch: " << sub_data.val;
 
-    auto sfd1 = orb_create_subscription_multi(ORB_ID(orb_multitest), 1);
+    orb_subscriber_t sfd1 = ORB_SUBSCRIBER_INITIALIZER;
+    EXPECT_EQ(orb_subscriber_create_multi(&sfd1, ORB_ID(orb_multitest), 1), ORB_OK);
 
-    ASSERT_TRUE(orb_copy(sfd1, &sub_data)) << "sub #1 copy failed: " << errno;
+    ASSERT_EQ(orb_subscriber_copy(&sfd1, &sub_data), ORB_OK) << "sub #1 copy failed: " << errno;
 
     ASSERT_EQ(sub_data.val, 203) << "sub #1 val. mismatch: " << sub_data.val;
 
     latency_test<orb_test_s>(ORB_ID(orb_test));
 
-    orb_destroy_subscription(&sfd0);
-    orb_destroy_subscription(&sfd1);
+    orb_subscriber_destroy(&sfd0);
+    orb_subscriber_destroy(&sfd1);
   }
   {
     /* For these tests 0 and 1 instances are taken from before, therefore
@@ -403,9 +372,10 @@ TEST_F(UnitTest, multi_topic) {
     // try multi-topic support subscribing before publishing
 
     /* Subscribe first and advertise afterwards. */
-    auto sfd2 = orb_create_subscription_multi(ORB_ID(orb_multitest), 2);
+    orb_subscriber_t sfd2 = ORB_SUBSCRIBER_INITIALIZER;
+    EXPECT_EQ(orb_subscriber_create_multi(&sfd2, ORB_ID(orb_multitest), 2), ORB_OK);
 
-    ASSERT_NE(sfd2, nullptr) << "errno: " << errno;
+    ASSERT_NE(sfd2._handle, nullptr) << "errno: " << errno;
 
     orb_test_s pub_data{};
     orb_test_s sub_data{};
@@ -413,35 +383,36 @@ TEST_F(UnitTest, multi_topic) {
     pub_data.val = 0;
 
     unsigned int instance2;
-    pfd[2] = orb_create_publication_multi(ORB_ID(orb_multitest), &instance2);
+    EXPECT_EQ(orb_publisher_create_multi(&pfd[2], ORB_ID(orb_multitest), &instance2), ORB_OK);
     ASSERT_EQ(instance2, 2) << "mult. id2: " << instance2;
 
     unsigned int instance3;
-    pfd[3] = orb_create_publication_multi(ORB_ID(orb_multitest), &instance3);
+    EXPECT_EQ(orb_publisher_create_multi(&pfd[3], ORB_ID(orb_multitest), &instance3), ORB_OK);
     ASSERT_EQ(instance3, 3) << "mult. id3: " << instance3;
 
     pub_data.val = 204;
-    ASSERT_TRUE(orb_publish(pfd[2], &pub_data)) << "mult. pub0 fail";
+    ASSERT_EQ(orb_publisher_publish(&pfd[2], &pub_data), ORB_OK) << "mult. pub0 fail";
 
     pub_data.val = 304;
-    ASSERT_TRUE(orb_publish(pfd[3], &pub_data)) << "mult. pub1 fail";
+    ASSERT_EQ(orb_publisher_publish(&pfd[3], &pub_data), ORB_OK) << "mult. pub1 fail";
 
-    ASSERT_TRUE(orb_copy(sfd2, &sub_data)) << "sub #2 copy failed: " << errno;
-    orb_destroy_subscription(&sfd2);
+    ASSERT_EQ(orb_subscriber_copy(&sfd2, &sub_data), ORB_OK) << "sub #2 copy failed: " << errno;
+    orb_subscriber_destroy(&sfd2);
 
     ASSERT_EQ(sub_data.val, 204) << "sub #3 val. mismatch: " << sub_data.val;
 
-    auto sfd3 = orb_create_subscription_multi(ORB_ID(orb_multitest), 3);
-    ASSERT_TRUE(orb_copy(sfd3, &sub_data)) << "sub #3 copy failed: " << errno;
-    orb_destroy_subscription(&sfd3);
+    orb_subscriber_t sfd3 = ORB_SUBSCRIBER_INITIALIZER;
+    EXPECT_EQ(orb_subscriber_create_multi(&sfd3, ORB_ID(orb_multitest), 3), ORB_OK);
+    ASSERT_EQ(orb_subscriber_copy(&sfd3, &sub_data), ORB_OK) << "sub #3 copy failed: " << errno;
+    orb_subscriber_destroy(&sfd3);
 
     ASSERT_EQ(sub_data.val, 304) << "sub #3 val. mismatch: " << sub_data.val;
   }
 
   // we still have the advertisements from the previous test_multi calls.
   for (auto &i : pfd) {
-    ASSERT_TRUE(orb_destroy_publication(&i))
-        << "orb_destroy_publication failed";
+    ASSERT_EQ(orb_publisher_destroy(&i), ORB_OK)
+        << "orb_publisher_destroy failed";
   }
 }
 
@@ -450,24 +421,24 @@ TEST_F(UnitTest, multi_topic2_queue_simulation) {
 
   std::atomic_bool thread_should_exit{false};
   const int num_instances = 3;
-  orb_subscription_t *orb_data_fd[num_instances]{};
+  orb_subscriber_t orb_data_fd[3] = {ORB_SUBSCRIBER_INITIALIZER, ORB_SUBSCRIBER_INITIALIZER,
+                                        ORB_SUBSCRIBER_INITIALIZER};
   int orb_data_next = 0;
 
   for (unsigned i = 0; i < num_instances; ++i) {
-    orb_data_fd[i] =
-        orb_create_subscription_multi(ORB_ID(orb_test_medium_multi), i);
+    orb_subscriber_create_multi(&orb_data_fd[i], ORB_ID(orb_test_medium_multi), i);
   }
 
   std::thread pub_test_multi2_main([&]() {
     int data_next_idx = 0;
     const int num_instances = 3;
-    orb_publication_t *orb_pub[num_instances]{};
+    orb_publisher_t orb_pub[3] = {ORB_PUBLISHER_INITIALIZER, ORB_PUBLISHER_INITIALIZER,
+                                     ORB_PUBLISHER_INITIALIZER};
     orb_test_medium_s data_topic{};
 
     for (unsigned i = 0; i < num_instances; ++i) {
-      orb_publication_t *&pub = orb_pub[i];
       unsigned idx = i;
-      pub = orb_create_publication_multi(ORB_ID(orb_test_medium_multi), &idx);
+      orb_publisher_create_multi(&orb_pub[i], ORB_ID(orb_test_medium_multi), &idx);
 
       if (idx != i) {
         thread_should_exit = true;
@@ -483,12 +454,12 @@ TEST_F(UnitTest, multi_topic2_queue_simulation) {
 
     while (message_counter++ < num_messages) {
       usleep(2);  // make sure the timestamps are different
-      orb_publication_t *&pub = orb_pub[data_next_idx];
+      auto &pub = orb_pub[data_next_idx];
 
       data_topic.timestamp = orb_absolute_time_us();
       data_topic.val = data_next_idx;
 
-      orb_publish(pub, &data_topic);
+      orb_publisher_publish(&pub, &data_topic);
 
       data_next_idx = (data_next_idx + 1) % num_instances;
 
@@ -501,7 +472,7 @@ TEST_F(UnitTest, multi_topic2_queue_simulation) {
     thread_should_exit = true;
 
     for (auto &i : orb_pub) {
-      orb_destroy_publication(&i);
+      orb_publisher_destroy(&i);
     }
     return 0;
   });
@@ -511,11 +482,11 @@ TEST_F(UnitTest, multi_topic2_queue_simulation) {
   while (!thread_should_exit.load()) {
     usleep(1000);
 
-    auto orb_data_cur_fd = orb_data_fd[orb_data_next];
+    auto &orb_data_cur_fd = orb_data_fd[orb_data_next];
 
-    if (orb_check_update(orb_data_cur_fd)) {
+    if (orb_subscriber_check_update(&orb_data_cur_fd)) {
       orb_test_medium_s msg{};
-      orb_copy(orb_data_cur_fd, &msg);
+      orb_subscriber_copy(&orb_data_cur_fd, &msg);
 
       if (last_time != 0) {
         ASSERT_LT(last_time, msg.timestamp) << "Timestamp not increasing!";
@@ -529,37 +500,38 @@ TEST_F(UnitTest, multi_topic2_queue_simulation) {
   pub_test_multi2_main.join();
 
   for (auto &i : orb_data_fd) {
-    orb_destroy_subscription(&i);
+    orb_subscriber_destroy(&i);
   }
 }  // namespace uORBTest
 
 TEST_F(UnitTest, queue) {
   orb_test_medium_s pub_data{};
   orb_test_medium_s sub_data{};
-  orb_publication_t *ptopic{nullptr};
+  orb_publisher_t ptopic = ORB_PUBLISHER_INITIALIZER;
 
-  auto sfd = orb_create_subscription(ORB_ID(orb_test_medium_queue));
+  orb_subscriber_t sfd = ORB_SUBSCRIBER_INITIALIZER;
+  EXPECT_EQ(orb_subscriber_create(&sfd, ORB_ID(orb_test_medium_queue)), ORB_OK);
 
-  ASSERT_NE(sfd, nullptr) << "subscribe failed: " << errno;
+  ASSERT_NE(sfd._handle, nullptr) << "subscribe failed: " << errno;
 
-  while (orb_check_update(sfd)) {
-    ASSERT_TRUE(orb_copy(sfd, &sub_data)) << "drain stale sample failed: " << errno;
+  while (orb_subscriber_check_update(&sfd)) {
+    ASSERT_EQ(orb_subscriber_copy(&sfd, &sub_data), ORB_OK) << "drain stale sample failed: " << errno;
   }
 
   const int queue_size = ORB_ID(orb_test_medium_queue)->o_queue_size;
   pub_data.val = 0;
-  ptopic = orb_create_publication(ORB_ID(orb_test_medium_queue));
-  ASSERT_NE(ptopic, nullptr) << "advertise failed: " << errno;
+  EXPECT_EQ(orb_publisher_create(&ptopic, ORB_ID(orb_test_medium_queue)), ORB_OK);
+  ASSERT_NE(ptopic._handle, nullptr) << "advertise failed: " << errno;
 
-  orb_publish(ptopic, &pub_data);
+  orb_publisher_publish(&ptopic, &pub_data);
 
-  ASSERT_TRUE(orb_check_update(sfd)) << "update flag not set";
+  ASSERT_TRUE(orb_subscriber_check_update(&sfd)) << "update flag not set";
 
-  ASSERT_TRUE(orb_copy(sfd, &sub_data)) << "copy(1) failed: " << errno;
+  ASSERT_EQ(orb_subscriber_copy(&sfd, &sub_data), ORB_OK) << "copy(1) failed: " << errno;
 
   ASSERT_EQ(sub_data.val, pub_data.val) << "copy(1) mismatch";
 
-  ASSERT_FALSE(orb_check_update(sfd)) << "spurious updated flag";
+  ASSERT_FALSE(orb_subscriber_check_update(&sfd)) << "spurious updated flag";
 
   // no messages in the queue anymore
 
@@ -567,17 +539,17 @@ TEST_F(UnitTest, queue) {
 
   for (int i = 0; i < queue_size - 2; ++i) {
     pub_data.val = i;
-    orb_publish(ptopic, &pub_data);
+    orb_publisher_publish(&ptopic, &pub_data);
   }
 
   for (int i = 0; i < queue_size - 2; ++i) {
-    ASSERT_TRUE(orb_check_update(sfd)) << "update flag not set, element " << i;
-    orb_copy(sfd, &sub_data);
+    ASSERT_TRUE(orb_subscriber_check_update(&sfd)) << "update flag not set, element " << i;
+    orb_subscriber_copy(&sfd, &sub_data);
     ASSERT_EQ(sub_data.val, i) << "got wrong element from the queue (got"
                                << sub_data.val << "should be" << i << ")";
   }
 
-  ASSERT_FALSE(orb_check_update(sfd))
+  ASSERT_FALSE(orb_subscriber_check_update(&sfd))
       << "update flag set, element " << queue_size;
 
   //  Testing overflow...
@@ -585,57 +557,58 @@ TEST_F(UnitTest, queue) {
 
   for (int i = 0; i < queue_size + overflow_by; ++i) {
     pub_data.val = i;
-    orb_publish(ptopic, &pub_data);
+    orb_publisher_publish(&ptopic, &pub_data);
   }
 
   for (int i = 0; i < queue_size; ++i) {
-    ASSERT_TRUE(orb_check_update(sfd)) << "update flag not set, element " << i;
-    orb_copy(sfd, &sub_data);
+    ASSERT_TRUE(orb_subscriber_check_update(&sfd)) << "update flag not set, element " << i;
+    orb_subscriber_copy(&sfd, &sub_data);
     ASSERT_EQ(sub_data.val, i + overflow_by)
         << "got wrong element from the queue (got " << sub_data.val
         << "should be" << i + overflow_by << ")";
   }
 
-  ASSERT_FALSE(orb_check_update(sfd))
+  ASSERT_FALSE(orb_subscriber_check_update(&sfd))
       << "update flag set, element " << queue_size;
 
   //  Testing underflow...
 
   for (int i = 0; i < queue_size; ++i) {
-    ASSERT_FALSE(orb_check_update(sfd)) << "update flag set, element " << i;
-    orb_copy(sfd, &sub_data);
+    ASSERT_FALSE(orb_subscriber_check_update(&sfd)) << "update flag set, element " << i;
+    orb_subscriber_copy(&sfd, &sub_data);
     ASSERT_EQ(sub_data.val, queue_size + overflow_by - 1)
         << "got wrong element from the queue (got " << sub_data.val
         << ", should be " << queue_size + overflow_by - 1 << ")";
   }
 
   pub_data.val = 943;
-  orb_publish(ptopic, &pub_data);
-  ASSERT_TRUE(orb_check_update(sfd)) << "update flag not set, element " << -1;
+  orb_publisher_publish(&ptopic, &pub_data);
+  ASSERT_TRUE(orb_subscriber_check_update(&sfd)) << "update flag not set, element " << -1;
 
-  orb_copy(sfd, &sub_data);
+  orb_subscriber_copy(&sfd, &sub_data);
   ASSERT_EQ(sub_data.val, pub_data.val)
       << "got wrong element from the queue (got " << sub_data.val
       << ", should be " << pub_data.val << ")";
 
-  ASSERT_TRUE(orb_destroy_publication(&ptopic));
-  ASSERT_TRUE(orb_destroy_subscription(&sfd));
+  ASSERT_EQ(orb_publisher_destroy(&ptopic), ORB_OK);
+  ASSERT_EQ(orb_subscriber_destroy(&sfd), ORB_OK);
 }
 
 TEST_F(UnitTest, wrap_around) {
   orb_test_medium_s pub_data{};
   orb_test_medium_s sub_data{};
-  orb_publication_t *ptopic{nullptr};
+  orb_publisher_t ptopic = ORB_PUBLISHER_INITIALIZER;
 
-  auto sfd = orb_create_subscription(ORB_ID(orb_test_medium_wrap_around));
+  orb_subscriber_t sfd = ORB_SUBSCRIBER_INITIALIZER;
+  EXPECT_EQ(orb_subscriber_create(&sfd, ORB_ID(orb_test_medium_wrap_around)), ORB_OK);
 
-  ASSERT_NE(sfd, nullptr) << "subscribe failed: " << errno;
+  ASSERT_NE(sfd._handle, nullptr) << "subscribe failed: " << errno;
 
   const int queue_size = 16;
   pub_data.val = 0;
-  ptopic = orb_create_publication(ORB_ID(orb_test_medium_wrap_around));
-  ASSERT_NE(ptopic, nullptr) << "advertise failed: " << errno;
-  orb_publish(ptopic, &pub_data);
+  EXPECT_EQ(orb_publisher_create(&ptopic, ORB_ID(orb_test_medium_wrap_around)), ORB_OK);
+  ASSERT_NE(ptopic._handle, nullptr) << "advertise failed: " << errno;
+  orb_publisher_publish(&ptopic, &pub_data);
 
   // Set generation to the location where wrap-around is about to be
   {
@@ -646,22 +619,22 @@ TEST_F(UnitTest, wrap_around) {
 
     // Refresh the subscriber's generation
     for (int i = 0; i < queue_size; i++) {
-      if (!orb_check_update(sfd)) {
+      if (!orb_subscriber_check_update(&sfd)) {
         break;
       }
-      orb_copy(sfd, &sub_data);
+      orb_subscriber_copy(&sfd, &sub_data);
     }
   }
 
-  orb_publish(ptopic, &pub_data);
+  orb_publisher_publish(&ptopic, &pub_data);
 
-  ASSERT_TRUE(orb_check_update(sfd)) << "update flag not set";
+  ASSERT_TRUE(orb_subscriber_check_update(&sfd)) << "update flag not set";
 
-  ASSERT_TRUE(orb_copy(sfd, &sub_data)) << "copy(1) failed: " << errno;
+  ASSERT_EQ(orb_subscriber_copy(&sfd, &sub_data), ORB_OK) << "copy(1) failed: " << errno;
 
   ASSERT_EQ(sub_data.val, pub_data.val) << "copy(1) mismatch";
 
-  ASSERT_FALSE(orb_check_update(sfd)) << "spurious updated flag";
+  ASSERT_FALSE(orb_subscriber_check_update(&sfd)) << "spurious updated flag";
 
   // no messages in the queue anymore
 
@@ -669,17 +642,17 @@ TEST_F(UnitTest, wrap_around) {
 
   for (int i = 0; i < queue_size - 2; ++i) {
     pub_data.val = i;
-    orb_publish(ptopic, &pub_data);
+    orb_publisher_publish(&ptopic, &pub_data);
   }
 
   for (int i = 0; i < queue_size - 2; ++i) {
-    ASSERT_TRUE(orb_check_update(sfd)) << "update flag not set, element " << i;
-    orb_copy(sfd, &sub_data);
+    ASSERT_TRUE(orb_subscriber_check_update(&sfd)) << "update flag not set, element " << i;
+    orb_subscriber_copy(&sfd, &sub_data);
     ASSERT_EQ(sub_data.val, i) << "got wrong element from the queue (got"
                                << sub_data.val << "should be" << i << ")";
   }
 
-  ASSERT_FALSE(orb_check_update(sfd))
+  ASSERT_FALSE(orb_subscriber_check_update(&sfd))
       << "update flag set, element " << queue_size;
 
   //  Testing overflow...
@@ -687,41 +660,41 @@ TEST_F(UnitTest, wrap_around) {
 
   for (int i = 0; i < queue_size + overflow_by; ++i) {
     pub_data.val = i;
-    orb_publish(ptopic, &pub_data);
+    orb_publisher_publish(&ptopic, &pub_data);
   }
 
   for (int i = 0; i < queue_size; ++i) {
-    ASSERT_TRUE(orb_check_update(sfd)) << "update flag not set, element " << i;
-    orb_copy(sfd, &sub_data);
+    ASSERT_TRUE(orb_subscriber_check_update(&sfd)) << "update flag not set, element " << i;
+    orb_subscriber_copy(&sfd, &sub_data);
     ASSERT_EQ(sub_data.val, i + overflow_by)
         << "got wrong element from the queue (got " << sub_data.val
         << "should be" << i + overflow_by << ")";
   }
 
-  ASSERT_FALSE(orb_check_update(sfd))
+  ASSERT_FALSE(orb_subscriber_check_update(&sfd))
       << "update flag set, element " << queue_size;
 
   //  Testing underflow...
 
   for (int i = 0; i < queue_size; ++i) {
-    ASSERT_FALSE(orb_check_update(sfd)) << "update flag set, element " << i;
-    orb_copy(sfd, &sub_data);
+    ASSERT_FALSE(orb_subscriber_check_update(&sfd)) << "update flag set, element " << i;
+    orb_subscriber_copy(&sfd, &sub_data);
     ASSERT_EQ(sub_data.val, queue_size + overflow_by - 1)
         << "got wrong element from the queue (got " << sub_data.val
         << ", should be " << queue_size + overflow_by - 1 << ")";
   }
 
   pub_data.val = 943;
-  orb_publish(ptopic, &pub_data);
-  ASSERT_TRUE(orb_check_update(sfd)) << "update flag not set, element " << -1;
+  orb_publisher_publish(&ptopic, &pub_data);
+  ASSERT_TRUE(orb_subscriber_check_update(&sfd)) << "update flag not set, element " << -1;
 
-  orb_copy(sfd, &sub_data);
+  orb_subscriber_copy(&sfd, &sub_data);
   ASSERT_EQ(sub_data.val, pub_data.val)
       << "got wrong element from the queue (got " << sub_data.val
       << ", should be " << pub_data.val << ")";
 
-  ASSERT_TRUE(orb_destroy_publication(&ptopic));
-  ASSERT_TRUE(orb_destroy_subscription(&sfd));
+  ASSERT_EQ(orb_publisher_destroy(&ptopic), ORB_OK);
+  ASSERT_EQ(orb_subscriber_destroy(&sfd), ORB_OK);
 }
 
 TEST_F(UnitTest, queue_poll_notify) {
@@ -729,19 +702,20 @@ TEST_F(UnitTest, queue_poll_notify) {
   std::atomic<int> num_messages_sent{0};
   std::atomic_bool thread_should_exit{false};
 
-  orb_subscription_t *sfd;
-  ASSERT_NE(sfd = orb_create_subscription(ORB_ID(orb_test_queue_poll)), nullptr)
+  orb_subscriber_t sfd = ORB_SUBSCRIBER_INITIALIZER;
+  EXPECT_EQ(orb_subscriber_create(&sfd, ORB_ID(orb_test_queue_poll)), ORB_OK);
+  ASSERT_NE(sfd._handle, nullptr)
       << "subscribe failed: " << errno;
 
   std::thread test_queue_thread{[&]() {
     orb_test_medium_s pub_data{};
-    orb_publication_t *ptopic{nullptr};
+    orb_publisher_t ptopic = ORB_PUBLISHER_INITIALIZER;
     const int queue_size = ORB_ID(orb_test_queue_poll)->o_queue_size;
-    ptopic = orb_create_publication(ORB_ID(orb_test_queue_poll));
-    if (ptopic == nullptr) {
+    EXPECT_EQ(orb_publisher_create(&ptopic, ORB_ID(orb_test_queue_poll)), ORB_OK);
+    if (ptopic._handle == nullptr) {
       thread_should_exit = true;
     }
-    ASSERT_NE(ptopic, nullptr) << "advertise failed: " << errno;
+    ASSERT_NE(ptopic._handle, nullptr) << "advertise failed: " << errno;
 
     int message_counter = 0;
     int num_messages = 20 * queue_size;
@@ -752,7 +726,7 @@ TEST_F(UnitTest, queue_poll_notify) {
 
       while (burst_counter++ <
              queue_size / 2 + 7) {  // make interval non-boundary aligned
-        orb_publish(ptopic, &pub_data);
+        orb_publisher_publish(&ptopic, &pub_data);
         ++pub_data.val;
       }
 
@@ -763,19 +737,21 @@ TEST_F(UnitTest, queue_poll_notify) {
     num_messages_sent = pub_data.val;
     usleep(100 * 1000);
     thread_should_exit = true;
-    orb_destroy_publication(&ptopic);
+    orb_publisher_destroy(&ptopic);
   }};
 
   int next_expected_val = 0;
-  uevent_t *poll = uevent_create();
-  ASSERT_NE(poll, nullptr);
-  uevent_source_t *src = uorb_subscription_create_source(sfd);
-  ASSERT_NE(src, nullptr);
-  ASSERT_EQ(uevent_add(poll, src, 0), 0);
+  uevent_t poll = UEVENT_INITIALIZER;
+  uevent_create(&poll);
+  ASSERT_NE(poll._handle, nullptr);
+  uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
+  uorb_subscriber_create_source(&src, &sfd);
+  ASSERT_NE(src._handle, nullptr);
+  ASSERT_EQ(uevent_add(&poll, &src, 0), 0);
 
   while (!thread_should_exit.load()) {
-    uevent_source_t *ready[1] = {nullptr};
-    int poll_ret = uevent_loop(poll, ready, 1, 500);
+    uevent_source_t ready[1] = {UEVENT_SOURCE_INITIALIZER};
+    int poll_ret = uevent_loop(&poll, ready, 1, 500);
     ASSERT_GE(poll_ret, 0) << "poll error (" << poll_ret << "," << errno << ")";
 
     if (thread_should_exit.load()) {
@@ -784,75 +760,79 @@ TEST_F(UnitTest, queue_poll_notify) {
 
     ASSERT_NE(poll_ret, 0) << "poll timeout";
 
-    if (poll_ret > 0 && ready[0] == src) {
-      orb_copy(sfd, &t);
+    if (poll_ret > 0 && ready[0]._handle == src._handle) {
+      orb_subscriber_copy(&sfd, &t);
       ASSERT_EQ(next_expected_val, t.val) << "copy mismatch";
       ++next_expected_val;
     }
   }
 
-  ASSERT_EQ(uevent_remove(poll, src), 0);
-  uorb_subscription_destroy_source(src);
-  uevent_destroy(poll);
+  ASSERT_EQ(uevent_remove(&poll, &src), 0);
+  uorb_subscriber_destroy_source(&src);
+  uevent_destroy(&poll);
   test_queue_thread.join();
 
-  ASSERT_TRUE(orb_destroy_subscription(&sfd));
+  ASSERT_EQ(orb_subscriber_destroy(&sfd), ORB_OK);
 
   ASSERT_EQ(num_messages_sent.load(), next_expected_val)
       << "number of sent and received messages mismatch";
 }
 
 TEST_F(UnitTest, poll_timeout_semantics) {
-  auto sub = orb_create_subscription(ORB_ID(orb_test));
-  ASSERT_NE(sub, nullptr);
+  orb_subscriber_t sub = ORB_SUBSCRIBER_INITIALIZER;
+  EXPECT_EQ(orb_subscriber_create(&sub, ORB_ID(orb_test)), ORB_OK);
+  ASSERT_NE(sub._handle, nullptr);
 
   // Drain any pre-existing updates from other test cases.
   orb_test_s drain{};
-  for (int i = 0; i < 8 && orb_check_update(sub); ++i) {
-    ASSERT_TRUE(orb_copy(sub, &drain));
+  for (int i = 0; i < 8 && orb_subscriber_check_update(&sub); ++i) {
+    ASSERT_EQ(orb_subscriber_copy(&sub, &drain), ORB_OK);
   }
 
-  uevent_t *poll = uevent_create();
-  ASSERT_NE(poll, nullptr);
-  uevent_source_t *src = uorb_subscription_create_source(sub);
-  ASSERT_NE(src, nullptr);
-  ASSERT_EQ(uevent_add(poll, src, 0), 0);
+  uevent_t poll = UEVENT_INITIALIZER;
+  uevent_create(&poll);
+  ASSERT_NE(poll._handle, nullptr);
+  uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
+  uorb_subscriber_create_source(&src, &sub);
+  ASSERT_NE(src._handle, nullptr);
+  ASSERT_EQ(uevent_add(&poll, &src, 0), 0);
 
-  uevent_source_t *ready[1] = {nullptr};
+  uevent_source_t ready[1] = {UEVENT_SOURCE_INITIALIZER};
 
   const auto zero_start = std::chrono::steady_clock::now();
-  EXPECT_EQ(uevent_loop(poll, ready, 1, 0), 0);
+  EXPECT_EQ(uevent_loop(&poll, ready, 1, 0), 0);
   const auto zero_elapsed_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(
           std::chrono::steady_clock::now() - zero_start)
           .count();
   EXPECT_LT(zero_elapsed_ms, 20);
 
-  orb_publication_t *pub = orb_create_publication(ORB_ID(orb_test));
-  ASSERT_NE(pub, nullptr);
+  orb_publisher_t pub = ORB_PUBLISHER_INITIALIZER;
+  EXPECT_EQ(orb_publisher_create(&pub, ORB_ID(orb_test)), ORB_OK);
+  ASSERT_NE(pub._handle, nullptr);
 
   std::thread publisher([&]() {
     std::this_thread::sleep_for(std::chrono::milliseconds(40));
     orb_test_s msg{};
     msg.val = 999;
-    EXPECT_TRUE(orb_publish(pub, &msg));
+    EXPECT_EQ(orb_publisher_publish(&pub, &msg), ORB_OK);
   });
 
   const auto neg_start = std::chrono::steady_clock::now();
-  EXPECT_EQ(uevent_loop(poll, ready, 1, -5), 1);
+  EXPECT_EQ(uevent_loop(&poll, ready, 1, -5), 1);
   const auto neg_elapsed_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(
           std::chrono::steady_clock::now() - neg_start)
           .count();
   EXPECT_GE(neg_elapsed_ms, 25);
-  EXPECT_EQ(ready[0], src);
+  EXPECT_EQ(ready[0]._handle, src._handle);
 
   publisher.join();
-  ASSERT_EQ(uevent_remove(poll, src), 0);
-  uorb_subscription_destroy_source(src);
-  uevent_destroy(poll);
-  EXPECT_TRUE(orb_destroy_publication(&pub));
-  EXPECT_TRUE(orb_destroy_subscription(&sub));
+  ASSERT_EQ(uevent_remove(&poll, &src), 0);
+  uorb_subscriber_destroy_source(&src);
+  uevent_destroy(&poll);
+  EXPECT_EQ(orb_publisher_destroy(&pub), ORB_OK);
+  EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
 }
 
 TEST_F(UnitTest, concurrent_publish_copy_with_multiple_handles) {
@@ -860,16 +840,16 @@ TEST_F(UnitTest, concurrent_publish_copy_with_multiple_handles) {
   constexpr int kSubscriberCount = 3;
   constexpr int kMessagesPerPublisher = 200;
 
-  orb_publication_t *publications[kPublisherCount]{};
+  orb_publisher_t publications[kPublisherCount] = {};
   for (auto &publication : publications) {
-    publication = orb_create_publication(ORB_ID(orb_test_medium));
-    ASSERT_NE(publication, nullptr);
+    EXPECT_EQ(orb_publisher_create(&publication, ORB_ID(orb_test_medium)), ORB_OK);
+    ASSERT_NE(publication._handle, nullptr);
   }
 
-  orb_subscription_t *subscriptions[kSubscriberCount]{};
+  orb_subscriber_t subscriptions[kSubscriberCount] = {};
   for (auto &subscription : subscriptions) {
-    subscription = orb_create_subscription(ORB_ID(orb_test_medium));
-    ASSERT_NE(subscription, nullptr);
+    EXPECT_EQ(orb_subscriber_create(&subscription, ORB_ID(orb_test_medium)), ORB_OK);
+    ASSERT_NE(subscription._handle, nullptr);
   }
 
   std::atomic<int> total_published{0};
@@ -886,20 +866,20 @@ TEST_F(UnitTest, concurrent_publish_copy_with_multiple_handles) {
            ++message_index) {
         msg.timestamp = orb_absolute_time_us();
         msg.val = publisher_index * kMessagesPerPublisher + message_index;
-        EXPECT_TRUE(orb_publish(publications[publisher_index], &msg));
+        EXPECT_EQ(orb_publisher_publish(&publications[publisher_index], &msg), ORB_OK);
         total_published.fetch_add(1, std::memory_order_relaxed);
         std::this_thread::yield();
       }
     });
   }
 
-  for (auto *subscription : subscriptions) {
-    subscribers.emplace_back([&, subscription]() {
+  for (auto &subscription : subscriptions) {
+    subscribers.emplace_back([&, subscription_ptr = &subscription]() {
       orb_test_medium_s msg{};
       while (!publishers_done.load(std::memory_order_acquire) ||
-             orb_check_update(subscription)) {
-        if (orb_check_update(subscription)) {
-          EXPECT_TRUE(orb_copy(subscription, &msg));
+             orb_subscriber_check_update(subscription_ptr)) {
+        if (orb_subscriber_check_update(subscription_ptr)) {
+          EXPECT_EQ(orb_subscriber_copy(subscription_ptr, &msg), ORB_OK);
           total_copied.fetch_add(1, std::memory_order_relaxed);
         } else {
           std::this_thread::yield();
@@ -921,85 +901,91 @@ TEST_F(UnitTest, concurrent_publish_copy_with_multiple_handles) {
   EXPECT_GT(total_copied.load(), 0);
 
   for (auto &subscription : subscriptions) {
-    EXPECT_TRUE(orb_destroy_subscription(&subscription));
+    EXPECT_EQ(orb_subscriber_destroy(&subscription), ORB_OK);
   }
   for (auto &publication : publications) {
-    EXPECT_TRUE(orb_destroy_publication(&publication));
+    EXPECT_EQ(orb_publisher_destroy(&publication), ORB_OK);
   }
 }
 
 TEST_F(UnitTest, publish_auto_creates_publication_on_first_use) {
-  // orb_publish_auto should create a publication handle on first use
-  orb_publication_t *pub = nullptr;
+  // orb_publisher_publish_auto should create a publication handle on first use
+  orb_publisher_t pub = ORB_PUBLISHER_INITIALIZER;
   orb_test_s data{};
   data.val = 42;
   unsigned int instance = 0;
-  ASSERT_TRUE(orb_publish_auto(ORB_ID(orb_test), &pub, &data, &instance));
-  ASSERT_NE(pub, nullptr);
+  ASSERT_EQ(orb_publisher_publish_auto(ORB_ID(orb_test), &pub, &data, &instance), ORB_OK);
+  ASSERT_NE(pub._handle, nullptr);
 
   // Subsequent calls should reuse the same publication
-  orb_publication_t *pub2 = pub;
   data.val = 43;
-  ASSERT_TRUE(orb_publish_auto(ORB_ID(orb_test), &pub, &data, &instance));
-  EXPECT_EQ(pub, pub2);  // Same handle reused
+  ASSERT_EQ(orb_publisher_publish_auto(ORB_ID(orb_test), &pub, &data, &instance), ORB_OK);
 
   // Verify data was published
-  orb_subscription_t *sub = orb_create_subscription(ORB_ID(orb_test));
-  ASSERT_NE(sub, nullptr);
-  EXPECT_TRUE(orb_check_update(sub));
+  orb_subscriber_t sub = ORB_SUBSCRIBER_INITIALIZER;
+  EXPECT_EQ(orb_subscriber_create(&sub, ORB_ID(orb_test)), ORB_OK);
+  ASSERT_NE(sub._handle, nullptr);
+  EXPECT_TRUE(orb_subscriber_check_update(&sub));
   orb_test_s received{};
-  EXPECT_TRUE(orb_copy(sub, &received));
+  EXPECT_EQ(orb_subscriber_copy(&sub, &received), ORB_OK);
   EXPECT_EQ(received.val, 43);
 
-  EXPECT_TRUE(orb_destroy_subscription(&sub));
-  EXPECT_TRUE(orb_destroy_publication(&pub));
+  EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
+  EXPECT_EQ(orb_publisher_destroy(&pub), ORB_OK);
 }
 
 TEST_F(UnitTest, check_and_copy_returns_true_when_updated) {
-  orb_publication_t *pub = orb_create_publication(ORB_ID(orb_test));
-  ASSERT_NE(pub, nullptr);
+  orb_publisher_t pub = ORB_PUBLISHER_INITIALIZER;
+  EXPECT_EQ(orb_publisher_create(&pub, ORB_ID(orb_test)), ORB_OK);
+  ASSERT_NE(pub._handle, nullptr);
 
-  orb_subscription_t *sub = orb_create_subscription(ORB_ID(orb_test));
-  ASSERT_NE(sub, nullptr);
+  orb_subscriber_t sub = ORB_SUBSCRIBER_INITIALIZER;
+  EXPECT_EQ(orb_subscriber_create(&sub, ORB_ID(orb_test)), ORB_OK);
+  ASSERT_NE(sub._handle, nullptr);
 
-  // Initially no update
-  EXPECT_FALSE(orb_check_and_copy(sub, nullptr));
+  // Drain any initial data from previous tests
+  orb_test_s drain{};
+  orb_subscriber_check_and_copy(&sub, &drain);
+
+  // Now no update
+  EXPECT_EQ(orb_subscriber_check_and_copy(&sub, nullptr), ORB_OK);
 
   // Publish data
   orb_test_s data{};
   data.val = 123;
-  ASSERT_TRUE(orb_publish(pub, &data));
+  ASSERT_EQ(orb_publisher_publish(&pub, &data), ORB_OK);
 
-  // Now should return true and copy
+  // Now should return OK and copy
   orb_test_s received{};
-  EXPECT_TRUE(orb_check_and_copy(sub, &received));
+  EXPECT_EQ(orb_subscriber_check_and_copy(&sub, &received), ORB_OK);
   EXPECT_EQ(received.val, 123);
 
-  // After copy, should return false again
-  EXPECT_FALSE(orb_check_and_copy(sub, nullptr));
+  // After copy, should still return OK (but no new data)
+  EXPECT_EQ(orb_subscriber_check_and_copy(&sub, nullptr), ORB_OK);
 
-  EXPECT_TRUE(orb_destroy_subscription(&sub));
-  EXPECT_TRUE(orb_destroy_publication(&pub));
+  EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
+  EXPECT_EQ(orb_publisher_destroy(&pub), ORB_OK);
 }
 
 TEST_F(UnitTest, subscription_interval_boundary_conditions) {
   // Test with interval = 0 (should always update)
   uorb::SubscriptionInterval<uorb::msg::orb_test> sub0(0, 0);
-  orb_publication_t *pub = orb_create_publication(ORB_ID(orb_test));
-  ASSERT_NE(pub, nullptr);
+  orb_publisher_t pub = ORB_PUBLISHER_INITIALIZER;
+  EXPECT_EQ(orb_publisher_create(&pub, ORB_ID(orb_test)), ORB_OK);
+  ASSERT_NE(pub._handle, nullptr);
 
   orb_test_s data{};
   data.val = 1;
-  ASSERT_TRUE(orb_publish(pub, &data));
+  ASSERT_EQ(orb_publisher_publish(&pub, &data), ORB_OK);
   EXPECT_TRUE(sub0.Updated());
 
   // Test with very large interval (should throttle)
   uorb::SubscriptionInterval<uorb::msg::orb_test> sub_large(1000000, 0);  // 1 second
   data.val = 2;
-  ASSERT_TRUE(orb_publish(pub, &data));
+  ASSERT_EQ(orb_publisher_publish(&pub, &data), ORB_OK);
   // May or may not update depending on timing, but should not crash
 
-  EXPECT_TRUE(orb_destroy_publication(&pub));
+  EXPECT_EQ(orb_publisher_destroy(&pub), ORB_OK);
 }
 
 TEST_F(UnitTest, topic_status_counter_saturation) {
@@ -1008,26 +994,22 @@ TEST_F(UnitTest, topic_status_counter_saturation) {
 
   // Capture counts before creating handles
   orb_status before{};
-  ASSERT_TRUE(orb_get_topic_status(ORB_ID(orb_test), 0, &before));
+  ASSERT_EQ(orb_get_topic_status(ORB_ID(orb_test), 0, &before), ORB_OK);
 
-  std::vector<orb_publication_t *> pubs;
-  pubs.reserve(kManyHandles);
+  std::vector<orb_publisher_t> pubs(kManyHandles, ORB_PUBLISHER_INITIALIZER);
   for (int i = 0; i < kManyHandles; ++i) {
-    auto *pub = orb_create_publication(ORB_ID(orb_test));
-    ASSERT_NE(pub, nullptr);
-    pubs.push_back(pub);
+    EXPECT_EQ(orb_publisher_create(&pubs[i], ORB_ID(orb_test)), ORB_OK);
+    ASSERT_NE(pubs[i]._handle, nullptr);
   }
 
-  std::vector<orb_subscription_t *> subs;
-  subs.reserve(kManyHandles);
+  std::vector<orb_subscriber_t> subs(kManyHandles, ORB_SUBSCRIBER_INITIALIZER);
   for (int i = 0; i < kManyHandles; ++i) {
-    auto *sub = orb_create_subscription(ORB_ID(orb_test));
-    ASSERT_NE(sub, nullptr);
-    subs.push_back(sub);
+    EXPECT_EQ(orb_subscriber_create(&subs[i], ORB_ID(orb_test)), ORB_OK);
+    ASSERT_NE(subs[i]._handle, nullptr);
   }
 
   orb_status after{};
-  ASSERT_TRUE(orb_get_topic_status(ORB_ID(orb_test), 0, &after));
+  ASSERT_EQ(orb_get_topic_status(ORB_ID(orb_test), 0, &after), ORB_OK);
 
   // Counters should saturate at 127, not overflow
   EXPECT_LE(after.publisher_count, kMaxTrackedHandles);
@@ -1040,11 +1022,11 @@ TEST_F(UnitTest, topic_status_counter_saturation) {
     EXPECT_EQ(after.subscriber_count, kMaxTrackedHandles);
   }
 
-  for (auto *sub : subs) {
-    EXPECT_TRUE(orb_destroy_subscription(&sub));
+  for (auto &sub : subs) {
+    EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
   }
-  for (auto *pub : pubs) {
-    EXPECT_TRUE(orb_destroy_publication(&pub));
+  for (auto &pub : pubs) {
+    EXPECT_EQ(orb_publisher_destroy(&pub), ORB_OK);
   }
 }
 

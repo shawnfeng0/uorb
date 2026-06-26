@@ -215,27 +215,29 @@ if (sub_example_string.Update()) {
 }
 ```
 
-或使用 `uevent` API 配合 `uorb_subscription_create_source()`，提供事件驱动的调度（推荐此用法）：
+或使用 `uevent` API 配合 `uorb_subscriber_create_source()`，提供事件驱动的调度（推荐此用法）：
 
 ```c++
 #include <uevent/uevent.h>
 #include <uorb_uevent/uorb_uevent.h>
 
-uevent_t *base = uevent_create();
-uevent_source_t *src = uorb_subscription_create_source(sub_example_string.handle());
-uevent_add(base, src, 0);
+uevent_t base = UEVENT_INITIALIZER;
+uevent_create(&base);
+uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
+uorb_subscriber_create_source(&src, sub_example_string.handle());
+uevent_add(&base, &src, 0);
 
-uevent_source_t *ready[1];
-if (0 < uevent_loop(base, ready, 1, timeout_ms)) {
+uevent_source_t ready[1] = {UEVENT_SOURCE_INITIALIZER};
+if (0 < uevent_loop(&base, ready, 1, timeout_ms)) {
   if (sub_example_string.Update()) {
     // 数据处理...
   }
 }
 
 // 清理
-uevent_remove(base, src);
-uorb_subscription_destroy_source(src);
-uevent_destroy(base);
+uevent_remove(&base, &src);
+uorb_subscriber_destroy_source(&src);
+uevent_destroy(&base);
 ```
 
 获取更新的数据和处理：

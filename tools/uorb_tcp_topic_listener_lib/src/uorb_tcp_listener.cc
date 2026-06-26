@@ -59,21 +59,27 @@ static void CmdListener(uorb::listener::Fd &fd,
     return;
   }
 
-  auto sub = orb_create_subscription(meta);
+  orb_subscriber_t sub{ORB_SUBSCRIBER_INITIALIZER};
+  if (orb_subscriber_create(&sub, meta) != ORB_OK) {
+    fd.write("Failed to create subscription\n");
+    return;
+  }
   std::vector<uint8_t> data(meta->o_size);
 
-  uevent_t *poll = uevent_create();
-  uevent_source_t *source = uorb_subscription_create_source(sub);
-  uevent_add(poll, source, 0);
+  uevent_t poll = UEVENT_INITIALIZER;
+  uevent_create(&poll);
+  uevent_source_t source = UEVENT_SOURCE_INITIALIZER;
+  uorb_subscriber_create_source(&source, &sub);
+  uevent_add(&poll, &source, 0);
 
   uorb::listener::DataPrinter data_printer(*meta);
   orb_abstime_us last_write_timestamp{};
   const int timeout_ms = 1000;
   uint32_t current_timeout_ms = 0;
   do {
-    uevent_source_t *ready[1];
-    if (uevent_loop(poll, ready, 1, timeout_ms) > 0) {
-      if (orb_check_and_copy(sub, data.data())) {
+    uevent_source_t ready[1] = {UEVENT_SOURCE_INITIALIZER};
+    if (uevent_loop(&poll, ready, 1, timeout_ms) > 0) {
+      if (orb_subscriber_check_and_copy(&sub, data.data()) == ORB_OK) {
         if (orb_elapsed_time_us(last_write_timestamp) > 100 * 1000) {
           last_write_timestamp = orb_absolute_time_us();
           fd.write(data_printer.Convert2String(data.data(), data.size()));
@@ -98,10 +104,10 @@ static void CmdListener(uorb::listener::Fd &fd,
     }
   } while (true);
 
-  uevent_remove(poll, source);
-  uorb_subscription_destroy_source(source);
-  uevent_destroy(poll);
-  orb_destroy_subscription(&sub);
+  uevent_remove(&poll, &source);
+  uorb_subscriber_destroy_source(&source);
+  uevent_destroy(&poll);
+  orb_subscriber_destroy(&sub);
 }
 
 static void CmdStatus(uorb::listener::Fd &fd,
@@ -117,7 +123,7 @@ static void CmdStatus(uorb::listener::Fd &fd,
   for (size_t i = 0; i < orb_topics_count; ++i) {
     for (size_t instance = 0; instance < ORB_MULTI_MAX_INSTANCES; ++instance) {
       orb_status status{};
-      if (orb_get_topic_status(topics[i], instance, &status)) {
+      if (orb_get_topic_status(topics[i], instance, &status) == ORB_OK) {
         std::string sub_count_str = std::to_string(status.subscriber_count);
         if (status.has_untracked_subscriber) sub_count_str += "+";
 

@@ -22,32 +22,27 @@ extern "C" {
  * When the subscription receives new data (published to its topic), the
  * event source will be notified and reported as ready in uevent_loop().
  *
- * The is_ready callback checks orb_check_update().
- * The register/unregister callbacks manage the subscription's publish
- * notification via orb_subscription_set_callback/clear_callback.
- *
+ * @param src event source handle to initialize
  * @param sub uORB subscription handle
- * @return event source handle, or NULL on error
+ * @return 0 on success, -1 on error
  */
-uevent_source_t *uorb_subscription_create_source(orb_subscription_t *sub);
+int uorb_subscriber_create_source(uevent_source_t *src, orb_subscriber_t *sub);
 
 /**
- * Destroy an event source created by uorb_subscription_create_source().
+ * Destroy an event source created by uorb_subscriber_create_source().
  *
  * The event source must be removed from the event base (via uevent_remove())
  * before calling this function.
  *
- * @param source event source handle (may be NULL)
+ * @param src event source handle (may be NULL)
  */
-void uorb_subscription_destroy_source(uevent_source_t *source);
+void uorb_subscriber_destroy_source(uevent_source_t *src);
 
 #ifdef __cplusplus
 }
 
 #include <atomic>
-#include <cerrno>
 #include <functional>
-#include <memory>
 #include <unordered_map>
 #include <utility>
 
@@ -59,126 +54,106 @@ namespace uorb {
  */
 class EventLoop {
  public:
-  EventLoop() : base_(uevent_create()) {}
+  EventLoop() { uevent_create(&base_); }
   ~EventLoop() {
-    if (!base_) return;
-    for (auto &entry : entries_) {
-      uevent_remove(base_, entry.second.source);
-      if (entry.second.owned) {
-        orb_subscription_t *sub = entry.second.sub;
-        orb_destroy_subscription(&sub);
+    if (!base_._handle) return;
+    for (auto &[key, entry] : entries_) {
+      uevent_remove(&base_, &entry.source);
+      if (entry.owned) {
+        orb_subscriber_destroy(&entry.sub);
       }
-      uorb_subscription_destroy_source(entry.second.source);
+      uorb_subscriber_destroy_source(&entry.source);
     }
-    uevent_destroy(base_);
+    uevent_destroy(&base_);
   }
 
   EventLoop(const EventLoop &) = delete;
   EventLoop &operator=(const EventLoop &) = delete;
 
-  // Check if the event loop was successfully created
-  explicit operator bool() const { return base_ != nullptr; }
+  explicit operator bool() const { return base_._handle != nullptr; }
 
-  /**
-   * Subscribe to a topic with a callback.
-   * The EventLoop owns the subscription and will destroy it on cleanup.
-   * @tparam meta The orb_metadata for the topic
-   * @tparam Callback The callback type (function pointer, lambda, or functor)
-   * @param cb Callback invoked when new data is available
-   * @return true on success, false on error
-   */
   template <const orb_metadata &meta, typename Callback>
   bool Subscribe(Callback &&cb) {
-    if (!base_) return false;
+    if (!base_._handle) return false;
 
-    orb_subscription_t *sub = orb_create_subscription(&meta);
-    if (!sub) return false;
+    orb_subscriber_t sub = ORB_SUBSCRIBER_INITIALIZER;
+    if (orb_subscriber_create(&sub, &meta) != ORB_OK) return false;
 
-    uevent_source_t *source = uorb_subscription_create_source(sub);
-    if (!source) {
-      orb_destroy_subscription(&sub);
+    uevent_source_t source = UEVENT_SOURCE_INITIALIZER;
+    if (uorb_subscriber_create_source(&source, &sub) != 0) {
+      orb_subscriber_destroy(&sub);
       return false;
     }
 
-    if (uevent_add(base_, source, 0) != 0) {
-      uorb_subscription_destroy_source(source);
-      orb_destroy_subscription(&sub);
+    if (uevent_add(&base_, &source, 0) != 0) {
+      uorb_subscriber_destroy_source(&source);
+      orb_subscriber_destroy(&sub);
       return false;
     }
 
-    auto dispatch = [sub, cb = std::forward<Callback>(cb)]() {
+    auto dispatch = [sub, cb = std::forward<Callback>(cb)]() mutable {
       using MsgType = typename msg::TypeMap<meta>::type;
       MsgType msg;
-      if (orb_copy(sub, &msg)) {
+      if (orb_subscriber_copy(&sub, &msg) == ORB_OK) {
         cb(msg);
       }
     };
 
-    entries_.emplace(source, Entry{sub, source, true, std::move(dispatch)});
+    entries_.emplace(source._handle, Entry{sub, source, true, std::move(dispatch)});
     return true;
   }
 
-  /**
-   * Add an existing subscription with a callback.
-   * Accepts C++ wrapper objects (Subscription, SubscriptionData, etc.) that have
-   * handle() and ValueType typedef. The callback receives the message struct.
-   * @tparam Sub The subscription wrapper type (must have handle() and ValueType)
-   * @tparam Callback The callback type (receives const ValueType&)
-   * @param sub Subscription wrapper
-   * @param cb Callback invoked when new data is available
-   * @return true on success, false on error
-   */
   template <typename Sub, typename Callback>
   bool AddSubscription(Sub &sub, Callback &&cb) {
-    if (!base_) return false;
+    if (!base_._handle) return false;
 
-    orb_subscription_t *handle = sub.handle();
+    orb_subscriber_t *handle = sub.handle();
     if (!handle) return false;
 
-    uevent_source_t *source = uorb_subscription_create_source(handle);
-    if (!source) return false;
-
-    // Check if already added
-    if (entries_.find(source) != entries_.end()) {
-      errno = EBUSY;
-      return false;
+    // Reject if this subscriber is already registered in the event loop.
+    // Checking before creating a source prevents bridge_register/unregister
+    // side effects from clobbering an existing callback registration.
+    for (const auto &[key, entry] : entries_) {
+      if (entry.sub._handle == handle->_handle) {
+        errno = EBUSY;
+        return false;
+      }
     }
 
-    if (uevent_add(base_, source, 0) != 0) {
-      uorb_subscription_destroy_source(source);
+    uevent_source_t source = UEVENT_SOURCE_INITIALIZER;
+    if (uorb_subscriber_create_source(&source, handle) != 0) return false;
+
+    if (uevent_add(&base_, &source, 0) != 0) {
+      uorb_subscriber_destroy_source(&source);
       return false;
     }
 
     using MsgType = typename Sub::ValueType;
     auto dispatch = [handle, cb = std::forward<Callback>(cb)]() {
       MsgType msg;
-      if (orb_copy(handle, &msg)) {
+      if (orb_subscriber_copy(handle, &msg) == ORB_OK) {
         cb(msg);
       }
     };
 
-    entries_.emplace(source, Entry{handle, source, false, std::move(dispatch)});
+    entries_.emplace(source._handle, Entry{*handle, source, false, std::move(dispatch)});
     return true;
   }
 
-  /**
-   * Remove a subscription from the event loop.
-   * Accepts C++ wrapper objects (Subscription, SubscriptionData, etc.) that have handle().
-   * @tparam Sub The subscription wrapper type (must have handle())
-   * @param sub Subscription wrapper to remove
-   * @return true on success, false on error
-   */
   template <typename Sub>
   bool RemoveSubscription(Sub &sub) {
-    if (!base_) return false;
+    if (!base_._handle) return false;
 
-    orb_subscription_t *handle = sub.handle();
+    orb_subscriber_t *handle = sub.handle();
     if (!handle) return false;
 
     for (auto it = entries_.begin(); it != entries_.end(); ++it) {
-      if (it->second.sub == handle) {
-        uevent_remove(base_, it->second.source);
-        uorb_subscription_destroy_source(it->second.source);
+      if (it->second.sub._handle == handle->_handle) {
+        uevent_remove(&base_, &it->second.source);
+        if (it->second.owned) {
+          orb_subscriber_destroy(&it->second.sub);
+        }
+        uorb_subscriber_destroy_source(&it->second.source);
         entries_.erase(it);
         return true;
       }
@@ -186,20 +161,15 @@ class EventLoop {
     return false;
   }
 
-  /**
-   * Run the event loop once.
-   * @param timeout_ms Timeout in milliseconds (-1 = block indefinitely)
-   * @return Number of ready sources, or -1 on error
-   */
   int RunOnce(int timeout_ms = -1) {
-    if (!base_ || quit_requested_.load()) return -1;
+    if (!base_._handle || quit_requested_.load()) return -1;
 
-    uevent_source_t *ready[32];
-    int n = uevent_loop(base_, ready, 32, timeout_ms);
+    uevent_source_t ready[32];
+    int n = uevent_loop(&base_, ready, 32, timeout_ms);
     if (n <= 0) return n;
 
     for (int i = 0; i < n; ++i) {
-      auto it = entries_.find(ready[i]);
+      auto it = entries_.find(ready[i]._handle);
       if (it != entries_.end()) {
         it->second.dispatch();
       }
@@ -207,45 +177,34 @@ class EventLoop {
     return n;
   }
 
-  /**
-   * Run the event loop until Quit() is called.
-   * @return true if Quit() was called, false on error or no entries
-   * 
-   * Note: After Quit() is called, any pending notifications that have not been
-   * processed will be discarded.
-   */
   bool Run() {
     while (!quit_requested_.load()) {
       if (entries_.empty()) {
-        return false;  // No entries to wait for
+        return false;
       }
       int n = RunOnce(-1);
       if (n < 0) {
-        return quit_requested_.load();  // Return true if Quit() was called
+        return quit_requested_.load();
       }
     }
     return true;
   }
 
-  /**
-   * Request the event loop to quit.
-   * Thread-safe.
-   */
   void Quit() {
     quit_requested_.store(true);
-    if (base_) uevent_loopbreak(base_);
+    if (base_._handle) uevent_loopbreak(&base_);
   }
 
  private:
   struct Entry {
-    orb_subscription_t *sub;
-    uevent_source_t *source;
+    orb_subscriber_t sub;
+    uevent_source_t source;
     bool owned;
     std::function<void()> dispatch;
   };
 
-  uevent_t *base_;
-  std::unordered_map<uevent_source_t *, Entry> entries_;
+  uevent_t base_ = UEVENT_INITIALIZER;
+  std::unordered_map<void*, Entry> entries_;
   std::atomic<bool> quit_requested_{false};
 };
 

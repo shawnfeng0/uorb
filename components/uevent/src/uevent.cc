@@ -1,20 +1,17 @@
 /**
- * @file uevent_loop.cc
+ * @file uevent.cc
  * Implementation of the generic event loop C API.
- *
- * This file contains the EventPoll (internal C++ class) and CEventSource
- * (C wrapper), and implements the uevent_* C API functions declared in
- * uevent/uevent.h.
  */
 
 #include <uevent/uevent.h>
+
+#include <new>
 
 #include "event_poll.h"
 
 namespace {
 
 // CEventSource: EventSource backed by C callbacks.
-// Bridges the C API to the internal EventSource/EventPoll system.
 class CEventSource final : public uevent::EventSource {
  public:
   CEventSource(uevent_ready_fn ready_fn,
@@ -37,7 +34,7 @@ class CEventSource final : public uevent::EventSource {
   bool SetWakeup(uevent::EventPoll *poll) override {
     if (!EventSource::SetWakeup(poll)) return false;
     if (register_fn_ && !register_fn_(ctx_)) {
-      EventSource::RemoveWakeup();
+      RemoveWakeup();
       return false;
     }
     return true;
@@ -61,88 +58,99 @@ class CEventSource final : public uevent::EventSource {
 
 // ---- C API implementation ----
 
-uevent_t *uevent_create(void) {
+int uevent_create(uevent_t *ev) {
+  if (!ev) {
+    errno = EINVAL;
+    return -1;
+  }
   auto *poll = new (std::nothrow) uevent::EventPoll();
   if (!poll) {
     errno = ENOMEM;
-    return nullptr;
+    return -1;
   }
-  return reinterpret_cast<uevent_t *>(poll);
+  ev->_handle = poll;
+  return 0;
 }
 
-void uevent_destroy(uevent_t *base) {
-  if (!base) return;
-  auto *poll = reinterpret_cast<uevent::EventPoll *>(base);
+void uevent_destroy(uevent_t *ev) {
+  if (!ev || !ev->_handle) return;
+  auto *poll = reinterpret_cast<uevent::EventPoll *>(ev->_handle);
   delete poll;
+  ev->_handle = nullptr;
 }
 
-int uevent_loop(uevent_t *base, uevent_source_t *ready[], int max_ready, int timeout_ms) {
-  if (!base || !ready || max_ready <= 0) {
+int uevent_loop(uevent_t *ev, uevent_source_t *ready, int max_ready, int timeout_ms) {
+  if (!ev || !ev->_handle || !ready || max_ready <= 0) {
     errno = EINVAL;
     return -1;
   }
-  auto *poll = reinterpret_cast<uevent::EventPoll *>(base);
+  auto *poll = reinterpret_cast<uevent::EventPoll *>(ev->_handle);
+  // uevent_source_t is { void* _handle }, same layout as void*,
+  // so reinterpret to EventSource** is safe.
   return poll->Wait(reinterpret_cast<uevent::EventSource **>(ready), max_ready, timeout_ms);
 }
 
-int uevent_loopbreak(uevent_t *base) {
-  if (!base) {
+int uevent_loopbreak(uevent_t *ev) {
+  if (!ev || !ev->_handle) {
     errno = EINVAL;
     return -1;
   }
-  auto *poll = reinterpret_cast<uevent::EventPoll *>(base);
+  auto *poll = reinterpret_cast<uevent::EventPoll *>(ev->_handle);
   poll->Stop();
   return 0;
 }
 
-uevent_source_t *uevent_source_create(uevent_ready_fn ready_fn,
-                                       uevent_register_fn register_fn,
-                                       uevent_unregister_fn unregister_fn,
-                                       uevent_ctx_destroy_fn ctx_destroy_fn,
-                                       void *ctx) {
-  if (!ready_fn) {
+int uevent_source_create(uevent_source_t *src,
+                         uevent_ready_fn ready_fn,
+                         uevent_register_fn register_fn,
+                         uevent_unregister_fn unregister_fn,
+                         uevent_ctx_destroy_fn ctx_destroy_fn,
+                         void *ctx) {
+  if (!src || !ready_fn) {
     errno = EINVAL;
-    return nullptr;
+    return -1;
   }
   auto *source = new (std::nothrow) CEventSource(ready_fn, register_fn, unregister_fn, ctx_destroy_fn, ctx);
   if (!source) {
     errno = ENOMEM;
-    return nullptr;
+    return -1;
   }
-  return reinterpret_cast<uevent_source_t *>(source);
+  src->_handle = source;
+  return 0;
 }
 
-void uevent_source_destroy(uevent_source_t *source) {
-  if (!source) return;
-  delete reinterpret_cast<CEventSource *>(source);
+void uevent_source_destroy(uevent_source_t *src) {
+  if (!src || !src->_handle) return;
+  delete reinterpret_cast<CEventSource *>(src->_handle);
+  src->_handle = nullptr;
 }
 
-void uevent_source_notify(uevent_source_t *source) {
-  if (!source) return;
-  reinterpret_cast<uevent::EventSource *>(source)->notify_waiters();
+void uevent_source_notify(uevent_source_t *src) {
+  if (!src || !src->_handle) return;
+  reinterpret_cast<uevent::EventSource *>(src->_handle)->notify_waiters();
 }
 
-int uevent_add(uevent_t *base, uevent_source_t *source, int timeout_ms) {
-  if (!base || !source) {
+int uevent_add(uevent_t *ev, uevent_source_t *src, int timeout_ms) {
+  if (!ev || !ev->_handle || !src || !src->_handle) {
     errno = EINVAL;
     return -1;
   }
-  auto *poll = reinterpret_cast<uevent::EventPoll *>(base);
-  auto *es = reinterpret_cast<uevent::EventSource *>(source);
+  auto *poll = reinterpret_cast<uevent::EventPoll *>(ev->_handle);
+  auto *es = reinterpret_cast<uevent::EventSource *>(src->_handle);
   return poll->Add(*es, timeout_ms) ? 0 : -1;
 }
 
-int uevent_remove(uevent_t *base, uevent_source_t *source) {
-  if (!base || !source) {
+int uevent_remove(uevent_t *ev, uevent_source_t *src) {
+  if (!ev || !ev->_handle || !src || !src->_handle) {
     errno = EINVAL;
     return -1;
   }
-  auto *poll = reinterpret_cast<uevent::EventPoll *>(base);
-  auto *es = reinterpret_cast<uevent::EventSource *>(source);
+  auto *poll = reinterpret_cast<uevent::EventPoll *>(ev->_handle);
+  auto *es = reinterpret_cast<uevent::EventSource *>(src->_handle);
   return poll->Remove(*es) ? 0 : -1;
 }
 
-bool uevent_source_is_bound(uevent_source_t *source) {
-  if (!source) return false;
-  return reinterpret_cast<uevent::EventSource *>(source)->HasWakeup();
+bool uevent_source_is_bound(uevent_source_t *src) {
+  if (!src || !src->_handle) return false;
+  return reinterpret_cast<uevent::EventSource *>(src->_handle)->HasWakeup();
 }

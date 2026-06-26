@@ -216,27 +216,29 @@ if (sub_example_string.Update()) {
 }
 ```
 
-Or use `uevent` API with `uorb_subscription_create_source()`, which provides event-driven dispatch (Recommend this usage):
+Or use `uevent` API with `uorb_subscriber_create_source()`, which provides event-driven dispatch (Recommend this usage):
 
 ```c++
 #include <uevent/uevent.h>
 #include <uorb_uevent/uorb_uevent.h>
 
-uevent_t *base = uevent_create();
-uevent_source_t *src = uorb_subscription_create_source(sub_example_string.handle());
-uevent_add(base, src, 0);
+uevent_t base = UEVENT_INITIALIZER;
+uevent_create(&base);
+uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
+uorb_subscriber_create_source(&src, sub_example_string.handle());
+uevent_add(&base, &src, 0);
 
-uevent_source_t *ready[1];
-if (0 < uevent_loop(base, ready, 1, timeout_ms)) {
+uevent_source_t ready[1] = {UEVENT_SOURCE_INITIALIZER};
+if (0 < uevent_loop(&base, ready, 1, timeout_ms)) {
   if (sub_example_string.Update()) {
     // Data processing...
   }
 }
 
 // Cleanup
-uevent_remove(base, src);
-uorb_subscription_destroy_source(src);
-uevent_destroy(base);
+uevent_remove(&base, &src);
+uorb_subscriber_destroy_source(&src);
+uevent_destroy(&base);
 ```
 
 Get updated data and processing:

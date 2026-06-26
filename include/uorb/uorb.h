@@ -16,6 +16,21 @@
 #endif
 
 /**
+ * Error codes for uORB operations.
+ */
+typedef enum {
+  ORB_OK = 0,
+  ORB_ERR_INVALID = EINVAL,
+  ORB_ERR_NO_MEM = ENOMEM,
+  ORB_ERR_BUSY = EBUSY,
+  ORB_ERR_EXIST = EEXIST,
+  ORB_ERR_NO_ENTRY = ENOENT,
+  ORB_ERR_TIMEOUT = ETIMEDOUT,
+  ORB_ERR_AGAIN = EAGAIN,
+  ORB_ERR_UNKNOWN = -1,
+} orb_err;
+
+/**
  * Object metadata.
  */
 struct orb_metadata {
@@ -33,9 +48,9 @@ struct orb_status {
   uint16_t queue_size;  // Queue size
 
   uint8_t subscriber_count;       // Number of tracked subscribers
-  bool has_untracked_subscriber;  // Whether orb_copy_once() has been used
+  bool has_untracked_subscriber;  // Whether orb_subscriber_copy_once() has been used
   uint8_t publisher_count;        // Number of tracked publishers
-  bool has_untracked_publisher;   // Whether orb_publish_once() has been used
+  bool has_untracked_publisher;   // Whether orb_publisher_publish_once() has been used
 
   unsigned latest_data_index;  // The latest data index
 };
@@ -140,14 +155,14 @@ extern "C" {
  * Public C API index:
  *
  * - Metadata: ORB_ID(), ORB_DECLARE(), ORB_DEFINE(), orb_metadata.
- * - Publication: orb_create_publication(), orb_create_publication_multi(),
- *   orb_destroy_publication(), orb_publish(), orb_publish_once(),
- *   orb_publish_auto().
- * - Subscription: orb_create_subscription(),
- *   orb_create_subscription_multi(), orb_destroy_subscription(), orb_copy(),
- *   orb_copy_once(), orb_check_update(), orb_check_and_copy().
- * - Publish callback: orb_subscription_set_callback(),
- *   orb_subscription_clear_callback().
+ * - Publication: orb_publisher_create(), orb_publisher_create_multi(),
+ *   orb_publisher_destroy(), orb_publisher_publish(), orb_publisher_publish_once(),
+ *   orb_publisher_publish_auto().
+ * - Subscription: orb_subscriber_create(),
+ *   orb_subscriber_create_multi(), orb_subscriber_destroy(), orb_subscriber_copy(),
+ *   orb_subscriber_copy_once(), orb_subscriber_check_update(), orb_subscriber_check_and_copy().
+ * - Publish callback: orb_subscriber_set_callback(),
+ *   orb_subscriber_clear_callback().
  * - Introspection: orb_exists(), orb_group_count(),
  *   orb_get_topic_status(), orb_version().
  * - Time: orb_absolute_time_us(), orb_elapsed_time_us().
@@ -156,30 +171,36 @@ extern "C" {
 /**
  * ORB topic advertiser handle
  *
- * "struct orb_publication" does not exist, it is only defined to hide the
- * implementation and avoid the implicit conversion of "void*" types.
- *
+ * Opaque handle with private void* pointer.
  * Publication handles are owned by the caller. Each handle returned from
- * orb_create_publication() or orb_create_publication_multi() must be released
- * with orb_destroy_publication(). C++ publication wrappers own their handles
+ * orb_publisher_create() or orb_publisher_create_multi() must be released
+ * with orb_publisher_destroy(). C++ publication wrappers own their handles
  * exclusively and destroy them in their destructors.
  */
-typedef struct orb_publication orb_publication_t;
+typedef struct {
+  void* _handle;
+} orb_publisher_t;
+
+#define ORB_PUBLISHER_INITIALIZER {NULL}
 
 /**
  * ORB topic subscriber handle
  *
- * "struct orb_subscriber" does not exist, it is only defined to hide the
- * implementation and avoid the implicit conversion of "void*" types.
+ * Opaque handle with private void* pointer.
  */
-typedef struct orb_subscription orb_subscription_t;
+typedef struct {
+  void* _handle;
+} orb_subscriber_t;
+
+#define ORB_SUBSCRIBER_INITIALIZER {NULL}
 
 /**
  * Create a publication handle for topic instance 0.
  *
- * @see orb_create_publication_multi()
+ * @see orb_publisher_create_multi()
+ * @return ORB_OK on success, error code otherwise
  */
-orb_publication_t *orb_create_publication(const struct orb_metadata *meta);
+orb_err orb_publisher_create(orb_publisher_t *pub, const struct orb_metadata *meta);
 
 /**
  * Advertise as the publisher of a topic.
@@ -190,7 +211,7 @@ orb_publication_t *orb_create_publication(const struct orb_metadata *meta);
  * Any number of advertisers may publish to a topic; publications are atomic
  * but co-ordination between publishers is not provided by the ORB.
  *
- * If instance is nullptr, the device is a single instance, and each call will
+ * If instance is NULL, the device is a single instance, and each call will
  * return the same instance. Otherwise, create an independent instance of the
  * topic (each instance has its own buffer), and each call will generate an
  * independent instance (up to ORB_MULTI_MAX_INSTANCES), which is useful for
@@ -198,55 +219,48 @@ orb_publication_t *orb_create_publication(const struct orb_metadata *meta);
  *
  * @param meta    The uORB metadata (usually from the ORB_ID() macro) for the
  * topic.
- *
  * @param instance  Pointer to an integer which will yield the instance ID
  * (0-based) of the publication. This is an output parameter and will be set to
  * the newly created instance, ie. 0 for the first advertiser, 1 for the next
- * and so on.
- * WARN: If it is NULL, only 0 instances will be returned, which means that if
- * there are other 0 instance publishers (by passing in NULL, or the first
- * instance), the data of multiple publishers will be sent to the same instance.
- *
- * @return NULL on error(No memory or too many instances), otherwise returns an
- * ORB topic advertiser handle that can be used to publish to the topic.
+ * and so on. If NULL, only instance 0 will be returned.
+ * @return ORB_OK on success, error code otherwise
  */
-orb_publication_t *orb_create_publication_multi(const struct orb_metadata *meta, unsigned int *instance);
+orb_err orb_publisher_create_multi(orb_publisher_t *pub, const struct orb_metadata *meta, unsigned int *instance);
 
 /**
  * Destroy a publication handle.
  *
- * @param handle_ptr Pointer to the handle returned from orb_create_publication()
- * or orb_create_publication_multi(); it will be destroyed and set to NULL.
- * @return true on success
+ * @param pub Pointer to the publication handle; it will be destroyed and set to NULL.
+ * @return ORB_OK on success
  */
-bool orb_destroy_publication(orb_publication_t **handle_ptr);
+orb_err orb_publisher_destroy(orb_publisher_t *pub);
 
 /**
  * Publish new data to a topic.
  *
  * The data is atomically published to the topic and any waiting subscribers
  * will be notified.  Subscribers that are not waiting can check the topic
- * for updates using orb_check_update().
+ * for updates using orb_subscriber_check_update().
  *
- * @param handle  The handle returned from orb_create_publication().
- * @param data    A pointer to the data to be published.
- *                The length must correspond to the topic structure.
- * @return        true on success, false with errno set accordingly.
+ * @param pub   The publication handle.
+ * @param data  A pointer to the data to be published.
+ *              The length must correspond to the topic structure.
+ * @return ORB_OK on success, error code otherwise
  */
-bool orb_publish(orb_publication_t *handle, const void *data);
+orb_err orb_publisher_publish(orb_publisher_t *pub, const void *data);
 
 /**
  * Publish data on topic instance 0 without creating a publication handle.
  *
  * This API does not contribute to the tracked publisher count. Prefer
- * orb_create_publication() + orb_publish() for normal publishers.
+ * orb_publisher_create() + orb_publisher_publish() for normal publishers.
  *
  * @param meta  The uORB metadata (usually from the ORB_ID() macro) for the
  * topic.
- * @param data @see orb_publish()
- * @return @see orb_publish()
+ * @param data @see orb_publisher_publish()
+ * @return @see orb_publisher_publish()
  */
-bool orb_publish_once(const struct orb_metadata *meta, const void *data);
+orb_err orb_publisher_publish_once(const struct orb_metadata *meta, const void *data);
 
 /**
  * Advertise as the publisher of a topic.
@@ -254,41 +268,41 @@ bool orb_publish_once(const struct orb_metadata *meta, const void *data);
  * This performs the initial advertisement of a topic; it creates the topic
  * node if required and publishes the initial data.
  *
- * @see orb_create_publication_multi() for meaning of the individual parameters
+ * @see orb_publisher_create_multi() for meaning of the individual parameters
  */
-static inline bool orb_publish_auto(const struct orb_metadata *meta, orb_publication_t **handle_ptr, const void *data,
+static inline orb_err orb_publisher_publish_auto(const struct orb_metadata *meta, orb_publisher_t *pub, const void *data,
                                     unsigned int *instance) {
-  if (!meta || !handle_ptr) {
-    errno = EINVAL;
-    return false;
+  if (!meta || !pub) {
+    return ORB_ERR_INVALID;
   }
 
-  if (!*handle_ptr) {
-    *handle_ptr = orb_create_publication_multi(meta, instance);
-    if (!*handle_ptr) {
-      return false;
+  if (!pub->_handle) {
+    orb_err err = orb_publisher_create_multi(pub, meta, instance);
+    if (err != ORB_OK) {
+      return err;
     }
   }
-  return orb_publish(*handle_ptr, data);
+  return orb_publisher_publish(pub, data);
 }
 
 /**
  * Create a subscription handle for topic instance 0.
  *
- * @see orb_create_subscription_multi()
+ * @see orb_subscriber_create_multi()
+ * @return ORB_OK on success, error code otherwise
  */
-orb_subscription_t *orb_create_subscription(const struct orb_metadata *meta);
+orb_err orb_subscriber_create(orb_subscriber_t *sub, const struct orb_metadata *meta);
 
 /**
  * Subscribe to a multi-instance of a topic.
  *
  * The returned value is a subscriber handle that can be passed to
- * orb_subscription_set_callback() to receive publish notifications.
- * in order to wait for updates to a topic, as well as orb_copy(),
- * orb_check_update().
+ * orb_subscriber_set_callback() to receive publish notifications.
+ * in order to wait for updates to a topic, as well as orb_subscriber_copy(),
+ * orb_subscriber_check_update().
  *
  * If there were any publications of the topic prior to the subscription,
- * orb_check_update() right after orb_create_subscription() will return true.
+ * orb_subscriber_check_update() right after orb_subscriber_create() will return true.
  *
  * Subscription will succeed even if the topic has not been advertised;
  * in this case the topic will have a timestamp of zero, it will never
@@ -302,71 +316,70 @@ orb_subscription_t *orb_create_subscription(const struct orb_metadata *meta);
  * can never be published.
  *
  * If a publisher publishes multiple instances the subscriber should
- * subscribe to each instance with orb_create_subscription
- * (@see orb_create_publication_multi()).
+ * subscribe to each instance with orb_subscriber_create
+ * (@see orb_publisher_create_multi()).
  *
- * @param meta    The uORB metadata (usually from the ORB_ID() macro)
- *      for the topic.
+ * @param sub       Pointer to the subscription handle to be created.
+ * @param meta      The uORB metadata (usually from the ORB_ID() macro)
+ *                  for the topic.
  * @param instance  The instance of the topic. Instance 0 matches the
- *      topic of the orb_create_subscription() call, higher indices
- *      are for topics created with orb_create_publication_multi().
- * @return    NULL on error, otherwise returns a subscriber handle
- *      that can be used to read and update the topic.
+ *                  topic of the orb_subscriber_create() call, higher indices
+ *                  are for topics created with orb_publisher_create_multi().
+ * @return ORB_OK on success, error code otherwise
  */
-orb_subscription_t *orb_create_subscription_multi(const struct orb_metadata *meta, unsigned instance);
+orb_err orb_subscriber_create_multi(orb_subscriber_t *sub, const struct orb_metadata *meta, unsigned instance);
 
 /**
  * Destroy a subscription handle.
  *
- * @param handle_ptr Pointer to the handle returned from orb_create_subscription()
- * or orb_create_subscription_multi(); it will be destroyed and set to NULL.
- * @return true on success.
+ * @param sub Pointer to the subscription handle; it will be destroyed and set to NULL.
+ * @return ORB_OK on success
  */
-bool orb_destroy_subscription(orb_subscription_t **handle_ptr);
+orb_err orb_subscriber_destroy(orb_subscriber_t *sub);
 
 /**
  * Fetch data from a topic.
  *
  * This is the only operation that will reset the internal marker that
  * indicates that a topic has been updated for a subscriber. Once poll
- * or orb_check_update() returns indicating that an update is available, this
+ * or orb_subscriber_check_update() returns indicating that an update is available, this
  * call must be used to update the subscription.
  *
- * @param handle  A handle returned from orb_create_subscription.
+ * @param sub     A handle returned from orb_subscriber_create.
  * @param buffer  Pointer to the buffer receiving the data.
  *                The length must correspond to the topic structure.
- * @return    true on success, false otherwise with errno set accordingly.
+ * @return ORB_OK on success, error code otherwise
  */
-bool orb_copy(orb_subscription_t *handle, void *buffer);
+orb_err orb_subscriber_copy(orb_subscriber_t *sub, void *buffer);
 
 /**
  * Copy data from topic instance 0 without creating a subscription handle.
  *
  * This API does not contribute to the tracked subscriber count. Prefer
- * orb_create_subscription() + orb_copy() for normal subscribers.
+ * orb_subscriber_create() + orb_subscriber_copy() for normal subscribers.
  *
- * @param meta  The uORB metadata (usually from the ORB_ID() macro) for the
- * topic.
- * @param buffer @see orb_copy()
- * @return @see orb_copy()
+ * @param meta    The uORB metadata (usually from the ORB_ID() macro) for the
+ *                topic.
+ * @param buffer @see orb_subscriber_copy()
+ * @return @see orb_subscriber_copy()
  */
-bool orb_copy_once(const struct orb_metadata *meta, void *buffer);
+orb_err orb_subscriber_copy_once(const struct orb_metadata *meta, void *buffer);
 
 /**
- * Check whether a topic has been published to since the last orb_copy.
+ * Check whether a topic has been published to since the last orb_subscriber_copy.
  *
  * This check can be used to determine whether to copy the topic when
  * not using poll(), or to avoid the overhead of calling poll() when the
  * topic is likely to have updated.
  *
  * Updates are tracked on a per-handle basis; this call will continue to
- * return true until orb_copy is called using the same handle.
+ * return true until orb_subscriber_copy is called using the same handle.
  *
- * @param handle  A handle returned from orb_create_subscription.
+ * @param sub  A handle returned from orb_subscriber_create.
  * @return true if the topic has been updated since the last time it was copied
  * using this handle.
  */
-bool orb_check_update(orb_subscription_t *handle);
+bool orb_subscriber_check_update(orb_subscriber_t *sub);
 
 /**
  * Callback type for publish notifications.
@@ -375,47 +388,50 @@ bool orb_check_update(orb_subscription_t *handle);
  * Use this to integrate with external event loops (see uorb_uevent/uorb_uevent.h).
  *
  * Note: The callback must not call back into the same DeviceNode (e.g., by
- * calling orb_publish() or orb_copy() on the same topic) as this would cause
+ * calling orb_publisher_publish() or orb_subscriber_copy() on the same topic) as this would cause
  * a deadlock. The callback is invoked while the DeviceNode's lock is held.
  *
- * @param ctx user context pointer passed to orb_subscription_set_callback()
+ * @param ctx user context pointer passed to orb_subscriber_set_callback()
  */
-typedef void (*orb_publish_callback_fn)(void *ctx);
+typedef void (*orb_subscriber_callback_fn)(void *ctx);
 
 /**
  * Register a callback to be invoked when new data is published.
  *
  * Only one callback can be registered per subscription at a time.
  * Registering a second callback while one is already registered will
- * fail with errno = EBUSY.
+ * fail with ORB_ERR_BUSY.
  *
  * @param sub subscription handle
  * @param cb  callback function
  * @param ctx user context pointer passed to cb
- * @return true on success, false on error
+ * @return ORB_OK on success, error code otherwise
  */
-bool orb_subscription_set_callback(orb_subscription_t *sub, orb_publish_callback_fn cb, void *ctx);
+orb_err orb_subscriber_set_callback(orb_subscriber_t *sub, orb_subscriber_callback_fn cb, void *ctx);
 
 /**
  * Remove a previously registered publish callback.
  *
  * @param sub subscription handle
- * @return true on success, false on error
+ * @return ORB_OK on success, error code otherwise
  */
-bool orb_subscription_clear_callback(orb_subscription_t *sub);
+orb_err orb_subscriber_clear_callback(orb_subscriber_t *sub);
 
 /**
  * If the message is updated, copy the message.
- * See orb_check_update() and orb_copy().
+ * See orb_subscriber_check_update() and orb_subscriber_copy().
  */
-static inline bool orb_check_and_copy(orb_subscription_t *handle, void *buffer) {
-  return orb_check_update(handle) && orb_copy(handle, buffer);
+static inline orb_err orb_subscriber_check_and_copy(orb_subscriber_t *sub, void *buffer) {
+  if (!orb_subscriber_check_update(sub)) {
+    return ORB_OK;
+  }
+  return orb_subscriber_copy(sub, buffer);
 }
 
 /**
  * Check if a topic has already been created and published (advertised)
  *
- * @param meta    ORB topic metadata.
+ * @param meta      ORB topic metadata.
  * @param instance  ORB instance
  * @return true if the topic exists, false otherwise.
  */
@@ -424,20 +440,20 @@ bool orb_exists(const struct orb_metadata *meta, unsigned int instance);
 /**
  * Get the number of published instances of a topic group
  *
- * @param meta    ORB topic metadata.
- * @return    The number of published instances of this topic
+ * @param meta  ORB topic metadata.
+ * @return      The number of published instances of this topic
  */
 unsigned int orb_group_count(const struct orb_metadata *meta);
 
 /**
  * Get the status of a topic (number of publishers, subscribers, etc.)
  *
- * @param meta    ORB topic metadata
+ * @param meta      ORB topic metadata
  * @param instance  ORB instance
- * @param status [out] The topic status.
- * @return true on success.
+ * @param status    [out] The topic status.
+ * @return ORB_OK on success, error code otherwise
  */
-bool orb_get_topic_status(const struct orb_metadata *meta, unsigned int instance, struct orb_status *status);
+orb_err orb_get_topic_status(const struct orb_metadata *meta, unsigned int instance, struct orb_status *status);
 
 /**
  * Get orb version string

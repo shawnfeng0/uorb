@@ -15,11 +15,11 @@ using namespace uorb;
 
 // ReceiverLocal: internal struct representing a uORB subscription.
 // Stores DeviceNode reference, generation tracking, and an optional
-// publish callback (set by the bridge library via orb_subscription_set_callback).
+// publish callback (set by the bridge library via orb_subscriber_set_callback).
 struct ReceiverLocal {
   DeviceNode &dev;
   unsigned last_generation;
-  orb_publish_callback_fn publish_cb;
+  orb_subscriber_callback_fn publish_cb;
   void *publish_cb_ctx;
   detail::CallbackEntry callback_entry;
 
@@ -47,169 +47,190 @@ struct ReceiverLocal {
 #define UORB_GIT_TAG "v0.0.0-0-unknown"
 #endif
 
-#define ORB_CHECK_TRUE(condition, error_code, error_action) \
-  ({                                                        \
-    if (!static_cast<bool>(condition)) {                    \
-      errno = error_code;                                   \
-      error_action;                                         \
-    }                                                       \
-  })
-
-orb_publication_t *orb_create_publication(const struct orb_metadata *meta) {
-  return orb_create_publication_multi(meta, nullptr);
+orb_err orb_publisher_create(orb_publisher_t *pub, const struct orb_metadata *meta) {
+  return orb_publisher_create_multi(pub, meta, nullptr);
 }
 
-orb_publication_t *orb_create_publication_multi(const struct orb_metadata *meta, unsigned int *instance) {
-  ORB_CHECK_TRUE(meta, EINVAL, return nullptr);
+orb_err orb_publisher_create_multi(orb_publisher_t *pub, const struct orb_metadata *meta, unsigned int *instance) {
+  if (!pub || !meta) {
+    return ORB_ERR_INVALID;
+  }
   auto &meta_ = *meta;
   auto &device_master = DeviceMaster::get_instance();
   auto *dev_ = device_master.CreateAdvertiser(meta_, instance);
   if (!dev_) {
-    return nullptr;
+    return errno == EEXIST ? ORB_ERR_EXIST
+         : errno == ENOMEM ? ORB_ERR_NO_MEM
+         : ORB_ERR_UNKNOWN;
   }
 
-  return reinterpret_cast<orb_publication_t *>(dev_);
+  pub->_handle = reinterpret_cast<void *>(dev_);
+  return ORB_OK;
 }
 
-bool orb_destroy_publication(orb_publication_t **handle_ptr) {
-  ORB_CHECK_TRUE(handle_ptr && *handle_ptr, EINVAL, return false);
+orb_err orb_publisher_destroy(orb_publisher_t *pub) {
+  if (!pub || !pub->_handle) {
+    return ORB_ERR_INVALID;
+  }
 
-  auto &publication_handle = *handle_ptr;
-
-  auto *dev = reinterpret_cast<uorb::DeviceNode *>(publication_handle);
+  auto *dev = reinterpret_cast<uorb::DeviceNode *>(pub->_handle);
   dev->remove_publisher();
 
-  publication_handle = nullptr;
+  pub->_handle = nullptr;
 
-  return true;
+  return ORB_OK;
 }
 
-bool orb_publish(orb_publication_t *handle, const void *data) {
-  ORB_CHECK_TRUE(handle && data, EINVAL, return false);
+orb_err orb_publisher_publish(orb_publisher_t *pub, const void *data) {
+  if (!pub || !pub->_handle || !data) {
+    return ORB_ERR_INVALID;
+  }
 
-  auto &dev = *(uorb::DeviceNode *)handle;
-  return dev.Publish(data);
+  auto &dev = *reinterpret_cast<uorb::DeviceNode *>(pub->_handle);
+  return dev.Publish(data) ? ORB_OK : ORB_ERR_UNKNOWN;
 }
 
-bool orb_publish_once(const struct orb_metadata *meta, const void *data) {
-  ORB_CHECK_TRUE(meta, EINVAL, return false);
+orb_err orb_publisher_publish_once(const struct orb_metadata *meta, const void *data) {
+  if (!meta || !data) {
+    return ORB_ERR_INVALID;
+  }
 
   auto &device_master = DeviceMaster::get_instance();
   auto *dev = device_master.OpenDeviceNode(*meta, 0);
   if (!dev) {
-    return false;
+    return ORB_ERR_UNKNOWN;
   }
 
   dev->mark_untracked_publisher();
-  return dev->Publish(data);
+  return dev->Publish(data) ? ORB_OK : ORB_ERR_UNKNOWN;
 }
 
-orb_subscription_t *orb_create_subscription(const struct orb_metadata *meta) {
-  return orb_create_subscription_multi(meta, 0);
+orb_err orb_subscriber_create(orb_subscriber_t *sub, const struct orb_metadata *meta) {
+  return orb_subscriber_create_multi(sub, meta, 0);
 }
 
-orb_subscription_t *orb_create_subscription_multi(const struct orb_metadata *meta, unsigned instance) {
-  ORB_CHECK_TRUE(meta, EINVAL, return nullptr);
+orb_err orb_subscriber_create_multi(orb_subscriber_t *sub, const struct orb_metadata *meta, unsigned instance) {
+  if (!sub || !meta) {
+    return ORB_ERR_INVALID;
+  }
 
   DeviceMaster &device_master = uorb::DeviceMaster::get_instance();
 
   auto *dev = device_master.OpenDeviceNode(*meta, instance);
   if (!dev) {
-    return nullptr;
+    return errno == EINVAL ? ORB_ERR_INVALID
+         : errno == ENOMEM ? ORB_ERR_NO_MEM
+         : ORB_ERR_UNKNOWN;
   }
 
   auto *subscriber = new (std::nothrow) ReceiverLocal(*dev);
   if (!subscriber) {
-    errno = ENOMEM;
-    return nullptr;
+    return ORB_ERR_NO_MEM;
   }
 
-  return reinterpret_cast<orb_subscription_t *>(subscriber);
+  sub->_handle = reinterpret_cast<void *>(subscriber);
+  return ORB_OK;
 }
 
-bool orb_destroy_subscription(orb_subscription_t **handle_ptr) {
-  ORB_CHECK_TRUE(handle_ptr && *handle_ptr, EINVAL, return false);
+orb_err orb_subscriber_destroy(orb_subscriber_t *sub) {
+  if (!sub || !sub->_handle) {
+    return ORB_ERR_INVALID;
+  }
 
-  auto *r = reinterpret_cast<ReceiverLocal *>(*handle_ptr);
+  auto *r = reinterpret_cast<ReceiverLocal *>(sub->_handle);
 
   // Remove callback if registered
   if (r->publish_cb) {
     r->dev.UnregisterCallback(&r->callback_entry);
   }
   delete r;
-  *handle_ptr = nullptr;
-  return true;
+  sub->_handle = nullptr;
+  return ORB_OK;
 }
 
-bool orb_copy(orb_subscription_t *handle, void *buffer) {
-  ORB_CHECK_TRUE(handle && buffer, EINVAL, return false);
+orb_err orb_subscriber_copy(orb_subscriber_t *sub, void *buffer) {
+  if (!sub || !sub->_handle || !buffer) {
+    return ORB_ERR_INVALID;
+  }
 
-  auto &sub = *reinterpret_cast<ReceiverLocal *>(handle);
+  auto &r = *reinterpret_cast<ReceiverLocal *>(sub->_handle);
 
-  return sub.Copy(buffer);
+  return r.Copy(buffer) ? ORB_OK : ORB_ERR_UNKNOWN;
 }
 
-bool orb_copy_once(const struct orb_metadata *meta, void *buffer) {
-  ORB_CHECK_TRUE(meta, EINVAL, return false);
+orb_err orb_subscriber_copy_once(const struct orb_metadata *meta, void *buffer) {
+  if (!meta || !buffer) {
+    return ORB_ERR_INVALID;
+  }
 
   auto &device_master = DeviceMaster::get_instance();
   auto *dev = device_master.OpenDeviceNode(*meta, 0);
   if (!dev) {
-    return false;
+    return ORB_ERR_UNKNOWN;
   }
 
   dev->mark_untracked_subscriber();
   unsigned last_generation_ = dev->initial_generation();
-  return dev->Copy(buffer, &last_generation_);
+  return dev->Copy(buffer, &last_generation_) ? ORB_OK : ORB_ERR_UNKNOWN;
 }
 
-bool orb_check_update(orb_subscription_t *handle) {
-  ORB_CHECK_TRUE(handle, EINVAL, return false);
-
-  auto &sub = *reinterpret_cast<ReceiverLocal *>(handle);
-
-  return sub.updates_available();
-}
-
-bool orb_subscription_set_callback(orb_subscription_t *sub, orb_publish_callback_fn cb, void *ctx) {
-  if (!sub) {
-    errno = EINVAL;
+bool orb_subscriber_check_update(orb_subscriber_t *sub) {
+  if (!sub || !sub->_handle) {
     return false;
   }
-  auto *r = reinterpret_cast<ReceiverLocal *>(sub);
+
+  auto &r = *reinterpret_cast<ReceiverLocal *>(sub->_handle);
+
+  return r.updates_available() > 0;
+}
+
+orb_err orb_subscriber_set_callback(orb_subscriber_t *sub, orb_subscriber_callback_fn cb, void *ctx) {
+  if (!sub || !sub->_handle) {
+    return ORB_ERR_INVALID;
+  }
+  auto *r = reinterpret_cast<ReceiverLocal *>(sub->_handle);
   if (r->publish_cb) {
-    errno = EBUSY;
-    return false;
+    return ORB_ERR_BUSY;
   }
   r->publish_cb = cb;
   r->publish_cb_ctx = ctx;
-  return r->dev.RegisterCallback(&r->callback_entry);
+  if (!r->dev.RegisterCallback(&r->callback_entry)) {
+    r->publish_cb = nullptr;
+    r->publish_cb_ctx = nullptr;
+    return ORB_ERR_UNKNOWN;
+  }
+  return ORB_OK;
 }
 
-bool orb_subscription_clear_callback(orb_subscription_t *sub) {
-  if (!sub) {
-    errno = EINVAL;
-    return false;
+orb_err orb_subscriber_clear_callback(orb_subscriber_t *sub) {
+  if (!sub || !sub->_handle) {
+    return ORB_ERR_INVALID;
   }
-  auto *r = reinterpret_cast<ReceiverLocal *>(sub);
-  if (!r->publish_cb) return true;
+  auto *r = reinterpret_cast<ReceiverLocal *>(sub->_handle);
+  if (!r->publish_cb) return ORB_OK;
   bool ok = r->dev.UnregisterCallback(&r->callback_entry);
   if (ok) {
     r->publish_cb = nullptr;
     r->publish_cb_ctx = nullptr;
   }
-  return ok;
+  return ok ? ORB_OK : ORB_ERR_UNKNOWN;
 }
 
 bool orb_exists(const struct orb_metadata *meta, unsigned int instance) {
-  ORB_CHECK_TRUE(meta, EINVAL, return false);
+  if (!meta) {
+    errno = EINVAL;
+    return false;
+  }
 
   auto &master = DeviceMaster::get_instance();
   return master.TopicExists(*meta, instance);
 }
 
 unsigned int orb_group_count(const struct orb_metadata *meta) {
-  ORB_CHECK_TRUE(meta, EINVAL, return false);
+  if (!meta) {
+    errno = EINVAL;
+    return 0;
+  }
 
   unsigned int instance = 0;
 
@@ -221,11 +242,13 @@ unsigned int orb_group_count(const struct orb_metadata *meta) {
   return instance;
 }
 
-bool orb_get_topic_status(const struct orb_metadata *meta, unsigned int instance, struct orb_status *status) {
-  ORB_CHECK_TRUE(meta, EINVAL, return false);
+orb_err orb_get_topic_status(const struct orb_metadata *meta, unsigned int instance, struct orb_status *status) {
+  if (!meta || !status) {
+    return ORB_ERR_INVALID;
+  }
 
   auto &master = DeviceMaster::get_instance();
-  return master.GetTopicStatus(*meta, instance, status);
+  return master.GetTopicStatus(*meta, instance, status) ? ORB_OK : ORB_ERR_UNKNOWN;
 }
 
 const char *orb_version(void) { return UORB_GIT_TAG; }

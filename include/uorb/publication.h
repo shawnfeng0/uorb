@@ -21,22 +21,22 @@ class Publication {
   Publication(Publication &&) = delete;
   Publication &operator=(const Publication &) = delete;
   Publication &operator=(Publication &&) = delete;
-  ~Publication() { handle_ &&orb_destroy_publication(&handle_); }
+  ~Publication() { if (handle_._handle) orb_publisher_destroy(&handle_); }
 
   /**
    * Publish the struct
    * @param data The uORB message struct we are updating.
    */
   bool Publish(const Type &data) {
-    if (!handle_) {
-      handle_ = orb_create_publication(&meta);
+    if (!handle_._handle) {
+      orb_publisher_create(&handle_, &meta);
     }
 
-    return handle_ && orb_publish(handle_, &data);
+    return handle_._handle && orb_publisher_publish(&handle_, &data) == ORB_OK;
   }
 
  private:
-  orb_publication_t *handle_{nullptr};
+  orb_publisher_t handle_ = ORB_PUBLISHER_INITIALIZER;
 };
 
 /**

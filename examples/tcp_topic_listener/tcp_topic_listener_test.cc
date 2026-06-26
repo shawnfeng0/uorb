@@ -68,13 +68,15 @@ template <const orb_metadata &T>
 
   int timeout_ms = 2000;
 
-  uevent_t *poll = uevent_create();
-  uevent_source_t *src = uorb_subscription_create_source(subscription_data.handle());
-  uevent_add(poll, src, 0);
+  uevent_t poll = UEVENT_INITIALIZER;
+  uevent_create(&poll);
+  uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
+  uorb_subscriber_create_source(&src, subscription_data.handle());
+  uevent_add(&poll, &src, 0);
 
   while (true) {
-    uevent_source_t *ready[1];
-    if (0 < uevent_loop(poll, ready, 1, timeout_ms)) {
+    uevent_source_t ready[1] = {UEVENT_SOURCE_INITIALIZER};
+    if (0 < uevent_loop(&poll, ready, 1, timeout_ms)) {
       if (subscription_data.Update()) {
         //        auto data = sub_example_string.data();
         //        printf("timestamp: %" PRIu64 "[us]", data.timestamp "\n");
@@ -104,8 +106,8 @@ int main(int, char *[]) {
 
   example_string_s example{};
   example.timestamp = orb_absolute_time_us();
-  orb_publish_once(&uorb::msg::example_string, &example);
-  orb_copy_once(&uorb::msg::example_string, &example);
+  orb_publisher_publish_once(&uorb::msg::example_string, &example);
+  orb_subscriber_copy_once(&uorb::msg::example_string, &example);
 
   orb_tcp_listener_init(orb_get_topics, 10924);
 

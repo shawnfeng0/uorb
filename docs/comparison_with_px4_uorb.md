@@ -4,26 +4,26 @@ The main difference lies in the implementation of the bottom layer, and the appl
 
 ## API interface difference(v1.11)
 
-* Unified publication and subscription type: `orb_publication_t*` and `orb_subscription_t*`
+* Unified publication and subscription type: `orb_publisher_t*` and `orb_subscriber_t*`
 * Pass pointers when unpublishing and unsubscribing to avoid wild pointers(Reference from zmq)
 * Use ``bool`` type (include in ``<stdbool.h>``) to indicate whether the operation is successful
 * Add independent `uevent` event loop library (`uevent/uevent.h`, `uevent_*` APIs), instead of `px4_poll` in PX4 Autopilot
-* Add EventLoop/EventPoll APIs (`uorb_uevent/uorb_uevent.h`, `uorb_subscription_create_source`) for callback/event-loop style dispatch
+* Add EventLoop/EventPoll APIs (`uorb_uevent/uorb_uevent.h`, `uorb_subscriber_create_source`) for callback/event-loop style dispatch
 * Configure the topic's queue size in the topic's metadata, not at the time of publishing, which is good for a single topic with multiple publishers.
 
 | PX4 uORB                                                     | Current uORB                                                 |
 | :----------------------------------------------------------- | :----------------------------------------------------------- |
 | ~~orb_advert_t orb_advertise(const struct orb_metadata \*meta, const void \*data)~~ |                                                              |
-| **orb_advert_t** orb_advertise_queue(const struct orb_metadata \*meta, const void \*data~~, unsigned int queue_size~~) | **orb_publication_t** \*orb_create_publication(const struct orb_metadata \*meta) |
+| **orb_advert_t** orb_advertise_queue(const struct orb_metadata \*meta, const void \*data~~, unsigned int queue_size~~) | **orb_publisher_t** \*orb_publisher_create(const struct orb_metadata \*meta) |
 | ~~orb_advert_t orb_advertise_multi(const struct orb_metadata \*meta, const void \*data, int \*instance)~~ |                                                              |
-| **orb_advert_t** orb_advertise_multi_queue(const struct orb_metadata \*meta, ~~const void \*data~~, int \*instance~~, unsigned queue_size~~) | **orb_publication_t** \*orb_create_publication_multi(const struct orb_metadata \*meta, unsigned int \*instance) |
-| **int** orb_publish(~~const struct orb_metadata \*meta,~~ orb_advert_t handle, const void \*data) | **bool** orb_publish(**orb_publication_t \*handle**, const void *data) |
-| **int** orb_unadvertise(orb_advert_t **handle**)             | **bool** orb_destroy_publication(**orb_publication_t \*\*handle_ptr**) |
-| **int** orb_subscribe(const struct orb_metadata \*meta)      | **orb_subscription_t ***orb_create_subscription(const struct orb_metadata *meta) |
-| **int** orb_subscribe_multi(const struct orb_metadata \*meta, unsigned instance) | **orb_subscription_t ***orb_create_subscription_multi(const struct orb_metadata *meta, unsigned instance) |
-| **int** orb_unsubscribe(**int handle**)                      | bool orb_destroy_subscription(**orb_subscription_t handle_ptr\*\***) |
-| **int** orb_copy(~~const struct orb_metadata \*meta,~~ **int handle**, void \*buffer) | **bool** orb_copy(**orb_subscription_t *handle**, void *buffer) |
-| **int** orb_check(**int handle** ~~, bool \*updated~~)       | **bool** orb_check_update(**orb_subscription_t *handle**)    |
+| **orb_advert_t** orb_advertise_multi_queue(const struct orb_metadata \*meta, ~~const void \*data~~, int \*instance~~, unsigned queue_size~~) | **orb_publisher_t** \*orb_publisher_create_multi(const struct orb_metadata \*meta, unsigned int \*instance) |
+| **int** orb_publisher_publish(~~const struct orb_metadata \*meta,~~ orb_advert_t handle, const void \*data) | **bool** orb_publisher_publish(**orb_publisher_t \*handle**, const void *data) |
+| **int** orb_unadvertise(orb_advert_t **handle**)             | **bool** orb_publisher_destroy(**orb_publisher_t \*\*handle_ptr**) |
+| **int** orb_subscribe(const struct orb_metadata \*meta)      | **orb_subscriber_t ***orb_subscriber_create(const struct orb_metadata *meta) |
+| **int** orb_subscribe_multi(const struct orb_metadata \*meta, unsigned instance) | **orb_subscriber_t ***orb_subscriber_create_multi(const struct orb_metadata *meta, unsigned instance) |
+| **int** orb_unsubscribe(**int handle**)                      | bool orb_subscriber_destroy(**orb_subscriber_t handle_ptr\*\***) |
+| **int** orb_subscriber_copy(~~const struct orb_metadata \*meta,~~ **int handle**, void \*buffer) | **bool** orb_subscriber_copy(**orb_subscriber_t *handle**, void *buffer) |
+| **int** orb_check(**int handle** ~~, bool \*updated~~)       | **bool** orb_subscriber_check_update(**orb_subscriber_t *handle**)    |
 | ~~int orb_set_interval(int handle, unsigned interval)~~      |                                                              |
 | ~~int orb_get_interval(int handle, unsigned \*interval)~~    |                                                              |
 | int px4_poll(**px4_pollfd_struct_t** \*fds, unsigned int nfds, int timeout) | uevent_* APIs (`uevent_create`, `uevent_add`, `uevent_loop`, etc.) |

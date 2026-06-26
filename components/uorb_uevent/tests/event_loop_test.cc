@@ -332,27 +332,31 @@ TEST(EventLoopTest, CallbackCanAddSubscriptionForFutureEvents) {
 TEST(EventLoopTest, SubscriptionCannotBindToMultipleEventPolls) {
   uorb::SubscriptionData<uorb::msg::orb_test> sub;
 
-  uevent_t *base_a = uevent_create();
-  uevent_t *base_b = uevent_create();
-  ASSERT_NE(base_a, nullptr);
-  ASSERT_NE(base_b, nullptr);
+  uevent_t base_a = UEVENT_INITIALIZER;
+  ASSERT_EQ(uevent_create(&base_a), 0);
+  ASSERT_NE(base_a._handle, nullptr);
 
-  uevent_source_t *source = uorb_subscription_create_source(sub.handle());
-  ASSERT_NE(source, nullptr);
+  uevent_t base_b = UEVENT_INITIALIZER;
+  ASSERT_EQ(uevent_create(&base_b), 0);
+  ASSERT_NE(base_b._handle, nullptr);
 
-  ASSERT_EQ(uevent_add(base_a, source, 0), 0);
+  uevent_source_t source = UEVENT_SOURCE_INITIALIZER;
+  ASSERT_EQ(uorb_subscriber_create_source(&source, sub.handle()), 0);
+  ASSERT_NE(source._handle, nullptr);
+
+  ASSERT_EQ(uevent_add(&base_a, &source, 0), 0);
 
   errno = 0;
-  EXPECT_EQ(uevent_add(base_b, source, 0), -1);
+  EXPECT_EQ(uevent_add(&base_b, &source, 0), -1);
   EXPECT_EQ(errno, EBUSY);
 
-  EXPECT_EQ(uevent_remove(base_a, source), 0);
-  EXPECT_EQ(uevent_add(base_b, source, 0), 0);
-  EXPECT_EQ(uevent_remove(base_b, source), 0);
+  EXPECT_EQ(uevent_remove(&base_a, &source), 0);
+  EXPECT_EQ(uevent_add(&base_b, &source, 0), 0);
+  EXPECT_EQ(uevent_remove(&base_b, &source), 0);
 
-  uorb_subscription_destroy_source(source);
-  uevent_destroy(base_a);
-  uevent_destroy(base_b);
+  uorb_subscriber_destroy_source(&source);
+  uevent_destroy(&base_a);
+  uevent_destroy(&base_b);
 }
 
 }  // namespace uORBTest
