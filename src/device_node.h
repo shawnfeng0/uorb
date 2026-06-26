@@ -3,7 +3,6 @@
 #include <uorb/uorb.h>
 
 #include <atomic>
-#include <cerrno>
 
 #include "base/intrusive_list/forward_list.h"
 #include "base/mutex.h"
@@ -64,7 +63,6 @@ class DeviceNode {
   // add item to list of work items to schedule on node update
   bool RegisterCallback(detail::CallbackEntry *entry) {
     if (!entry) {
-      errno = EINVAL;
       return false;
     }
 

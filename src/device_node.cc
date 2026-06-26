@@ -1,6 +1,5 @@
 #include "device_node.h"
 
-#include <cerrno>
 #include <cstring>
 #include <new>
 
@@ -69,7 +68,6 @@ unsigned uorb::DeviceNode::updates_available(unsigned generation) const { return
 
 bool uorb::DeviceNode::Publish(const void *data) {
   if (data == nullptr) {
-    errno = EFAULT;
     return false;
   }
 
@@ -81,7 +79,6 @@ bool uorb::DeviceNode::Publish(const void *data) {
 
       /* failed or could not allocate */
       if (nullptr == data_) {
-        errno = ENOMEM;
         return false;
       }
     }

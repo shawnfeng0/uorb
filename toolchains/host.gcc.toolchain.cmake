@@ -13,5 +13,5 @@ SET(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 
 # set ${CMAKE_C_FLAGS} and ${CMAKE_CXX_FLAGS}flag
 # c11 does not contain clock_* functions, but gnu11 contains
-SET(CMAKE_CXX_FLAGS "-std=c++11 ${CMAKE_CXX_FLAGS}")
+SET(CMAKE_CXX_FLAGS "-std=c++14 ${CMAKE_CXX_FLAGS}")
 SET(CMAKE_C_FLAGS "-std=gnu11 ${CMAKE_C_FLAGS}")

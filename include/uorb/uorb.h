@@ -275,7 +275,7 @@ orb_err orb_publisher_publish_once(const struct orb_metadata *meta, const void *
  */
 static inline orb_err orb_publisher_publish_auto(const struct orb_metadata *meta, orb_publisher_t *pub, const void *data,
                                     unsigned int *instance) {
-  if (!meta || !pub) {
+  if (!meta || !pub || !data) {
     return ORB_ERR_INVALID;
   }
 
@@ -448,6 +448,9 @@ orb_err orb_subscriber_clear_callback(orb_subscriber_t *sub);
  * See orb_subscriber_check_update() and orb_subscriber_copy().
  */
 static inline orb_err orb_subscriber_check_and_copy(orb_subscriber_t *sub, void *buffer) {
+  if (!sub || !sub->_handle || !buffer) {
+    return ORB_ERR_INVALID;
+  }
   if (!orb_subscriber_check_update(sub)) {
     return ORB_OK;
   }

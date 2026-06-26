@@ -944,7 +944,7 @@ TEST_F(UnitTest, check_and_copy_returns_true_when_updated) {
   orb_subscriber_check_and_copy(&sub, &drain);
 
   // Now no update
-  EXPECT_EQ(orb_subscriber_check_and_copy(&sub, nullptr), ORB_OK);
+  EXPECT_EQ(orb_subscriber_check_and_copy(&sub, &drain), ORB_OK);
 
   // Publish data
   orb_test_s data{};
@@ -957,7 +957,7 @@ TEST_F(UnitTest, check_and_copy_returns_true_when_updated) {
   EXPECT_EQ(received.val, 123);
 
   // After copy, should still return OK (but no new data)
-  EXPECT_EQ(orb_subscriber_check_and_copy(&sub, nullptr), ORB_OK);
+  EXPECT_EQ(orb_subscriber_check_and_copy(&sub, &drain), ORB_OK);
 
   EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
   EXPECT_EQ(orb_publisher_destroy(&pub), ORB_OK);

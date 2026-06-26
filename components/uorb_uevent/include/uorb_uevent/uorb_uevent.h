@@ -51,6 +51,11 @@ namespace uorb {
 /**
  * EventLoop: C++ wrapper around the generic event loop C API.
  * Provides type-safe callback dispatch for uORB subscriptions.
+ *
+ * Thread safety: Not thread-safe. All methods (Subscribe, RunOnce, Run,
+ * Quit, destructor) must be called from the same thread. The callback
+ * dispatch lambda is invoked from RunOnce/Run, so it also runs on the
+ * caller's thread.
  */
 class EventLoop {
  public:
@@ -123,7 +128,8 @@ class EventLoop {
   /// Note: Run() returns false immediately if there are no subscriptions.
   /// Callers should add subscriptions via Subscribe() before calling Run().
   /// Run() resets quit_requested_ at the start, so it can be called again
-  /// after a previous Quit().
+  /// after a previous Quit(). Calling Quit() before Run() has no effect —
+  /// the flag is cleared when Run() starts.
   bool Run() {
     quit_requested_.store(false);
     while (!quit_requested_.load()) {
