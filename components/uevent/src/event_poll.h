@@ -63,7 +63,11 @@ class EventPoll {
       ready_set_.erase(&source);
       deadlines_.erase(&source);
       timeout_fired_.erase(&source);
-      source.ClearWakeup();
+    }
+    source.ClearWakeup();
+    {
+      base::LockGuard<base::Mutex> lk(mu_);
+      ready_set_.erase(&source);
     }
     source.OnRemoved();
     return true;

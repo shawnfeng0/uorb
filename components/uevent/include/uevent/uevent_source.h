@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <cerrno>
+#include <thread>
 
 namespace uevent {
 
@@ -40,15 +41,20 @@ class EventSource {
 
   virtual bool RemoveWakeup() {
     OnRemoved();
-    wakeup_.store(nullptr, std::memory_order_release);
+    ClearWakeup();
     return true;
   }
 
-  // Clear wakeup_ atomically WITHOUT calling OnRemoved().
-  // Used by EventPoll::Remove under the lock; call OnRemoved() after
-  // releasing the lock to avoid lock-ordering deadlocks.
+  // Clear wakeup_ and drain any in-flight notify_waiters() calls.
+  // After this returns, no thread is executing or will execute NotifyReady
+  // through this source, so the EventPoll can be safely freed.
+  // Must be called OUTSIDE EventPoll::mu_ — NotifyReady acquires mu_
+  // and would deadlock if called while mu_ is held.
   void ClearWakeup() {
     wakeup_.store(nullptr, std::memory_order_release);
+    while (notify_count_.load(std::memory_order_acquire) > 0) {
+      std::this_thread::yield();
+    }
   }
 
   // Called when the source is removed from an EventPoll. Override to perform
@@ -70,6 +76,7 @@ class EventSource {
 
  private:
   std::atomic<EventPoll *> wakeup_{nullptr};
+  std::atomic<int> notify_count_{0};  // in-flight notify_waiters() calls
 };
 
 }  // namespace uevent

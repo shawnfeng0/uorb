@@ -154,5 +154,5 @@ void uorb::DeviceNode::FillStatus(orb_status *status) const {
   status->has_untracked_subscriber = has_untracked_subscriber_;
   status->publisher_count = publisher_count_;
   status->has_untracked_publisher = has_untracked_publisher_;
-  status->latest_data_index = generation_.load();
+  status->latest_data_index = generation_;
 }

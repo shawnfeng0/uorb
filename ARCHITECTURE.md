@@ -267,7 +267,9 @@ orb_subscriber_create(&sub, ORB_ID(orb_test));
 
 // Publish data
 orb_test_t data = { .val = 42 };
-orb_publisher_publish(&pub, &data);
+if (orb_publisher_publish(&pub, &data) != ORB_OK) {
+    // handle publish failure
+}
 
 // Check for updates
 if (orb_subscriber_check_update(&sub)) {

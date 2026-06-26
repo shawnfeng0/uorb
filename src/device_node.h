@@ -106,8 +106,10 @@ class DeviceNode {
   const orb_metadata &meta_; /**< object metadata information */
   uint8_t *data_{nullptr};   /**< allocated object buffer */
 
-  // Lock order invariant: DeviceMaster::lock_ → DeviceNode::data_lock_ → DeviceNode::callback_lock_
-  // Never acquire in reverse order.
+  // Lock ordering:
+  //   DeviceMaster::lock_  →  data_lock_  (node lookup)
+  //   callback_lock_       →  data_lock_  (callbacks calling Copy)
+  // data_lock_ and callback_lock_ are NEVER held simultaneously in Publish().
   mutable base::Mutex data_lock_{};      // protects: data_, generation_, subscriber_count_,
                                          //          publisher_count_, has_untracked_subscriber_,
                                          //          has_untracked_publisher_

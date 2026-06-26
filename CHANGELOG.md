@@ -7,6 +7,42 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Add `orb_callback_ctx` union type for callback context (supports `void*`, `uint32_t`, `uint64_t`), similar to POSIX `union sigval`.
+- Pass published message pointer to subscriber callbacks via `on_publish(msg, ctx)`.
+- Add notification drain mechanism in `EventSource` to prevent use-after-free during `EventPoll` destruction.
+- Expand test coverage with edge-case and stress tests across all components.
+
+### Changed
+
+- Decouple event loop from uORB core into a standalone `uevent` component with a `uorb_uevent` bridge library.
+- Remove `orb_poll`; unify on `uevent` event loop API.
+- Adopt struct-with-void-handle API pattern (`orb_subscriber_t`, `uevent_t`, etc.) across uORB and uevent C APIs.
+- Replace virtual dispatch with CRTP in the `Subscription` class hierarchy.
+- Simplify `EventLoop` API: `Quit()` is now thread-safe and restartable.
+- Use negative `orb_err` enum codes and eliminate `errno` throughout the uORB C API.
+- Split `DeviceNode` into separate `data_lock_` and `callback_lock_` for finer-grained locking.
+- Pass data parameter to publish notification callbacks (`notify_all` → `on_publish`).
+- Replace manual lock/unlock with RAII `UniqueLock` in `EventPoll::Wait`.
+- Lower CMake minimum version to 3.5 for broader platform compatibility.
+- Set C++14 standard consistently across all toolchain files.
+- Remove redundant `cmake_minimum_required` from subdirectory CMakeLists.
+- Refresh `ARCHITECTURE.md` and getting started docs (English and Chinese) to reflect new API.
+
+### Fixed
+
+- Prevent AB-BA deadlock between `DeviceNode` and `EventPoll` locks.
+- Fix TSan data race in latency test.
+- Add null checks for callback, buffer, and instance parameters in C API.
+- Always unregister callback on subscriber destroy (remove `if (publish_cb)` guard).
+- Add thread safety documentation for `EventLoop` and subscriber callbacks.
+- Fix C++17 structured bindings usage in C++14 component.
+- Fix misleading lock order comment in `DeviceNode`.
+- Remove redundant `generation_.load()` under `data_lock_`.
+- Fix spurious space in Chinese getting started doc include path.
+- Check `orb_publisher_publish()` return value in architecture example.
+
 [Unreleased]: https://github.com/ShawnFeng0/uorb/compare/v0.5.0...HEAD
 
 ## [0.5.0] - 2026-06-04

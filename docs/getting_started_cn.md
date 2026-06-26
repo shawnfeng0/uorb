@@ -48,7 +48,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE uorb) # Link the uorb library and 
 
 uORB基于话题而不是数据流进行通信，并且每个话题都有对应的结构体。
 
-uORB的C接口在uorb / uorb.h中定义。
+uORB的C接口在uorb/uorb.h中定义。
 
 ## 创建uORB话题
 
