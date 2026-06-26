@@ -2,7 +2,7 @@
 
 #include <atomic>
 #include <cerrno>
-#include <mutex>
+#include <pthread.h>
 
 namespace uevent {
 
@@ -18,12 +18,17 @@ class EventPoll;
  */
 class EventSource {
  public:
+#ifdef PTHREAD_MUTEX_INITIALIZER
   EventSource() = default;
+  virtual ~EventSource() = default;
+#else
+  EventSource() { pthread_mutex_init(&notify_mu_, nullptr); }
+  virtual ~EventSource() { pthread_mutex_destroy(&notify_mu_); }
+#endif
   EventSource(const EventSource &) = delete;
   EventSource(EventSource &&) = delete;
   EventSource &operator=(const EventSource &) = delete;
   EventSource &operator=(EventSource &&) = delete;
-  virtual ~EventSource() = default;
 
   virtual bool SetWakeup(EventPoll *poll) {
     if (!poll) {
@@ -50,10 +55,7 @@ class EventSource {
   // Must be called OUTSIDE EventPoll::mu_ — notify_waiters() calls
   // NotifyReady which acquires mu_, causing AB-BA deadlock if
   // called while mu_ is held.
-  void ClearWakeup() {
-    std::lock_guard<std::mutex> lk(notify_mu_);
-    wakeup_.store(nullptr, std::memory_order_release);
-  }
+  void ClearWakeup();
 
   // Called when the source is removed from an EventPoll. Override to perform
   // cleanup (e.g., unregister callbacks). This is called BEFORE wakeup_ is
@@ -73,7 +75,11 @@ class EventSource {
   void notify_waiters();
 
  private:
-  std::mutex notify_mu_;                 // serializes notify_waiters() vs ClearWakeup()
+  pthread_mutex_t notify_mu_
+#ifdef PTHREAD_MUTEX_INITIALIZER
+      = PTHREAD_MUTEX_INITIALIZER
+#endif
+  ;  // serializes notify_waiters() vs ClearWakeup()
   std::atomic<EventPoll *> wakeup_{nullptr};
 };
 
