@@ -62,8 +62,9 @@ class EventPoll {
       ready_set_.erase(&source);
       deadlines_.erase(&source);
       timeout_fired_.erase(&source);
-      source.RemoveWakeup();  // Call before releasing lock to avoid race
+      source.ClearWakeup();
     }
+    source.OnRemoved();
     return true;
   }
 

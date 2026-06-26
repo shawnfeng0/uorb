@@ -39,9 +39,23 @@ class EventSource {
   }
 
   virtual bool RemoveWakeup() {
+    OnRemoved();
     wakeup_.store(nullptr, std::memory_order_release);
     return true;
   }
+
+  // Clear wakeup_ atomically WITHOUT calling OnRemoved().
+  // Used by EventPoll::Remove under the lock; call OnRemoved() after
+  // releasing the lock to avoid lock-ordering deadlocks.
+  void ClearWakeup() {
+    wakeup_.store(nullptr, std::memory_order_release);
+  }
+
+  // Called when the source is removed from an EventPoll. Override to perform
+  // cleanup (e.g., unregister callbacks). This is called BEFORE wakeup_ is
+  // cleared, so HasWakeup() still returns true. Can be called outside the
+  // EventPoll lock to avoid lock-ordering deadlocks.
+  virtual void OnRemoved() {}
 
   bool HasWakeup() const { return wakeup_.load(std::memory_order_acquire) != nullptr; }
   bool HasWakeup(const EventPoll *poll) const {

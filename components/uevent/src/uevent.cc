@@ -34,16 +34,17 @@ class CEventSource final : public uevent::EventSource {
   bool SetWakeup(uevent::EventPoll *poll) override {
     if (!EventSource::SetWakeup(poll)) return false;
     if (register_fn_ && !register_fn_(ctx_)) {
-      RemoveWakeup();
+      ClearWakeup();
       return false;
     }
+    registered_ = true;
     return true;
   }
 
-  bool RemoveWakeup() override {
-    if (!HasWakeup()) return true;
-    if (unregister_fn_) unregister_fn_(ctx_);
-    return EventSource::RemoveWakeup();
+  void OnRemoved() override {
+    if (registered_.exchange(false) && unregister_fn_) {
+      unregister_fn_(ctx_);
+    }
   }
 
  private:
@@ -52,6 +53,7 @@ class CEventSource final : public uevent::EventSource {
   uevent_unregister_fn unregister_fn_;
   uevent_ctx_destroy_fn ctx_destroy_fn_;
   void *ctx_;
+  std::atomic<bool> registered_{false};
 };
 
 }  // anonymous namespace
