@@ -68,13 +68,13 @@ class DeviceNode {
       return false;
     }
 
-    base::LockGuard<base::Mutex> lg(lock_);
+    base::LockGuard<base::Mutex> lg(callback_lock_);
     receiver_list_.push_front(*entry);
     return true;
   }
 
   bool UnregisterCallback(const detail::CallbackEntry *entry) {
-    base::LockGuard<base::Mutex> lg(lock_);
+    base::LockGuard<base::Mutex> lg(callback_lock_);
     return receiver_list_.remove(*entry);
   }
 
@@ -108,7 +108,12 @@ class DeviceNode {
   const orb_metadata &meta_; /**< object metadata information */
   uint8_t *data_{nullptr};   /**< allocated object buffer */
 
-  mutable base::Mutex lock_{};
+  // Lock order invariant: DeviceMaster::lock_ → DeviceNode::data_lock_ → DeviceNode::callback_lock_
+  // Never acquire in reverse order.
+  mutable base::Mutex data_lock_{};      // protects: data_, generation_, subscriber_count_,
+                                         //          publisher_count_, has_untracked_subscriber_,
+                                         //          has_untracked_publisher_
+  mutable base::Mutex callback_lock_{};  // protects: receiver_list_
 
   intrusive_list::forward_list<detail::CallbackEntry, &detail::CallbackEntry::node> receiver_list_;
   intrusive_list::forward_list_node device_list_node_{};

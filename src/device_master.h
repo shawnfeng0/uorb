@@ -59,5 +59,8 @@ class uorb::DeviceMaster {
   static DeviceMaster instance_;
 
   intrusive_list::forward_list<DeviceNode, &DeviceNode::device_list_node_> node_list_;
+  // Lock order: DeviceMaster::lock_ must be acquired BEFORE any DeviceNode lock.
+  // Within DeviceNode: data_lock_ must be acquired BEFORE callback_lock_.
+  // Full order: DeviceMaster::lock_ → DeviceNode::data_lock_ → DeviceNode::callback_lock_
   mutable base::Mutex lock_{};
 };

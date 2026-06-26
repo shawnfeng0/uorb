@@ -44,7 +44,7 @@ bool uorb::DeviceNode::Copy(void *dst, unsigned *sub_generation_ptr) const {
 
   auto &sub_generation = *sub_generation_ptr;
 
-  base::LockGuard<base::Mutex> lg(lock_);
+  base::LockGuard<base::Mutex> lg(data_lock_);
 
   // If queue_size is 4 and cur_generation is 10, then 6, 7, 8, 9 are in the
   // range, and others are not.
@@ -73,76 +73,81 @@ bool uorb::DeviceNode::Publish(const void *data) {
     return false;
   }
 
-  base::LockGuard<base::Mutex> lg(lock_);
+  {
+    base::LockGuard<base::Mutex> lg(data_lock_);
 
-  if (nullptr == data_) {
-    data_ = new (std::nothrow) uint8_t[meta_.o_size * queue_size_];
-
-    /* failed or could not allocate */
     if (nullptr == data_) {
-      errno = ENOMEM;
-      return false;
+      data_ = new (std::nothrow) uint8_t[meta_.o_size * queue_size_];
+
+      /* failed or could not allocate */
+      if (nullptr == data_) {
+        errno = ENOMEM;
+        return false;
+      }
     }
+
+    memcpy(data_ + (meta_.o_size * (generation_ & (queue_size_ - 1))), (const char *)data, meta_.o_size);
+
+    generation_++;
   }
 
-  memcpy(data_ + (meta_.o_size * (generation_ % queue_size_)), (const char *)data, meta_.o_size);
-
-  generation_++;
-
-  for (auto &entry : receiver_list_) {
-    entry.on_publish(entry.ctx);
+  {
+    base::LockGuard<base::Mutex> lg(callback_lock_);
+    for (auto &entry : receiver_list_) {
+      entry.on_publish(entry.ctx);
+    }
   }
 
   return true;
 }
 
 void uorb::DeviceNode::add_subscriber() {
-  base::LockGuard<base::Mutex> lg(lock_);
+  base::LockGuard<base::Mutex> lg(data_lock_);
   if (subscriber_count_ < kMaxCounterValue) {
     subscriber_count_++;
   }
 }
 
 void uorb::DeviceNode::remove_subscriber() {
-  base::LockGuard<base::Mutex> lg(lock_);
+  base::LockGuard<base::Mutex> lg(data_lock_);
   if (subscriber_count_ > 0) {
     subscriber_count_--;
   }
 }
 
 void uorb::DeviceNode::mark_untracked_subscriber() {
-  base::LockGuard<base::Mutex> lg(lock_);
+  base::LockGuard<base::Mutex> lg(data_lock_);
   has_untracked_subscriber_ = true;
 }
 
 unsigned uorb::DeviceNode::initial_generation() const {
-  base::LockGuard<base::Mutex> lg(lock_);
+  base::LockGuard<base::Mutex> lg(data_lock_);
 
   // If there any previous publications allow the subscriber to read them
   return generation_ - (data_ ? 1 : 0);
 }
 
 void uorb::DeviceNode::remove_publisher() {
-  base::LockGuard<base::Mutex> lg(lock_);
+  base::LockGuard<base::Mutex> lg(data_lock_);
   if (publisher_count_ > 0) {
     publisher_count_--;
   }
 }
 
 void uorb::DeviceNode::add_publisher() {
-  base::LockGuard<base::Mutex> lg(lock_);
+  base::LockGuard<base::Mutex> lg(data_lock_);
   if (publisher_count_ < kMaxCounterValue) {
     publisher_count_++;
   }
 }
 
 void uorb::DeviceNode::mark_untracked_publisher() {
-  base::LockGuard<base::Mutex> lg(lock_);
+  base::LockGuard<base::Mutex> lg(data_lock_);
   has_untracked_publisher_ = true;
 }
 
 void uorb::DeviceNode::FillStatus(orb_status *status) const {
-  base::LockGuard<base::Mutex> lg(lock_);
+  base::LockGuard<base::Mutex> lg(data_lock_);
   status->queue_size = queue_size_;
   status->subscriber_count = subscriber_count_;
   status->has_untracked_subscriber = has_untracked_subscriber_;

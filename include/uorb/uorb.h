@@ -319,6 +319,10 @@ orb_err orb_subscriber_create(orb_subscriber_t *sub, const struct orb_metadata *
  * subscribe to each instance with orb_subscriber_create
  * (@see orb_publisher_create_multi()).
  *
+ * @note Topic nodes are persistent: once created by the first publisher or
+ * subscriber, a DeviceNode lives for the lifetime of the process. This is
+ * intentional for embedded use cases where topics are statically defined.
+ *
  * @param sub       Pointer to the subscription handle to be created.
  * @param meta      The uORB metadata (usually from the ORB_ID() macro)
  *                  for the topic.
@@ -387,9 +391,11 @@ bool orb_subscriber_check_update(orb_subscriber_t *sub);
  * Invoked when new data is published to the subscription's topic.
  * Use this to integrate with external event loops (see uorb_uevent/uorb_uevent.h).
  *
- * Note: The callback must not call back into the same DeviceNode (e.g., by
- * calling orb_publisher_publish() or orb_subscriber_copy() on the same topic) as this would cause
- * a deadlock. The callback is invoked while the DeviceNode's lock is held.
+ * Note: The callback is invoked while the DeviceNode's callback_lock_ is held.
+ * Since data operations (Copy/Publish) use a separate data_lock_, the callback
+ * may safely call orb_subscriber_copy() on the same topic without deadlock.
+ * Do not call orb_publisher_publish() on the same topic from the callback, as
+ * this would acquire data_lock_ and then callback_lock_ in the same thread.
  *
  * @param ctx user context pointer passed to orb_subscriber_set_callback()
  */
