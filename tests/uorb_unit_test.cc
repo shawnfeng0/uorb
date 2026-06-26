@@ -35,6 +35,7 @@
 
 #include <gtest/gtest.h>
 #include <uevent/uevent.h>
+#include <uorb/publication_multi.h>
 #include <uorb/subscription_interval.h>
 #include <uorb_uevent/uorb_uevent.h>
 
@@ -1028,6 +1029,232 @@ TEST_F(UnitTest, topic_status_counter_saturation) {
   for (auto &pub : pubs) {
     EXPECT_EQ(orb_publisher_destroy(&pub), ORB_OK);
   }
+}
+
+TEST_F(UnitTest, orb_exists_returns_true_after_publish) {
+  orb_publisher_t pub = ORB_PUBLISHER_INITIALIZER;
+  EXPECT_EQ(orb_publisher_create(&pub, ORB_ID(orb_test)), ORB_OK);
+  ASSERT_NE(pub._handle, nullptr);
+
+  orb_test_s data{};
+  data.val = 42;
+  ASSERT_EQ(orb_publisher_publish(&pub, &data), ORB_OK);
+
+  // Topic exists because there is an active publisher
+  EXPECT_TRUE(orb_exists(ORB_ID(orb_test), 0));
+
+  EXPECT_EQ(orb_publisher_destroy(&pub), ORB_OK);
+
+  // After destroying the publisher, publisher_count drops to 0
+  EXPECT_FALSE(orb_exists(ORB_ID(orb_test), 0));
+}
+
+TEST_F(UnitTest, orb_group_count_reports_correct_count) {
+  orb_publisher_t pubs[3] = {ORB_PUBLISHER_INITIALIZER, ORB_PUBLISHER_INITIALIZER,
+                                ORB_PUBLISHER_INITIALIZER};
+  unsigned instances[3]{};
+
+  for (int i = 0; i < 3; ++i) {
+    EXPECT_EQ(orb_publisher_create_multi(&pubs[i], ORB_ID(orb_test_medium), &instances[i]), ORB_OK);
+    EXPECT_EQ(instances[i], i);
+  }
+
+  EXPECT_EQ(orb_group_count(ORB_ID(orb_test_medium)), 3U);
+
+  // Destroy one publisher
+  EXPECT_EQ(orb_publisher_destroy(&pubs[0]), ORB_OK);
+  EXPECT_EQ(orb_group_count(ORB_ID(orb_test_medium)), 2U);
+
+  // Destroy remaining publishers
+  EXPECT_EQ(orb_publisher_destroy(&pubs[1]), ORB_OK);
+  EXPECT_EQ(orb_publisher_destroy(&pubs[2]), ORB_OK);
+  EXPECT_EQ(orb_group_count(ORB_ID(orb_test_medium)), 0U);
+}
+
+TEST_F(UnitTest, orb_get_topic_status_reports_fields) {
+  orb_publisher_t pub = ORB_PUBLISHER_INITIALIZER;
+  EXPECT_EQ(orb_publisher_create(&pub, ORB_ID(orb_test)), ORB_OK);
+  ASSERT_NE(pub._handle, nullptr);
+
+  orb_subscriber_t sub = ORB_SUBSCRIBER_INITIALIZER;
+  EXPECT_EQ(orb_subscriber_create(&sub, ORB_ID(orb_test)), ORB_OK);
+  ASSERT_NE(sub._handle, nullptr);
+
+  orb_test_s data{};
+  data.val = 77;
+  ASSERT_EQ(orb_publisher_publish(&pub, &data), ORB_OK);
+
+  orb_status status{};
+  ASSERT_EQ(orb_get_topic_status(ORB_ID(orb_test), 0, &status), ORB_OK);
+  EXPECT_GE(status.publisher_count, 1);
+  EXPECT_GE(status.subscriber_count, 1);
+  EXPECT_GT(status.queue_size, 0);
+
+  // Non-existent instance should return ORB_ERR_UNKNOWN
+  orb_status status2{};
+  EXPECT_EQ(orb_get_topic_status(ORB_ID(orb_test), 3, &status2), ORB_ERR_UNKNOWN);
+
+  EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
+  EXPECT_EQ(orb_publisher_destroy(&pub), ORB_OK);
+}
+
+TEST_F(UnitTest, publication_multi_wrapper_publishes_and_reports_instance) {
+  // --- PublicationMultiData with embedded message storage ---
+  uorb::PublicationMultiData<uorb::msg::orb_test_medium> pub_data;
+  pub_data.data().val = 42;
+  ASSERT_TRUE(pub_data.Publish());
+  ASSERT_LE(pub_data.instance(), ORB_MULTI_MAX_INSTANCES - 1);
+
+  // Subscribe to the same instance and verify end-to-end delivery.
+  orb_subscriber_t sub_data = ORB_SUBSCRIBER_INITIALIZER;
+  ASSERT_EQ(orb_subscriber_create_multi(&sub_data, ORB_ID(orb_test_medium),
+                                        pub_data.instance()),
+            ORB_OK);
+  ASSERT_NE(sub_data._handle, nullptr);
+
+  // Drain the initial publish so the next publish is a fresh update.
+  orb_test_medium_s recv{};
+  orb_subscriber_check_and_copy(&sub_data, &recv);
+
+  pub_data.data().val = 4242;
+  ASSERT_TRUE(pub_data.Publish());
+  ASSERT_TRUE(orb_subscriber_check_update(&sub_data));
+  ASSERT_EQ(orb_subscriber_copy(&sub_data, &recv), ORB_OK);
+  EXPECT_EQ(recv.val, 4242);
+  EXPECT_EQ(orb_subscriber_destroy(&sub_data), ORB_OK);
+
+  // --- PublicationMulti without embedded data (external data) ---
+  uorb::PublicationMulti<uorb::msg::orb_test_medium> pub_ext;
+  orb_test_medium_s ext{};
+  ext.val = 99;
+  ASSERT_TRUE(pub_ext.Publish(ext));
+  ASSERT_LE(pub_ext.instance(), ORB_MULTI_MAX_INSTANCES - 1);
+
+  orb_subscriber_t sub_ext = ORB_SUBSCRIBER_INITIALIZER;
+  ASSERT_EQ(orb_subscriber_create_multi(&sub_ext, ORB_ID(orb_test_medium),
+                                        pub_ext.instance()),
+            ORB_OK);
+  ASSERT_NE(sub_ext._handle, nullptr);
+
+  // Drain the initial publish.
+  orb_subscriber_check_and_copy(&sub_ext, &recv);
+
+  ext.val = 9999;
+  ASSERT_TRUE(pub_ext.Publish(ext));
+  ASSERT_TRUE(orb_subscriber_check_update(&sub_ext));
+  ASSERT_EQ(orb_subscriber_copy(&sub_ext, &recv), ORB_OK);
+  EXPECT_EQ(recv.val, 9999);
+  EXPECT_EQ(orb_subscriber_destroy(&sub_ext), ORB_OK);
+}
+
+TEST_F(UnitTest, subscription_interval_throttle_behavior) {
+  uorb::SubscriptionInterval<uorb::msg::orb_test> sub(100000, 0);  // 100ms interval
+
+  orb_publisher_t pub = ORB_PUBLISHER_INITIALIZER;
+  EXPECT_EQ(orb_publisher_create(&pub, ORB_ID(orb_test)), ORB_OK);
+  ASSERT_NE(pub._handle, nullptr);
+
+  orb_test_s data{};
+  orb_test_s dst{};
+
+  // First publish and update (last_update_ = 0, so interval check passes)
+  data.val = 55;
+  ASSERT_EQ(orb_publisher_publish(&pub, &data), ORB_OK);
+  EXPECT_TRUE(sub.Updated());
+  EXPECT_TRUE(sub.Update(&dst));
+  EXPECT_EQ(dst.val, 55);
+
+  // After first Update with last_update_=0, CalculateNextUpdateTime sets
+  // last_update_ to (now - interval), so the next Updated() still passes.
+  // Consume this update as well to properly anchor last_update_.
+  data.val = 56;
+  ASSERT_EQ(orb_publisher_publish(&pub, &data), ORB_OK);
+  EXPECT_TRUE(sub.Updated());
+  EXPECT_TRUE(sub.Update(&dst));
+  EXPECT_EQ(dst.val, 56);
+
+  // Now last_update_ is anchored to the second Update time.
+  // Publish new data but throttle should prevent immediate update.
+  data.val = 57;
+  ASSERT_EQ(orb_publisher_publish(&pub, &data), ORB_OK);
+  EXPECT_FALSE(sub.Updated());
+
+  // After sleeping past the interval, Updated() should return true
+  usleep(110 * 1000);  // 110ms > 100ms interval
+  EXPECT_TRUE(sub.Updated());
+
+  // And Update should now succeed with the new value
+  EXPECT_TRUE(sub.Update(&dst));
+  EXPECT_EQ(dst.val, 57);
+
+  EXPECT_EQ(orb_publisher_destroy(&pub), ORB_OK);
+}
+
+TEST_F(UnitTest, subscription_interval_runtime_change) {
+  uorb::SubscriptionInterval<uorb::msg::orb_test> sub(1000000, 0);  // 1s interval
+
+  orb_publisher_t pub = ORB_PUBLISHER_INITIALIZER;
+  EXPECT_EQ(orb_publisher_create(&pub, ORB_ID(orb_test)), ORB_OK);
+  ASSERT_NE(pub._handle, nullptr);
+
+  orb_test_s data{};
+  orb_test_s dst{};
+
+  // First publish and update (last_update_ = 0)
+  data.val = 1;
+  ASSERT_EQ(orb_publisher_publish(&pub, &data), ORB_OK);
+  EXPECT_TRUE(sub.Updated());
+  EXPECT_TRUE(sub.Update(&dst));
+  EXPECT_EQ(dst.val, 1);
+
+  // Second publish and update (still passes due to CalculateNextUpdateTime
+  // starting from last_update_=0; anchors last_update_ properly).
+  data.val = 2;
+  ASSERT_EQ(orb_publisher_publish(&pub, &data), ORB_OK);
+  EXPECT_TRUE(sub.Updated());
+  EXPECT_TRUE(sub.Update(&dst));
+  EXPECT_EQ(dst.val, 2);
+
+  // Publish new data but 1s interval should now throttle
+  data.val = 3;
+  ASSERT_EQ(orb_publisher_publish(&pub, &data), ORB_OK);
+  EXPECT_FALSE(sub.Updated());
+
+  // Disable throttling at runtime
+  sub.set_interval_us(0);
+  EXPECT_TRUE(sub.Updated());
+
+  EXPECT_EQ(orb_publisher_destroy(&pub), ORB_OK);
+}
+
+TEST_F(UnitTest, publish_once_without_subscribers) {
+  orb_test_s data{};
+  data.val = 88;
+
+  // Publish without any subscribers - should still succeed
+  EXPECT_EQ(orb_publisher_publish_once(ORB_ID(orb_test), &data), ORB_OK);
+
+  // Create a subscriber
+  orb_subscriber_t sub = ORB_SUBSCRIBER_INITIALIZER;
+  EXPECT_EQ(orb_subscriber_create(&sub, ORB_ID(orb_test)), ORB_OK);
+  ASSERT_NE(sub._handle, nullptr);
+
+  // copy_once should retrieve the published data
+  orb_test_s buffer{};
+  EXPECT_EQ(orb_subscriber_copy_once(ORB_ID(orb_test), &buffer), ORB_OK);
+  EXPECT_EQ(buffer.val, 88);
+
+  EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
+}
+
+TEST_F(UnitTest, copy_once_on_never_published_topic) {
+  orb_test_large_s buffer{};
+  buffer.val = 12345;  // Set non-zero to detect if overwritten
+
+  // Call copy_once on a topic that has never been published.
+  // Should not crash. Returns ORB_ERR_UNKNOWN since no data has been published.
+  orb_err result = orb_subscriber_copy_once(ORB_ID(orb_test_large), &buffer);
+  EXPECT_EQ(result, ORB_ERR_UNKNOWN);
 }
 
 }  // namespace uORBTest

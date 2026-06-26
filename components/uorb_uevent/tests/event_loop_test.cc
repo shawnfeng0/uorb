@@ -359,4 +359,203 @@ TEST(EventLoopTest, SubscriptionCannotBindToMultipleEventPolls) {
   uevent_destroy(&base_b);
 }
 
+// RunOnce uses a fixed-size ready[32] array. When more than 32 subscriptions
+// are ready, a single call can dispatch at most 32; subsequent calls pick up
+// the remainder.
+TEST(EventLoopTest, RunOnceExceedsReadyCapacity) {
+  uorb::EventLoop loop;
+  ASSERT_TRUE(loop);
+
+  constexpr int kNumSubs = 35;
+  std::atomic<int> call_count{0};
+
+  // Subscribe 35 times to the same topic. Each Subscribe() creates an
+  // independent subscriber with its own event source.
+  for (int i = 0; i < kNumSubs; ++i) {
+    ASSERT_TRUE(loop.Subscribe<uorb::msg::orb_test>(
+        [&](const orb_test_s &) { ++call_count; }));
+  }
+
+  DrainPendingEvents(loop);
+  call_count = 0;
+
+  uorb::PublicationData<uorb::msg::orb_test> pub;
+  pub.data().val = 1;
+  ASSERT_TRUE(pub.Publish());
+
+  // First RunOnce should return at most 32 (limited by ready[32]).
+  int first = loop.RunOnce(100);
+  ASSERT_GT(first, 0);
+  ASSERT_LE(first, 32);
+
+  // Drain remaining events with non-blocking calls.
+  int total = first;
+  for (int i = 0; i < 4 && total < kNumSubs; ++i) {
+    int n = loop.RunOnce(0);
+    if (n <= 0) break;
+    total += n;
+  }
+
+  EXPECT_EQ(call_count.load(), kNumSubs);
+  EXPECT_EQ(total, kNumSubs);
+}
+
+// Quit() is idempotent: calling it multiple times must be safe.
+TEST(EventLoopTest, QuitCalledMultipleTimes) {
+  uorb::EventLoop loop;
+  ASSERT_TRUE(loop);
+  ASSERT_TRUE(loop.Subscribe<uorb::msg::orb_test>([](const orb_test_s &) {}));
+
+  loop.Quit();
+  loop.Quit();
+  loop.Quit();
+
+  // Sticky: RunOnce must return -1 immediately.
+  EXPECT_EQ(loop.RunOnce(0), -1);
+  EXPECT_EQ(loop.RunOnce(100), -1);
+}
+
+// Subscribe() does not check quit_requested_, so new entries can be added
+// even after Quit(). RunOnce must still return -1 (sticky).
+TEST(EventLoopTest, SubscribeAfterQuit) {
+  uorb::EventLoop loop;
+  ASSERT_TRUE(loop);
+  ASSERT_TRUE(loop.Subscribe<uorb::msg::orb_test>([](const orb_test_s &) {}));
+
+  loop.Quit();
+
+  // Subscribe() should still succeed — it doesn't check quit_requested_.
+  EXPECT_TRUE(loop.Subscribe<uorb::msg::orb_test>([](const orb_test_s &) {}));
+
+  // RunOnce must return -1 immediately (quit_requested_ is sticky).
+  EXPECT_EQ(loop.RunOnce(0), -1);
+  EXPECT_EQ(loop.RunOnce(100), -1);
+}
+
+// A callback that re-publishes to the same topic. The re-published message
+// is delivered on the next RunOnce call.
+TEST(EventLoopTest, CallbackPublishesSameTopic) {
+  uorb::EventLoop loop;
+  ASSERT_TRUE(loop);
+
+  std::atomic<int> call_count{0};
+  std::atomic<bool> already_republished{false};
+
+  ASSERT_TRUE(loop.Subscribe<uorb::msg::orb_test>([&](const orb_test_s &) {
+    ++call_count;
+    if (!already_republished.exchange(true)) {
+      uorb::PublicationData<uorb::msg::orb_test> pub;
+      pub.data().val = 99;
+      pub.Publish();
+    }
+  }));
+
+  DrainPendingEvents(loop);
+  call_count = 0;
+  already_republished = false;
+
+  // Publish initial message.
+  uorb::PublicationData<uorb::msg::orb_test> pub;
+  pub.data().val = 1;
+  ASSERT_TRUE(pub.Publish());
+
+  // First RunOnce dispatches the callback (count=1, re-publishes).
+  EXPECT_EQ(loop.RunOnce(1000), 1);
+  EXPECT_EQ(call_count.load(), 1);
+
+  // Second RunOnce dispatches the re-published message (count=2).
+  EXPECT_EQ(loop.RunOnce(1000), 1);
+  EXPECT_EQ(call_count.load(), 2);
+
+  // No more pending data.
+  EXPECT_EQ(loop.RunOnce(0), 0);
+}
+
+// A callback that re-entrantly calls RunOnce(0) to drain pending events on
+// another subscription. This is safe because EventPoll::Wait releases its
+// mutex before returning the ready array.
+TEST(EventLoopTest, CallbackCallsRunOnce) {
+  uorb::EventLoop loop;
+  ASSERT_TRUE(loop);
+
+  std::atomic<int> first_calls{0};
+  std::atomic<int> second_calls{0};
+
+  ASSERT_TRUE(loop.Subscribe<uorb::msg::orb_test>([&](const orb_test_s &) {
+    ++first_calls;
+    // Re-entrant call to drain any pending events on the second topic.
+    loop.RunOnce(0);
+  }));
+  ASSERT_TRUE(loop.Subscribe<uorb::msg::orb_test_medium>(
+      [&](const orb_test_medium_s &) { ++second_calls; }));
+
+  DrainPendingEvents(loop);
+  first_calls = 0;
+  second_calls = 0;
+
+  // Publish to both topics.
+  uorb::PublicationData<uorb::msg::orb_test> pub_a;
+  pub_a.data().val = 1;
+  ASSERT_TRUE(pub_a.Publish());
+
+  uorb::PublicationData<uorb::msg::orb_test_medium> pub_b;
+  pub_b.data().val = 2;
+  ASSERT_TRUE(pub_b.Publish());
+
+  // RunOnce dispatches the first callback, which calls RunOnce(0) to
+  // dispatch the second callback.
+  loop.RunOnce(1000);
+
+  EXPECT_EQ(first_calls.load(), 1);
+  EXPECT_EQ(second_calls.load(), 1);
+}
+
+// Stress test: 100 subscriptions to the same topic, single publish, all
+// callbacks must fire across multiple RunOnce(0) calls.
+TEST(EventLoopTest, ManySubscriptionsStress) {
+  uorb::EventLoop loop;
+  ASSERT_TRUE(loop);
+
+  constexpr int kNumSubs = 100;
+  std::atomic<int> call_count{0};
+
+  for (int i = 0; i < kNumSubs; ++i) {
+    ASSERT_TRUE(loop.Subscribe<uorb::msg::orb_test>(
+        [&](const orb_test_s &) { ++call_count; }));
+  }
+
+  DrainPendingEvents(loop);
+  call_count = 0;
+
+  uorb::PublicationData<uorb::msg::orb_test> pub;
+  pub.data().val = 7;
+  ASSERT_TRUE(pub.Publish());
+
+  // Repeatedly call RunOnce(0) until no more events are ready.
+  for (int i = 0; i < 10; ++i) {
+    int n = loop.RunOnce(0);
+    if (n <= 0) break;
+  }
+
+  EXPECT_EQ(call_count.load(), kNumSubs);
+}
+
+// RemoveSubscription must return false for a subscription that was never
+// added to the loop.
+TEST(EventLoopTest, RemoveNonExistentSubscription) {
+  uorb::EventLoop loop;
+  ASSERT_TRUE(loop);
+
+  uorb::SubscriptionData<uorb::msg::orb_test> sub1;
+  uorb::SubscriptionData<uorb::msg::orb_test> sub2;
+
+  ASSERT_TRUE(loop.AddSubscription(sub1, [](const orb_test_s &) {}));
+
+  // sub2 was never added to the loop. Removing it should fail.
+  EXPECT_FALSE(loop.RemoveSubscription(sub2));
+
+  // Cleanup.
+  EXPECT_TRUE(loop.RemoveSubscription(sub1));
+}
+
 }  // namespace uORBTest

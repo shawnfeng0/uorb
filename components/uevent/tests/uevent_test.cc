@@ -583,3 +583,266 @@ TEST(UeventTest, DestroySourceWhileAddedToBase) {
   uevent_source_destroy(&src);
   uevent_destroy(&base);
 }
+
+// ---- Register / unregister callbacks invoked on add / remove ----
+
+TEST(UeventTest, RegisterUnregisterCallbacksInvoked) {
+  struct Ctx {
+    std::atomic<bool> registered{false};
+    std::atomic<bool> unregistered{false};
+  };
+  Ctx ctx;
+
+  auto ready_fn = [](void *) -> bool { return false; };
+  auto register_fn = [](void *p) -> bool {
+    static_cast<Ctx *>(p)->registered = true;
+    return true;
+  };
+  auto unregister_fn = [](void *p) -> bool {
+    static_cast<Ctx *>(p)->unregistered = true;
+    return true;
+  };
+
+  uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
+  ASSERT_EQ(uevent_source_create(&src, ready_fn, register_fn, unregister_fn,
+                                  nullptr, &ctx),
+            0);
+
+  uevent_t base = UEVENT_INITIALIZER;
+  ASSERT_EQ(uevent_create(&base), 0);
+
+  ASSERT_EQ(uevent_add(&base, &src, 0), 0);
+  EXPECT_TRUE(ctx.registered.load());
+  EXPECT_FALSE(ctx.unregistered.load());
+
+  ASSERT_EQ(uevent_remove(&base, &src), 0);
+  EXPECT_TRUE(ctx.unregistered.load());
+
+  uevent_source_destroy(&src);
+  uevent_destroy(&base);
+}
+
+// ---- register_fn returning false fails uevent_add ----
+
+TEST(UeventTest, RegisterFnReturningFalseFailsAdd) {
+  struct Ctx {
+    std::atomic<bool> unregistered{false};
+  };
+  Ctx ctx;
+
+  auto ready_fn = [](void *) -> bool { return false; };
+  auto register_fn = [](void *) -> bool { return false; };
+  auto unregister_fn = [](void *p) -> bool {
+    static_cast<Ctx *>(p)->unregistered = true;
+    return true;
+  };
+
+  uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
+  ASSERT_EQ(uevent_source_create(&src, ready_fn, register_fn, unregister_fn,
+                                  nullptr, &ctx),
+            0);
+
+  uevent_t base = UEVENT_INITIALIZER;
+  ASSERT_EQ(uevent_create(&base), 0);
+
+  EXPECT_EQ(uevent_add(&base, &src, 0), -1);
+  // unregister should NOT be called when register fails
+  EXPECT_FALSE(ctx.unregistered.load());
+
+  uevent_source_destroy(&src);
+  uevent_destroy(&base);
+}
+
+// ---- uevent_loop returns immediately when source is already ready ----
+
+TEST(UeventTest, AddWhenSourceAlreadyReady) {
+  struct Ctx {
+    std::atomic<bool> ready{true};
+  };
+  Ctx ctx;
+
+  auto ready_fn = [](void *p) -> bool {
+    return static_cast<Ctx *>(p)->ready.load();
+  };
+
+  uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
+  ASSERT_EQ(uevent_source_create(&src, ready_fn, nullptr, nullptr, nullptr, &ctx), 0);
+
+  uevent_t base = UEVENT_INITIALIZER;
+  ASSERT_EQ(uevent_create(&base), 0);
+  ASSERT_EQ(uevent_add(&base, &src, 0), 0);
+
+  // Source is already ready; loop with timeout=0 should return 1 immediately
+  uevent_source_t ready[1] = {UEVENT_SOURCE_INITIALIZER};
+  EXPECT_EQ(uevent_loop(&base, ready, 1, 0), 1);
+  EXPECT_EQ(ready[0]._handle, src._handle);
+
+  ASSERT_EQ(uevent_remove(&base, &src), 0);
+  uevent_source_destroy(&src);
+  uevent_destroy(&base);
+}
+
+// ---- Concurrent add while loop is blocked ----
+
+TEST(UeventTest, ConcurrentAddRemoveWhileWaitBlocked) {
+  struct Ctx {
+    std::atomic<bool> ready{false};
+  };
+  Ctx ctx;
+
+  auto ready_fn = [](void *p) -> bool {
+    return static_cast<Ctx *>(p)->ready.load();
+  };
+
+  uevent_t base = UEVENT_INITIALIZER;
+  ASSERT_EQ(uevent_create(&base), 0);
+
+  uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
+
+  std::thread producer([&]() {
+    std::this_thread::sleep_for(std::chrono::milliseconds(30));
+    uevent_source_create(&src, ready_fn, nullptr, nullptr, nullptr, &ctx);
+    uevent_add(&base, &src, 0);
+    ctx.ready = true;
+    uevent_source_notify(&src);
+  });
+
+  uevent_source_t ready[1] = {UEVENT_SOURCE_INITIALIZER};
+  // Block forever; producer will add a ready source and notify
+  ASSERT_EQ(uevent_loop(&base, ready, 1, -1), 1);
+
+  producer.join();
+  ASSERT_NE(src._handle, nullptr);
+  EXPECT_EQ(ready[0]._handle, src._handle);
+
+  ASSERT_EQ(uevent_remove(&base, &src), 0);
+  uevent_source_destroy(&src);
+  uevent_destroy(&base);
+}
+
+// ---- Destroy base with sources still added (should not crash) ----
+
+TEST(UeventTest, DestroyBaseWithSourcesStillAdded) {
+  auto ready_fn = [](void *) -> bool { return false; };
+
+  uevent_source_t src1 = UEVENT_SOURCE_INITIALIZER;
+  uevent_source_t src2 = UEVENT_SOURCE_INITIALIZER;
+  uevent_source_t src3 = UEVENT_SOURCE_INITIALIZER;
+  ASSERT_EQ(uevent_source_create(&src1, ready_fn, nullptr, nullptr, nullptr, nullptr), 0);
+  ASSERT_EQ(uevent_source_create(&src2, ready_fn, nullptr, nullptr, nullptr, nullptr), 0);
+  ASSERT_EQ(uevent_source_create(&src3, ready_fn, nullptr, nullptr, nullptr, nullptr), 0);
+
+  uevent_t base = UEVENT_INITIALIZER;
+  ASSERT_EQ(uevent_create(&base), 0);
+  ASSERT_EQ(uevent_add(&base, &src1, 0), 0);
+  ASSERT_EQ(uevent_add(&base, &src2, 0), 0);
+  ASSERT_EQ(uevent_add(&base, &src3, 0), 0);
+
+  // Destroy base without removing sources first — should not crash
+  uevent_destroy(&base);
+
+  EXPECT_FALSE(uevent_source_is_bound(&src1));
+  EXPECT_FALSE(uevent_source_is_bound(&src2));
+  EXPECT_FALSE(uevent_source_is_bound(&src3));
+
+  // Sources should now be unbound; destroy them safely
+  uevent_source_destroy(&src1);
+  uevent_source_destroy(&src2);
+  uevent_source_destroy(&src3);
+}
+
+// ---- Stress test with many sources ----
+
+TEST(UeventTest, ManySourcesStress) {
+  constexpr int N = 50;
+
+  struct Ctx {
+    std::atomic<bool> ready{false};
+  };
+  Ctx ctxs[N];
+
+  auto ready_fn = [](void *p) -> bool {
+    return static_cast<Ctx *>(p)->ready.load();
+  };
+
+  uevent_source_t srcs[N] = {};
+  for (int i = 0; i < N; ++i) {
+    ASSERT_EQ(uevent_source_create(&srcs[i], ready_fn, nullptr, nullptr, nullptr,
+                                    &ctxs[i]),
+              0);
+  }
+
+  uevent_t base = UEVENT_INITIALIZER;
+  ASSERT_EQ(uevent_create(&base), 0);
+
+  for (int i = 0; i < N; ++i) {
+    ASSERT_EQ(uevent_add(&base, &srcs[i], 0), 0);
+  }
+
+  // Set all ready and notify all
+  for (int i = 0; i < N; ++i) {
+    ctxs[i].ready = true;
+    uevent_source_notify(&srcs[i]);
+  }
+
+  uevent_source_t ready[N] = {};
+  ASSERT_EQ(uevent_loop(&base, ready, N, 100), N);
+
+  // Verify all sources were returned
+  int matched = 0;
+  for (int i = 0; i < N; ++i) {
+    for (int j = 0; j < N; ++j) {
+      if (ready[i]._handle == srcs[j]._handle) {
+        matched++;
+        break;
+      }
+    }
+  }
+  EXPECT_EQ(matched, N);
+
+  // Clean up
+  for (int i = 0; i < N; ++i) {
+    ASSERT_EQ(uevent_remove(&base, &srcs[i]), 0);
+    uevent_source_destroy(&srcs[i]);
+  }
+  uevent_destroy(&base);
+}
+
+// ---- Loopbreak from multiple threads concurrently ----
+
+TEST(UeventTest, LoopbreakFromMultipleThreadsConcurrently) {
+  struct Ctx {
+    std::atomic<bool> ready{false};
+  };
+  Ctx ctx;
+
+  auto ready_fn = [](void *p) -> bool {
+    return static_cast<Ctx *>(p)->ready.load();
+  };
+
+  uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
+  ASSERT_EQ(uevent_source_create(&src, ready_fn, nullptr, nullptr, nullptr, &ctx), 0);
+
+  uevent_t base = UEVENT_INITIALIZER;
+  ASSERT_EQ(uevent_create(&base), 0);
+  ASSERT_EQ(uevent_add(&base, &src, 0), 0);
+
+  // Launch 3 threads that each call uevent_loopbreak
+  std::thread threads[3];
+  for (auto &t : threads) {
+    t = std::thread([&base]() {
+      std::this_thread::sleep_for(std::chrono::milliseconds(30));
+      uevent_loopbreak(&base);
+    });
+  }
+
+  // Block forever; one of the loopbreak calls should wake us up
+  uevent_source_t ready[1] = {UEVENT_SOURCE_INITIALIZER};
+  EXPECT_EQ(uevent_loop(&base, ready, 1, -1), -1);
+
+  for (auto &t : threads) t.join();
+
+  ASSERT_EQ(uevent_remove(&base, &src), 0);
+  uevent_source_destroy(&src);
+  uevent_destroy(&base);
+}
