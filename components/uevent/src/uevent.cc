@@ -82,6 +82,8 @@ void uevent_destroy(uevent_t *ev) {
 }
 
 int uevent_loop(uevent_t *ev, uevent_source_t *ready, int max_ready, int timeout_ms) {
+  static_assert(sizeof(uevent_source_t) == sizeof(void *),
+                "uevent_source_t must have same layout as void* for reinterpret_cast safety");
   if (!ev || !ev->_handle || !ready || max_ready <= 0) {
     errno = EINVAL;
     return -1;

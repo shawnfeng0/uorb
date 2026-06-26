@@ -6,6 +6,7 @@
 #include <uevent/uevent_source.h>
 
 #include <errno.h>
+#include <atomic>
 #include <list>
 #include <unordered_map>
 #include <unordered_set>
@@ -191,7 +192,7 @@ class EventPoll {
   std::unordered_set<EventSource *> ready_set_;
   std::unordered_map<EventSource *, struct timespec> deadlines_;
   std::unordered_set<EventSource *> timeout_fired_;
-  bool stop_ = false;
+  std::atomic<bool> stop_{false};
 };
 
 }  // namespace uevent
