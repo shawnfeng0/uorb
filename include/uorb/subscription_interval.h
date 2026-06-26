@@ -13,7 +13,10 @@ namespace uorb {
  * more often than the configured interval.
  */
 template <const orb_metadata &meta>
-class SubscriptionInterval : public Subscription<meta> {
+class SubscriptionInterval
+    : public detail::SubscriptionBase<meta, SubscriptionInterval<meta>> {
+  using Base = detail::SubscriptionBase<meta, SubscriptionInterval<meta>>;
+
  private:
   template <typename Tp>
   static constexpr Tp constrain(Tp val, Tp min_val, Tp max_val) {
@@ -26,52 +29,27 @@ class SubscriptionInterval : public Subscription<meta> {
   /**
    * Constructor
    *
-   * @param meta The uORB metadata (usually from the ORB_ID() macro) for the
-   * topic.
-   * @param interval The requested maximum update interval in microseconds.
+   * @param interval_us The requested maximum update interval in microseconds.
    * @param instance The instance for multi sub.
    */
   explicit SubscriptionInterval(uint32_t interval_us = 0, uint8_t instance = 0) noexcept
-      : Subscription<meta>(instance), interval_us_(interval_us) {}
+      : Base(instance), interval_us_(interval_us) {}
 
-  ~SubscriptionInterval() override = default;
-
-  /**
-   * Check if there is a new update.
-   * */
-  bool Updated() override {
-    return Subscription<meta>::Updated() &&
+  /// Check if there is a new update, throttled by the configured interval.
+  bool Updated() {
+    return Base::Updated() &&
            (orb_elapsed_time_us(last_update_) >= interval_us_);
   }
 
-  /**
-   * Copy the struct if updated.
-   * @param dst The destination pointer where the struct will be copied.
-   * @return true only if topic was updated and copied successfully.
-   */
-  bool Update(ValueType *dst) override {
-    if (Updated()) {
-      return Copy(dst);
-    }
-
-    return false;
-  }
-  bool Update(ValueType &dst) override { return Update(&dst); }
-
-  /**
-   * Copy the struct
-   * @param dst The destination pointer where the struct will be copied.
-   * @return true only if topic was copied successfully.
-   */
-  bool Copy(ValueType *dst) override {
-    if (Subscription<meta>::Copy(dst)) {
+  /// Copy the struct and update the throttle timestamp.
+  bool Copy(ValueType *dst) {
+    if (Base::Copy(dst)) {
       last_update_ = CalculateNextUpdateTime(last_update_, interval_us_, orb_absolute_time_us());
       return true;
     }
-
     return false;
   }
-  bool Copy(ValueType &dst) override { return Copy(&dst); }
+  bool Copy(ValueType &dst) { return Copy(&dst); }
 
   uint32_t interval_us() const { return interval_us_; }
   uint32_t interval_ms() const { return interval_us_ / 1000; }
