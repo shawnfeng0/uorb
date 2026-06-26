@@ -26,13 +26,15 @@ class Publication {
   /**
    * Publish the struct
    * @param data The uORB message struct we are updating.
+   * @return ORB_OK on success, error code otherwise.
    */
-  bool Publish(const Type &data) {
+  orb_err Publish(const Type &data) {
     if (!handle_._handle) {
-      orb_publisher_create(&handle_, &meta);
+      orb_err err = orb_publisher_create(&handle_, &meta);
+      if (err != ORB_OK) return err;
     }
 
-    return handle_._handle && orb_publisher_publish(&handle_, &data) == ORB_OK;
+    return orb_publisher_publish(&handle_, &data);
   }
 
  private:
@@ -58,7 +60,7 @@ class PublicationData : public Publication<meta> {
   const Type &data() const { return data_; }
 
   // Publishes the embedded struct.
-  bool Publish() { return Publication<meta>::Publish(data_); }
+  orb_err Publish() { return Publication<meta>::Publish(data_); }
 
  private:
   Type data_{};

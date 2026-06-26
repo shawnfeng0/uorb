@@ -26,13 +26,15 @@ class PublicationMulti {
   /**
    * Publish the struct
    * @param data The uORB message struct we are updating.
+   * @return ORB_OK on success, error code otherwise.
    */
-  bool Publish(const Type &data) {
+  orb_err Publish(const Type &data) {
     if (!handle_._handle) {
-      orb_publisher_create_multi(&handle_, &meta, &instance_);
+      orb_err err = orb_publisher_create_multi(&handle_, &meta, &instance_);
+      if (err != ORB_OK) return err;
     }
 
-    return handle_._handle && orb_publisher_publish(&handle_, &data) == ORB_OK;
+    return orb_publisher_publish(&handle_, &data);
   }
 
   unsigned instance() const { return instance_; }
@@ -61,7 +63,7 @@ class PublicationMultiData : public PublicationMulti<meta> {
   const Type &data() const { return data_; }
 
   // Publishes the embedded struct.
-  bool Publish() { return PublicationMulti<meta>::Publish(data_); }
+  orb_err Publish() { return PublicationMulti<meta>::Publish(data_); }
 
  private:
   Type data_{};

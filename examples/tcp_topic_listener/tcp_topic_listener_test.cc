@@ -30,7 +30,7 @@ template <const orb_metadata &T>
 
     data.timestamp = orb_absolute_time_us();
 
-    if (!publication_data.Publish()) {
+    if (publication_data.Publish() != ORB_OK) {
       printf("Publish error\n");
     }
 
@@ -53,7 +53,7 @@ template <const orb_metadata &T>
     data.z += 3;
     data.temperature += 4;
 
-    if (!publication_data.Publish()) {
+    if (publication_data.Publish() != ORB_OK) {
       printf("Publish error\n");
     }
 

@@ -5,7 +5,6 @@
 
 #pragma once
 
-#include <errno.h>
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -17,17 +16,21 @@
 
 /**
  * Error codes for uORB operations.
+ *
+ * All error codes are negative so callers can test with `err < 0` or
+ * `err != ORB_OK`. They are intentionally not mapped to errno values
+ * to avoid namespace collisions with system errno.
  */
 typedef enum {
   ORB_OK = 0,
-  ORB_ERR_INVALID = EINVAL,
-  ORB_ERR_NO_MEM = ENOMEM,
-  ORB_ERR_BUSY = EBUSY,
-  ORB_ERR_EXIST = EEXIST,
-  ORB_ERR_NO_ENTRY = ENOENT,
-  ORB_ERR_TIMEOUT = ETIMEDOUT,
-  ORB_ERR_AGAIN = EAGAIN,
-  ORB_ERR_UNKNOWN = -1,
+  ORB_ERR_INVALID = -1,
+  ORB_ERR_NO_MEM = -2,
+  ORB_ERR_BUSY = -3,
+  ORB_ERR_EXIST = -4,
+  ORB_ERR_NO_ENTRY = -5,
+  ORB_ERR_TIMEOUT = -6,
+  ORB_ERR_AGAIN = -7,
+  ORB_ERR_UNKNOWN = -8,
 } orb_err;
 
 /**

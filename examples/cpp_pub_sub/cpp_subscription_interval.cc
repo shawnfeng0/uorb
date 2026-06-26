@@ -24,7 +24,7 @@ void publish_accel_samples() {
     sample.z = sample_index * 0.3f;
     sample.temperature = 25.0f + sample_index;
 
-    if (!publisher.Publish()) {
+    if (publisher.Publish() != ORB_OK) {
       printf("Publish sensor_accel failed\n");
       return;
     }

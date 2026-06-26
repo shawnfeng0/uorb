@@ -1,17 +1,16 @@
 #include "device_master.h"
 
-#include <cerrno>
 #include <new>
 
 #include "device_node.h"
 
 uorb::DeviceMaster uorb::DeviceMaster::instance_;
 
-uorb::DeviceNode *uorb::DeviceMaster::CreateAdvertiser(const orb_metadata &meta, unsigned int *instance) {
+orb_err uorb::DeviceMaster::CreateAdvertiser(const orb_metadata &meta, unsigned int *instance, DeviceNode **out) {
   const bool is_single_instance = !instance;
   const unsigned max_group_tries = is_single_instance ? 1 : ORB_MULTI_MAX_INSTANCES;
 
-  DeviceNode *device_node;
+  DeviceNode *device_node = nullptr;
   unsigned group_tries = 0;
 
   base::LockGuard<base::Mutex> lg(lock_);
@@ -30,8 +29,7 @@ uorb::DeviceNode *uorb::DeviceMaster::CreateAdvertiser(const orb_metadata &meta,
     if (!device_node) {
       device_node = new (std::nothrow) DeviceNode(meta, group_tries);
       if (!device_node) {
-        errno = ENOMEM;
-        return nullptr;
+        return ORB_ERR_NO_MEM;
       }
       device_node->add_publisher();
       node_list_.push_front(*device_node);
@@ -42,12 +40,12 @@ uorb::DeviceNode *uorb::DeviceMaster::CreateAdvertiser(const orb_metadata &meta,
 
   // All instances already exist
   if (group_tries >= max_group_tries) {
-    errno = EEXIST;
-    return nullptr;
+    return ORB_ERR_EXIST;
   }
 
   if (instance) *instance = group_tries;
-  return device_node;
+  *out = device_node;
+  return ORB_OK;
 }
 
 uorb::DeviceNode *uorb::DeviceMaster::GetDeviceNode(const orb_metadata &meta, uint8_t instance) const {
@@ -82,27 +80,25 @@ uorb::DeviceNode *uorb::DeviceMaster::GetDeviceNodeLocked(const orb_metadata &me
   return nullptr;
 }
 
-uorb::DeviceNode *uorb::DeviceMaster::OpenDeviceNode(const orb_metadata &meta, unsigned int instance) {
+orb_err uorb::DeviceMaster::OpenDeviceNode(const orb_metadata &meta, unsigned int instance, DeviceNode **out) {
   if (instance >= ORB_MULTI_MAX_INSTANCES) {
-    errno = EINVAL;
-    return nullptr;
+    return ORB_ERR_INVALID;
   }
 
   base::LockGuard<base::Mutex> lg(lock_);
 
   DeviceNode *device_node = GetDeviceNodeLocked(meta, instance);
   if (device_node) {
-    return device_node;
+    *out = device_node;
+    return ORB_OK;
   }
 
   device_node = new (std::nothrow) DeviceNode(meta, instance);
-
   if (!device_node) {
-    errno = ENOMEM;
-    return nullptr;
+    return ORB_ERR_NO_MEM;
   }
 
   node_list_.push_front(*device_node);
-
-  return device_node;  // Create new device
+  *out = device_node;
+  return ORB_OK;
 }

@@ -21,7 +21,7 @@ void publish_instance(const char *label) {
     snprintf(reinterpret_cast<char *>(message.str), example_string_s::STRING_LENGTH,
              "%s message %d", label, message_index);
 
-    if (!publisher.Publish()) {
+    if (publisher.Publish() != ORB_OK) {
       printf("Publish %s failed\n", label );
       return;
     }

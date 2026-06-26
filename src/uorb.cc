@@ -5,7 +5,6 @@
 
 #include <uorb/uorb.h>
 
-#include <cerrno>
 #include <new>
 
 #include "device_master.h"
@@ -57,11 +56,10 @@ orb_err orb_publisher_create_multi(orb_publisher_t *pub, const struct orb_metada
   }
   auto &meta_ = *meta;
   auto &device_master = DeviceMaster::get_instance();
-  auto *dev_ = device_master.CreateAdvertiser(meta_, instance);
-  if (!dev_) {
-    return errno == EEXIST ? ORB_ERR_EXIST
-         : errno == ENOMEM ? ORB_ERR_NO_MEM
-         : ORB_ERR_UNKNOWN;
+  DeviceNode *dev_ = nullptr;
+  orb_err err = device_master.CreateAdvertiser(meta_, instance, &dev_);
+  if (err != ORB_OK) {
+    return err;
   }
 
   pub->_handle = reinterpret_cast<void *>(dev_);
@@ -96,9 +94,10 @@ orb_err orb_publisher_publish_once(const struct orb_metadata *meta, const void *
   }
 
   auto &device_master = DeviceMaster::get_instance();
-  auto *dev = device_master.OpenDeviceNode(*meta, 0);
-  if (!dev) {
-    return ORB_ERR_UNKNOWN;
+  DeviceNode *dev = nullptr;
+  orb_err err = device_master.OpenDeviceNode(*meta, 0, &dev);
+  if (err != ORB_OK) {
+    return err;
   }
 
   dev->mark_untracked_publisher();
@@ -116,11 +115,10 @@ orb_err orb_subscriber_create_multi(orb_subscriber_t *sub, const struct orb_meta
 
   DeviceMaster &device_master = uorb::DeviceMaster::get_instance();
 
-  auto *dev = device_master.OpenDeviceNode(*meta, instance);
-  if (!dev) {
-    return errno == EINVAL ? ORB_ERR_INVALID
-         : errno == ENOMEM ? ORB_ERR_NO_MEM
-         : ORB_ERR_UNKNOWN;
+  DeviceNode *dev = nullptr;
+  orb_err err = device_master.OpenDeviceNode(*meta, instance, &dev);
+  if (err != ORB_OK) {
+    return err;
   }
 
   auto *subscriber = new (std::nothrow) ReceiverLocal(*dev);
@@ -164,9 +162,10 @@ orb_err orb_subscriber_copy_once(const struct orb_metadata *meta, void *buffer) 
   }
 
   auto &device_master = DeviceMaster::get_instance();
-  auto *dev = device_master.OpenDeviceNode(*meta, 0);
-  if (!dev) {
-    return ORB_ERR_UNKNOWN;
+  DeviceNode *dev = nullptr;
+  orb_err err = device_master.OpenDeviceNode(*meta, 0, &dev);
+  if (err != ORB_OK) {
+    return err;
   }
 
   dev->mark_untracked_subscriber();
@@ -218,7 +217,6 @@ orb_err orb_subscriber_clear_callback(orb_subscriber_t *sub) {
 
 bool orb_exists(const struct orb_metadata *meta, unsigned int instance) {
   if (!meta) {
-    errno = EINVAL;
     return false;
   }
 
@@ -228,7 +226,6 @@ bool orb_exists(const struct orb_metadata *meta, unsigned int instance) {
 
 unsigned int orb_group_count(const struct orb_metadata *meta) {
   if (!meta) {
-    errno = EINVAL;
     return 0;
   }
 

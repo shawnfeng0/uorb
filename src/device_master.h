@@ -29,12 +29,12 @@ class uorb::DeviceMaster {
    * (0-based) of the publication. This is an output parameter and will be set
    * to the newly created instance, ie. 0 for the first advertiser, 1 for the
    * next and so on. If it is nullptr, it will only be created at 0.
-   * @return nullptr on error and set errno. Otherwise returns a DeviceNode that
-   * can be used to publish to the topic.
+   * @param out Output parameter for the DeviceNode handle on success.
+   * @return ORB_OK on success, error code otherwise.
    */
-  DeviceNode *CreateAdvertiser(const orb_metadata &meta, unsigned int *instance);
+  orb_err CreateAdvertiser(const orb_metadata &meta, unsigned int *instance, DeviceNode **out);
 
-  DeviceNode *OpenDeviceNode(const orb_metadata &meta, unsigned int instance);
+  orb_err OpenDeviceNode(const orb_metadata &meta, unsigned int instance, DeviceNode **out);
   bool TopicExists(const orb_metadata &meta, uint8_t instance) const;
   bool GetTopicStatus(const orb_metadata &meta, uint8_t instance, orb_status *status) const;
 

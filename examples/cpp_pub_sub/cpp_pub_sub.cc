@@ -25,7 +25,7 @@ void *thread_publisher(void *unused) {
              example_string_s::STRING_LENGTH, "%d: %s", i,
              "This is a string message.");
 
-    if (!pub_example_string.Publish()) {
+    if (pub_example_string.Publish() != ORB_OK) {
       printf("Publish error\n");
     }
 

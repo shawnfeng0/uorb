@@ -142,13 +142,8 @@ TEST_F(UnitTest, rejects_null_arguments) {
 
   EXPECT_FALSE(orb_subscriber_check_update(nullptr));
 
-  errno = 0;
   EXPECT_FALSE(orb_exists(nullptr, 0));
-  EXPECT_EQ(errno, EINVAL);
-
-  errno = 0;
   EXPECT_EQ(orb_group_count(nullptr), 0U);
-  EXPECT_EQ(errno, EINVAL);
 
   EXPECT_EQ(orb_get_topic_status(nullptr, 0, nullptr), ORB_ERR_INVALID);
 
@@ -1102,7 +1097,7 @@ TEST_F(UnitTest, publication_multi_wrapper_publishes_and_reports_instance) {
   // --- PublicationMultiData with embedded message storage ---
   uorb::PublicationMultiData<uorb::msg::orb_test_medium> pub_data;
   pub_data.data().val = 42;
-  ASSERT_TRUE(pub_data.Publish());
+  ASSERT_EQ(pub_data.Publish(), ORB_OK);
   ASSERT_LE(pub_data.instance(), ORB_MULTI_MAX_INSTANCES - 1);
 
   // Subscribe to the same instance and verify end-to-end delivery.
@@ -1117,7 +1112,7 @@ TEST_F(UnitTest, publication_multi_wrapper_publishes_and_reports_instance) {
   orb_subscriber_check_and_copy(&sub_data, &recv);
 
   pub_data.data().val = 4242;
-  ASSERT_TRUE(pub_data.Publish());
+  ASSERT_EQ(pub_data.Publish(), ORB_OK);
   ASSERT_TRUE(orb_subscriber_check_update(&sub_data));
   ASSERT_EQ(orb_subscriber_copy(&sub_data, &recv), ORB_OK);
   EXPECT_EQ(recv.val, 4242);
@@ -1127,7 +1122,7 @@ TEST_F(UnitTest, publication_multi_wrapper_publishes_and_reports_instance) {
   uorb::PublicationMulti<uorb::msg::orb_test_medium> pub_ext;
   orb_test_medium_s ext{};
   ext.val = 99;
-  ASSERT_TRUE(pub_ext.Publish(ext));
+  ASSERT_EQ(pub_ext.Publish(ext), ORB_OK);
   ASSERT_LE(pub_ext.instance(), ORB_MULTI_MAX_INSTANCES - 1);
 
   orb_subscriber_t sub_ext = ORB_SUBSCRIBER_INITIALIZER;
@@ -1140,7 +1135,7 @@ TEST_F(UnitTest, publication_multi_wrapper_publishes_and_reports_instance) {
   orb_subscriber_check_and_copy(&sub_ext, &recv);
 
   ext.val = 9999;
-  ASSERT_TRUE(pub_ext.Publish(ext));
+  ASSERT_EQ(pub_ext.Publish(ext), ORB_OK);
   ASSERT_TRUE(orb_subscriber_check_update(&sub_ext));
   ASSERT_EQ(orb_subscriber_copy(&sub_ext, &recv), ORB_OK);
   EXPECT_EQ(recv.val, 9999);
