@@ -191,11 +191,11 @@ TEST(UorbUeventTest, SetCallbackReceivesPublish) {
   }
 
   std::atomic<int> callback_count{0};
-  auto cb = [](void *ctx) {
-    static_cast<std::atomic<int> *>(ctx)->fetch_add(1);
+  auto cb = [](const void *, orb_callback_ctx ctx) {
+    static_cast<std::atomic<int> *>(ctx.ptr)->fetch_add(1);
   };
 
-  ASSERT_EQ(orb_subscriber_set_callback(&sub, cb, &callback_count), ORB_OK);
+  ASSERT_EQ(orb_subscriber_set_callback(&sub, cb, orb_callback_ctx{&callback_count}), ORB_OK);
 
   orb_test_s msg{};
   callback_count = 0;
@@ -216,14 +216,14 @@ TEST(UorbUeventTest, SetCallbackTwiceFails) {
   EXPECT_EQ(orb_subscriber_create(&sub, ORB_ID(orb_test)), ORB_OK);
   ASSERT_NE(sub._handle, nullptr);
 
-  auto cb = [](void *) {};
-  ASSERT_EQ(orb_subscriber_set_callback(&sub, cb, nullptr), ORB_OK);
+  auto cb = [](const void *, orb_callback_ctx) {};
+  ASSERT_EQ(orb_subscriber_set_callback(&sub, cb, {}), ORB_OK);
 
-  EXPECT_EQ(orb_subscriber_set_callback(&sub, cb, nullptr), ORB_ERR_BUSY);
+  EXPECT_EQ(orb_subscriber_set_callback(&sub, cb, {}), ORB_ERR_BUSY);
 
   ASSERT_EQ(orb_subscriber_clear_callback(&sub), ORB_OK);
   // Now should work again
-  ASSERT_EQ(orb_subscriber_set_callback(&sub, cb, nullptr), ORB_OK);
+  ASSERT_EQ(orb_subscriber_set_callback(&sub, cb, {}), ORB_OK);
   ASSERT_EQ(orb_subscriber_clear_callback(&sub), ORB_OK);
 
   EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
@@ -336,11 +336,11 @@ TEST(UorbUeventTest, CallbackTriggeredFromPublisherThread) {
   for (int i = 0; i < 8 && orb_subscriber_check_update(&sub); ++i) orb_subscriber_copy(&sub, &drain);
 
   std::atomic<int> callback_count{0};
-  auto cb = [](void *ctx) {
-    static_cast<std::atomic<int> *>(ctx)->fetch_add(1, std::memory_order_relaxed);
+  auto cb = [](const void *, orb_callback_ctx ctx) {
+    static_cast<std::atomic<int> *>(ctx.ptr)->fetch_add(1, std::memory_order_relaxed);
   };
 
-  ASSERT_EQ(orb_subscriber_set_callback(&sub, cb, &callback_count), ORB_OK);
+  ASSERT_EQ(orb_subscriber_set_callback(&sub, cb, orb_callback_ctx{&callback_count}), ORB_OK);
 
   // Publish from another thread
   std::thread publisher([&]() {
@@ -612,8 +612,8 @@ TEST(UorbUeventTest, SetCallbackThenCreateSource) {
   ASSERT_NE(sub._handle, nullptr);
 
   // Set a callback on the subscriber manually.
-  auto cb = [](void *) {};
-  ASSERT_EQ(orb_subscriber_set_callback(&sub, cb, nullptr), ORB_OK);
+  auto cb = [](const void *, orb_callback_ctx) {};
+  ASSERT_EQ(orb_subscriber_set_callback(&sub, cb, {}), ORB_OK);
 
   // Creating the source should still succeed — it just copies the handle.
   uevent_source_t src = UEVENT_SOURCE_INITIALIZER;

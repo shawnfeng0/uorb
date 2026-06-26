@@ -94,7 +94,7 @@ bool uorb::DeviceNode::Publish(const void *data) {
   {
     base::LockGuard<base::Mutex> lg(callback_lock_);
     for (auto &entry : receiver_list_) {
-      entry.on_publish(entry.ctx);
+      entry.on_publish(data, entry.ctx);
     }
   }
 

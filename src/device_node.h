@@ -18,7 +18,7 @@ namespace detail {
 // Function-pointer based callback entry for DeviceNode's publish notification.
 // Replaces the old virtual ReceiverBase — simpler, no inheritance needed.
 struct CallbackEntry {
-  void (*on_publish)(void *ctx);
+  void (*on_publish)(const void *msg, void *ctx);
   void *ctx;
   intrusive_list::forward_list_node node{};
 };

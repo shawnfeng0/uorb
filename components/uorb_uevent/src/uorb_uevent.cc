@@ -20,14 +20,15 @@ static bool bridge_is_ready(void *ctx) {
   return orb_subscriber_check_update(&bridge->sub);
 }
 
-static void bridge_on_publish(void *ctx) {
-  auto *bridge = static_cast<UorbEventBridge *>(ctx);
+static void bridge_on_publish(const void *, orb_callback_ctx ctx) {
+  auto *bridge = static_cast<UorbEventBridge *>(ctx.ptr);
   uevent_source_notify(&bridge->source);
 }
 
 static bool bridge_register(void *ctx) {
   auto *bridge = static_cast<UorbEventBridge *>(ctx);
-  return orb_subscriber_set_callback(&bridge->sub, bridge_on_publish, bridge) == ORB_OK;
+  return orb_subscriber_set_callback(&bridge->sub, bridge_on_publish,
+                                     orb_callback_ctx{bridge}) == ORB_OK;
 }
 
 static bool bridge_unregister(void *ctx) {

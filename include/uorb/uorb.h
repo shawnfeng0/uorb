@@ -389,6 +389,16 @@ orb_err orb_subscriber_copy_once(const struct orb_metadata *meta, void *buffer);
 bool orb_subscriber_check_update(orb_subscriber_t *sub);
 
 /**
+ * Callback context union, similar to POSIX union sigval.
+ * The caller chooses whether to pass a pointer or an integer.
+ */
+typedef union {
+  void *ptr;
+  uint32_t u32;
+  uint64_t u64;
+} orb_callback_ctx;
+
+/**
  * Callback type for publish notifications.
  *
  * Invoked when new data is published to the subscription's topic.
@@ -400,9 +410,10 @@ bool orb_subscriber_check_update(orb_subscriber_t *sub);
  * Do not call orb_publisher_publish() on the same topic from the callback, as
  * this would acquire data_lock_ and then callback_lock_ in the same thread.
  *
- * @param ctx user context pointer passed to orb_subscriber_set_callback()
+ * @param msg pointer to the published message data (valid during the callback)
+ * @param ctx user context passed to orb_subscriber_set_callback()
  */
-typedef void (*orb_subscriber_callback_fn)(void *ctx);
+typedef void (*orb_subscriber_callback_fn)(const void *msg, orb_callback_ctx ctx);
 
 /**
  * Register a callback to be invoked when new data is published.
@@ -413,10 +424,11 @@ typedef void (*orb_subscriber_callback_fn)(void *ctx);
  *
  * @param sub subscription handle
  * @param cb  callback function
- * @param ctx user context pointer passed to cb
+ * @param ctx user context (pointer or integer) passed to cb
  * @return ORB_OK on success, error code otherwise
  */
-orb_err orb_subscriber_set_callback(orb_subscriber_t *sub, orb_subscriber_callback_fn cb, void *ctx);
+orb_err orb_subscriber_set_callback(orb_subscriber_t *sub, orb_subscriber_callback_fn cb,
+                                    orb_callback_ctx ctx);
 
 /**
  * Remove a previously registered publish callback.

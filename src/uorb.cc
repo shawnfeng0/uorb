@@ -19,17 +19,17 @@ struct ReceiverLocal {
   DeviceNode &dev;
   unsigned last_generation;
   orb_subscriber_callback_fn publish_cb;
-  void *publish_cb_ctx;
+  orb_callback_ctx publish_cb_ctx;
   detail::CallbackEntry callback_entry;
 
   explicit ReceiverLocal(DeviceNode &device_node) : dev(device_node) {
     last_generation = device_node.initial_generation();
     device_node.add_subscriber();
     publish_cb = nullptr;
-    publish_cb_ctx = nullptr;
-    callback_entry.on_publish = [](void *ctx) {
+    publish_cb_ctx = {};
+    callback_entry.on_publish = [](const void *msg, void *ctx) {
       auto *self = static_cast<ReceiverLocal *>(ctx);
-      if (self->publish_cb) self->publish_cb(self->publish_cb_ctx);
+      if (self->publish_cb) self->publish_cb(msg, self->publish_cb_ctx);
     };
     callback_entry.ctx = this;
   }
@@ -183,7 +183,8 @@ bool orb_subscriber_check_update(orb_subscriber_t *sub) {
   return r.updates_available() > 0;
 }
 
-orb_err orb_subscriber_set_callback(orb_subscriber_t *sub, orb_subscriber_callback_fn cb, void *ctx) {
+orb_err orb_subscriber_set_callback(orb_subscriber_t *sub, orb_subscriber_callback_fn cb,
+                                    orb_callback_ctx ctx) {
   if (!sub || !sub->_handle) {
     return ORB_ERR_INVALID;
   }
@@ -195,7 +196,7 @@ orb_err orb_subscriber_set_callback(orb_subscriber_t *sub, orb_subscriber_callba
   r->publish_cb_ctx = ctx;
   if (!r->dev.RegisterCallback(&r->callback_entry)) {
     r->publish_cb = nullptr;
-    r->publish_cb_ctx = nullptr;
+    r->publish_cb_ctx = {};
     return ORB_ERR_UNKNOWN;
   }
   return ORB_OK;
@@ -210,7 +211,7 @@ orb_err orb_subscriber_clear_callback(orb_subscriber_t *sub) {
   bool ok = r->dev.UnregisterCallback(&r->callback_entry);
   if (ok) {
     r->publish_cb = nullptr;
-    r->publish_cb_ctx = nullptr;
+    r->publish_cb_ctx = {};
   }
   return ok ? ORB_OK : ORB_ERR_UNKNOWN;
 }
