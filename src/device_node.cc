@@ -37,13 +37,17 @@ uorb::DeviceNode::DeviceNode(const struct orb_metadata &meta, uint8_t instance)
 uorb::DeviceNode::~DeviceNode() { delete[] data_; }
 
 bool uorb::DeviceNode::Copy(void *dst, unsigned *sub_generation_ptr) const {
-  if (!dst || !sub_generation_ptr || !data_) {
+  if (!dst || !sub_generation_ptr) {
     return false;
   }
 
   auto &sub_generation = *sub_generation_ptr;
 
   base::LockGuard<base::Mutex> lg(data_lock_);
+
+  if (!data_) {
+    return false;
+  }
 
   // If queue_size is 4 and cur_generation is 10, then 6, 7, 8, 9 are in the
   // range, and others are not.

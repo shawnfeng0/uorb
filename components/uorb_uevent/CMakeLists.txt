@@ -18,6 +18,3 @@ target_link_libraries(uorb_uevent
         uevent
         uorb
 )
-
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)

@@ -220,7 +220,7 @@ orb_err orb_subscriber_clear_callback(orb_subscriber_t *sub) {
 }
 
 bool orb_exists(const struct orb_metadata *meta, unsigned int instance) {
-  if (!meta) {
+  if (!meta || instance >= ORB_MULTI_MAX_INSTANCES) {
     return false;
   }
 
@@ -244,7 +244,7 @@ unsigned int orb_group_count(const struct orb_metadata *meta) {
 }
 
 orb_err orb_get_topic_status(const struct orb_metadata *meta, unsigned int instance, struct orb_status *status) {
-  if (!meta || !status) {
+  if (!meta || !status || instance >= ORB_MULTI_MAX_INSTANCES) {
     return ORB_ERR_INVALID;
   }
 

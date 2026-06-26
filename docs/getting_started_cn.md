@@ -260,43 +260,32 @@ printf("timestamp: %" PRIu64 "[us], Receive msg: \"%s\"\n", data.timestamp,
 #include "uorb_uevent/uorb_uevent.h"
 ```
 
-### 两种注册回调的方式
+### 注册回调
 
-1. **由 `EventLoop` 拥有订阅**：使用 `Subscribe<Topic>(callback)`，`EventLoop` 内部创建并持有订阅，析构时自动释放。
+使用 `Subscribe<Topic>(callback)`，`EventLoop` 内部创建并持有订阅，析构时自动释放。
 
-   ```c++
-   uorb::EventLoop loop;
-   loop.Subscribe<uorb::msg::example_string>(
-       [](const example_string_s &msg) {
-         // 处理消息
-       });
-   ```
-
-2. **由调用者拥有订阅**：自己定义 `uorb::SubscriptionData`，再用 `AddSubscription(sub, cb)` 注册。调用者必须保证订阅对象的生命周期长于 `EventLoop`，或在 `EventLoop` 析构前调用 `RemoveSubscription(sub)`。
-
-   ```c++
-   uorb::SubscriptionData<uorb::msg::sensor_accel> sub_accel;
-   loop.AddSubscription(sub_accel, [](const sensor_accel_s &msg) {
-     // 处理消息
-   });
-   // ... 稍后 ...
-   loop.RemoveSubscription(sub_accel);
-   ```
+```c++
+uorb::EventLoop loop;
+loop.Subscribe<uorb::msg::example_string>(
+    [](const example_string_s &msg) {
+      // 处理消息
+    });
+```
 
 ### 驱动事件循环
 
 * `RunOnce(timeout_ms)`：阻塞至多 `timeout_ms` 毫秒，分发已就绪的回调一次；`timeout_ms = -1` 表示一直阻塞到有事件或 `Quit()` 被调用。返回本次分发的事件数；发生错误或 `Quit()` 被调用时返回 `-1`；如果当前没有任何已注册的订阅则返回 `0`。
 * `Run()`：循环调用 `RunOnce(-1)`，直到 `Quit()` 被调用（返回 `true`）或出现错误 / 没有已注册的订阅（返回 `false`）。
-* `Quit()`：**线程安全**，可以在任意线程调用，用于请求事件循环退出。`Quit()` 是"粘性"的——一旦调用，后续 `RunOnce()` 会立即返回 `-1`，`EventLoop` 不能被重启。
+* `Quit()`：**线程安全**，可以在任意线程调用，用于请求事件循环退出。`Quit()` 不是永久性的——`Run()` 在每次开始时会重置退出标志，因此可以在 `Quit()` 之后再次调用 `Run()` 重启事件循环。
 
 ### 线程模型
 
 * `Quit()` 可以在任意线程调用。
-* 其它成员函数（`AddSubscription` / `RemoveSubscription` / `Subscribe` / `RunOnce` / `Run`）必须在同一个线程（通常是运行事件循环的线程）调用。
+* 其它成员函数（`Subscribe` / `RunOnce` / `Run`）必须在同一个线程（通常是运行事件循环的线程）调用。
 
 ### 完整示例
 
-完整示例见 [examples/cpp_pub_sub/cpp_pub_sub_event_loop.cc](../examples/cpp_pub_sub/cpp_pub_sub_event_loop.cc)，演示了 loop 持有的 `Subscribe<>()`、调用方持有的 `AddSubscription()`、多线程发布以及跨线程 `Quit()`。
+完整示例见 [examples/cpp_pub_sub/cpp_pub_sub_event_loop.cc](../examples/cpp_pub_sub/cpp_pub_sub_event_loop.cc)，演示了 `Subscribe<>()`、多线程发布以及跨线程 `Quit()`。
 
 ## 其它示例
 

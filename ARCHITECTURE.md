@@ -29,10 +29,10 @@ The library is organized into three independent components:
 
 ┌─────────────────────────────────────────────────────────┐
 │            uorb_uevent (Bridge Library)                  │
-│  ┌─────────────────────────────────────────────────┐     │
-│  │  EventLoop (C++ wrapper)                        │     │
-│  │  uorb_subscriber_create_source() (C API)          │     │
-│  └─────────────────────────────────────────────────┘     │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │  EventLoop (C++ wrapper)                        │    │
+│  │  uorb_subscriber_create_source() (C API)       │    │
+│  └─────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -149,15 +149,15 @@ class EventLoop {
     ┌─────────┐     ┌─────────┐
     │  uorb   │     │ uevent  │
     │ (Core   │     │ (Event  │
-    │  pub/sub)│    │  loop)  │
+    │ pub/sub)│     │  loop)  │
     └────┬────┘     └────┬────┘
          │               │
          │               │
          └───────┬───────┘
                  │
-            ┌────┴──────┐
+            ┌────┴───────┐
             │uorb_uevent │  (Bridge library)
-            └───────────┘
+            └────────────┘
 ```
 
 **Key principles:**
@@ -316,7 +316,7 @@ uevent_destroy(&base);
 uorb::EventLoop loop;
 
 // Subscribe to a topic with a callback
-loop.Subscribe<ORB_ID(orb_test)>([](const orb_test_t &msg) {
+loop.Subscribe<uorb::msg::orb_test>([](const orb_test_s &msg) {
     printf("Received: %d\n", msg.val);
 });
 
