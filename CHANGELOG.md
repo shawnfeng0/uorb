@@ -11,7 +11,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Add `orb_callback_ctx` union type for callback context (supports `void*`, `uint32_t`, `uint64_t`), similar to POSIX `union sigval`.
 - Pass published message pointer to subscriber callbacks via `on_publish(msg, ctx)`.
-- Add notification drain mechanism in `EventSource` to prevent use-after-free during `EventPoll` destruction.
+- Add notification drain mechanism in `EventSource` (mutex-protected) to prevent use-after-free during `EventPoll` destruction.
 - Expand test coverage with edge-case and stress tests across all components.
 
 ### Changed

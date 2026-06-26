@@ -2,7 +2,7 @@
 
 #include <atomic>
 #include <cerrno>
-#include <thread>
+#include <mutex>
 
 namespace uevent {
 
@@ -45,16 +45,14 @@ class EventSource {
     return true;
   }
 
-  // Clear wakeup_ and drain any in-flight notify_waiters() calls.
-  // After this returns, no thread is executing or will execute NotifyReady
-  // through this source, so the EventPoll can be safely freed.
-  // Must be called OUTSIDE EventPoll::mu_ — NotifyReady acquires mu_
-  // and would deadlock if called while mu_ is held.
+  // Clear wakeup_ under notify_mu_. Blocks until any in-flight
+  // notify_waiters() call completes, then sets wakeup_ to nullptr.
+  // Must be called OUTSIDE EventPoll::mu_ — notify_waiters() calls
+  // NotifyReady which acquires mu_, causing AB-BA deadlock if
+  // called while mu_ is held.
   void ClearWakeup() {
+    std::lock_guard<std::mutex> lk(notify_mu_);
     wakeup_.store(nullptr, std::memory_order_release);
-    while (notify_count_.load(std::memory_order_acquire) > 0) {
-      std::this_thread::yield();
-    }
   }
 
   // Called when the source is removed from an EventPoll. Override to perform
@@ -75,8 +73,8 @@ class EventSource {
   void notify_waiters();
 
  private:
+  std::mutex notify_mu_;                 // serializes notify_waiters() vs ClearWakeup()
   std::atomic<EventPoll *> wakeup_{nullptr};
-  std::atomic<int> notify_count_{0};  // in-flight notify_waiters() calls
 };
 
 }  // namespace uevent
