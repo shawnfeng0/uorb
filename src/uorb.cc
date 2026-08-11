@@ -47,6 +47,10 @@ struct ReceiverLocal {
 #endif
 
 orb_err orb_publisher_create(orb_publisher_t *pub, const struct orb_metadata *meta) {
+  static_assert(sizeof(orb_publisher_t) == sizeof(void *),
+                "orb_publisher_t must have same layout as void*");
+  static_assert(sizeof(orb_subscriber_t) == sizeof(void *),
+                "orb_subscriber_t must have same layout as void*");
   return orb_publisher_create_multi(pub, meta, nullptr);
 }
 

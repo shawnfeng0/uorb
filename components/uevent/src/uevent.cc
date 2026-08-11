@@ -61,6 +61,8 @@ class CEventSource final : public uevent::EventSource {
 // ---- C API implementation ----
 
 int uevent_create(uevent_t *ev) {
+  static_assert(sizeof(uevent_t) == sizeof(void *),
+                "uevent_t must have same layout as void* for handle wrapper safety");
   if (!ev) {
     errno = EINVAL;
     return -1;
