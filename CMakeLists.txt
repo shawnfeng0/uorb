@@ -38,6 +38,7 @@ target_link_libraries(uorb PRIVATE pthread)
 # =============================================================================
 add_subdirectory(components/uevent)
 add_subdirectory(components/uorb_uevent)
+add_subdirectory(components/px4_compat)
 
 # =============================================================================
 # Install (disabled for embedded builds)
@@ -77,4 +78,7 @@ if (UORB_BUILD_TESTS)
 
     # uorb_uevent bridge tests
     add_subdirectory(components/uorb_uevent/tests)
+
+    # PX4-compatible API shim tests
+    add_subdirectory(components/px4_compat/tests)
 endif ()
