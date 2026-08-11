@@ -28,6 +28,41 @@ The main difference lies in the implementation of the bottom layer, and the appl
 | ~~int orb_get_interval(int handle, unsigned \*interval)~~    |                                                              |
 | int px4_poll(**px4_pollfd_struct_t** \*fds, unsigned int nfds, int timeout) | uevent_* APIs (`uevent_create`, `uevent_add`, `uevent_loop`, etc.) |
 
+## PX4-compatible API shim (`uorb_px4_compat`)
+
+For users migrating from PX4's uORB, a standalone compatibility layer is
+provided in `components/px4_compat/`.  Link against the CMake target
+`uorb_px4_compat` and include `<uorb_compat/px4_compat.h>` to use the
+familiar PX4-style C API without changing your application code.
+
+The shim maps the PX4 API surface directly onto the native uORB API:
+
+| PX4 uORB                                                                    | uorb_px4_compat shim                                        |
+| :-------------------------------------------------------------------------- | :---------------------------------------------------------- |
+| `orb_advert_t orb_advertise(meta, data)`                                    | ✅ provided                                                 |
+| `orb_advert_t orb_advertise_queue(meta, data, queue_size)`                  | ✅ provided (queue_size ignored — set in ORB_DEFINE)        |
+| `orb_advert_t orb_advertise_multi(meta, data, instance)`                    | ✅ provided                                                 |
+| `orb_advert_t orb_advertise_multi_queue(meta, data, instance, queue_size)`  | ✅ provided (queue_size ignored)                            |
+| `int orb_publish(meta, handle, data)`                                       | ✅ provided                                                 |
+| `int orb_unadvertise(handle)`                                               | ✅ provided                                                 |
+| `int orb_subscribe(meta)`                                                   | ✅ provided (returns int fd)                                |
+| `int orb_subscribe_multi(meta, instance)`                                   | ✅ provided (returns int fd)                                |
+| `int orb_unsubscribe(fd)`                                                   | ✅ provided                                                 |
+| `int orb_copy(meta, fd, buffer)`                                            | ✅ provided                                                 |
+| `int orb_check(fd, &updated)`                                               | ✅ provided                                                 |
+| `int orb_set_interval(fd, interval_ms)`                                     | ✅ stored (throttling not enforced by core library)         |
+| `int orb_get_interval(fd, &interval_ms)`                                    | ✅ provided                                                 |
+| `int px4_poll(fds, nfds, timeout_ms)`                                       | ✅ provided (condvar-based; uORB fds only, not OS fds)      |
+
+**Limitations:**
+- `px4_pollfd_struct_t::fd` values are internal handles managed by the shim.
+  They are *not* OS-level file descriptors and cannot be mixed with real fds
+  in a POSIX `poll()` call.
+- `orb_set_interval()` stores the value but the core library does not enforce
+  message throttling; callers must gate copies themselves.
+- At most `ORB_PX4_COMPAT_MAX_SUBSCRIBERS` (default 128) concurrent
+  subscriptions are supported.
+
 ## Difference in implementation
 
 * Delete the ``o_id ``(``ORB_ID enum``) field in ``orb_metadata``. This field has no meaning and is very redundant. It is newly added in PX4-v1.11. 

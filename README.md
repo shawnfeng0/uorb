@@ -41,6 +41,8 @@ pip3 install -r tools/msg/tools/requirements.txt
 * [Getting Started Guide](docs/getting_started.md)
 * Public C API: [include/uorb/uorb.h](include/uorb/uorb.h)
 * C++ wrappers: [include/uorb](include/uorb)
+* PX4-compatible API shim: [components/px4_compat](components/px4_compat)
+* [Comparison with PX4 uORB (and compat shim)](docs/comparison_with_px4_uorb.md)
 * [Changelog](CHANGELOG.md)
 
 ## Examples
