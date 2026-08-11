@@ -68,6 +68,9 @@ class EventSource {
     return wakeup_.load(std::memory_order_acquire) == poll;
   }
 
+  bool in_ready_queue() const { return in_ready_queue_; }
+  void set_in_ready_queue(bool v) { in_ready_queue_ = v; }
+
   virtual bool is_ready() const = 0;
 
   // Wake the EventPoll blocked in Wait(). Call this from the event-producing
@@ -81,6 +84,7 @@ class EventSource {
 #endif
   ;  // serializes notify_waiters() vs ClearWakeup()
   std::atomic<EventPoll *> wakeup_{nullptr};
+  bool in_ready_queue_{false};
 };
 
 }  // namespace uevent

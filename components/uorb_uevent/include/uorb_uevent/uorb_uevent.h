@@ -95,10 +95,12 @@ class EventLoop {
     }
 
     auto dispatch = [sub, cb = std::forward<Callback>(cb)]() mutable {
-      using MsgType = typename msg::TypeMap<meta>::type;
-      MsgType msg;
-      if (orb_subscriber_copy(&sub, &msg) == ORB_OK) {
-        cb(msg);
+      if (orb_subscriber_check_update(&sub)) {
+        using MsgType = typename msg::TypeMap<meta>::type;
+        MsgType msg;
+        if (orb_subscriber_copy(&sub, &msg) == ORB_OK) {
+          cb(msg);
+        }
       }
     };
 

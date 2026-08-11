@@ -9,8 +9,11 @@
 namespace uevent {
 
 void EventSource::notify_waiters() {
+  if (!wakeup_.load(std::memory_order_acquire)) {
+    return;
+  }
   pthread_mutex_lock(&notify_mu_);
-  auto *poll = wakeup_.load(std::memory_order_acquire);
+  auto *poll = wakeup_.load(std::memory_order_relaxed);
   if (poll) poll->NotifyReady(this);
   pthread_mutex_unlock(&notify_mu_);
 }

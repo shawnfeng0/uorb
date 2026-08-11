@@ -51,11 +51,20 @@ static void print_result(const char *name, int threads, long long ops,
   printf("%-40s %10d %10.3f\n", name, threads, mops);
 }
 
-static void print_ready_hint(int width, long long loops, long long ready_total) {
+static void print_ready_hint(int width, long long loops, long long ready_total, double ms = 0.0) {
   if (g_csv_output || loops <= 0) return;
   const double avg_ready = static_cast<double>(ready_total) /
                            static_cast<double>(loops);
-  printf("  -> width=%d, avg_ready_per_loop=%.2f\n", width, avg_ready);
+  const double drain_ratio = (static_cast<double>(width) > 0)
+                                 ? (avg_ready / static_cast<double>(width)) * 100.0
+                                 : 0.0;
+  if (ms > 0.0 && ready_total > 0) {
+    const double ns_per_event = (ms * 1e6) / static_cast<double>(ready_total);
+    printf("  -> width=%d, avg_ready_per_loop=%.2f, drain_ratio=%.1f%%, queue_maint_cost=%.1f ns/event\n",
+           width, avg_ready, drain_ratio, ns_per_event);
+  } else {
+    printf("  -> width=%d, avg_ready_per_loop=%.2f\n", width, avg_ready);
+  }
 }
 
 static bool mode_enabled(const char *selected_mode, const char *mode) {
@@ -250,8 +259,9 @@ static void run_uevent_poll_many_subs(
     }
   }
 
-  print_result(label, num_subs, loops, elapsed_ms(t0));
-  print_ready_hint(num_subs, loops, ready_total);
+  const double ms = elapsed_ms(t0);
+  print_result(label, num_subs, loops, ms);
+  print_ready_hint(num_subs, loops, ready_total, ms);
 
   for (size_t i = 0; i < num_subs; ++i) {
     uevent_remove(&poll, &sources[i]);

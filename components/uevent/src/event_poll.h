@@ -6,15 +6,83 @@
 #include <uevent/uevent_source.h>
 
 #include <errno.h>
+#include <algorithm>
 #include <atomic>
 #include <list>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "base/mutex.h"
 #include "base/condition_variable.h"
 
 namespace uevent {
+
+class RingBuffer {
+ public:
+  void Reserve(size_t capacity) {
+    if (capacity <= capacity_) return;
+    size_t new_cap = 16;
+    while (new_cap < capacity) new_cap <<= 1;
+
+    std::vector<EventSource *> new_buf(new_cap, nullptr);
+    size_t count = size();
+    if (capacity_ > 0) {
+      size_t mask = capacity_ - 1;
+      for (size_t i = 0; i < count; ++i) {
+        new_buf[i] = buf_[(head_ + i) & mask];
+      }
+    }
+    buf_ = std::move(new_buf);
+    head_ = 0;
+    tail_ = count;
+    capacity_ = new_cap;
+  }
+
+  bool empty() const { return head_ == tail_; }
+  size_t size() const { return tail_ - head_; }
+
+  void push(EventSource *s) {
+    if (tail_ - head_ >= capacity_) {
+      Reserve(capacity_ == 0 ? 16 : capacity_ * 2);
+    }
+    buf_[tail_ & (capacity_ - 1)] = s;
+    ++tail_;
+  }
+
+  EventSource *pop() {
+    if (head_ == tail_) return nullptr;
+    size_t idx = head_ & (capacity_ - 1);
+    EventSource *s = buf_[idx];
+    buf_[idx] = nullptr;
+    ++head_;
+    return s;
+  }
+
+  void remove(EventSource *s) {
+    if (capacity_ == 0 || head_ == tail_) return;
+    size_t mask = capacity_ - 1;
+    for (size_t i = head_; i < tail_; ++i) {
+      if (buf_[i & mask] == s) {
+        buf_[i & mask] = nullptr;
+      }
+    }
+  }
+
+  void clear() {
+    if (capacity_ > 0) {
+      std::fill(buf_.begin(), buf_.end(), nullptr);
+    }
+    head_ = 0;
+    tail_ = 0;
+  }
+
+ private:
+  std::vector<EventSource *> buf_;
+  size_t head_{0};
+  size_t tail_{0};
+  size_t capacity_{0};
+};
 
 class EventPoll {
  public:
@@ -25,7 +93,8 @@ class EventPoll {
     {
       base::LockGuard<base::Mutex> lk(mu_);
       to_cleanup.swap(sources_);
-      ready_set_.clear();
+      ready_queue_.clear();
+      ready_count_ = 0;
       deadlines_.clear();
       timeout_fired_.clear();
     }
@@ -45,7 +114,12 @@ class EventPoll {
 
     base::LockGuard<base::Mutex> lk(mu_);
     sources_.push_back(&source);
-    if (source.is_ready()) ready_set_.insert(&source);
+    ready_queue_.Reserve(sources_.size());
+    if (source.is_ready() && !source.in_ready_queue()) {
+      source.set_in_ready_queue(true);
+      ready_queue_.push(&source);
+      ++ready_count_;
+    }
     if (timeout_ms > 0) {
       deadlines_[&source] = cv_.timespec_add_ms(cv_.get_now(), timeout_ms);
     }
@@ -60,14 +134,22 @@ class EventPoll {
     {
       base::LockGuard<base::Mutex> lk(mu_);
       sources_.remove(&source);
-      ready_set_.erase(&source);
+      if (source.in_ready_queue()) {
+        source.set_in_ready_queue(false);
+        ready_queue_.remove(&source);
+        if (ready_count_ > 0) --ready_count_;
+      }
       deadlines_.erase(&source);
       timeout_fired_.erase(&source);
     }
     source.ClearWakeup();
     {
       base::LockGuard<base::Mutex> lk(mu_);
-      ready_set_.erase(&source);
+      if (source.in_ready_queue()) {
+        source.set_in_ready_queue(false);
+        ready_queue_.remove(&source);
+        if (ready_count_ > 0) --ready_count_;
+      }
     }
     source.OnRemoved();
     return true;
@@ -92,12 +174,27 @@ class EventPoll {
     }
 
     for (;;) {
+      // If ready_queue_ is empty, scan sources_ for any source that is ready.
+      if (ready_queue_.empty()) {
+        for (auto *s : sources_) {
+          if (s->is_ready() && !s->in_ready_queue()) {
+            s->set_in_ready_queue(true);
+            ready_queue_.push(s);
+            ++ready_count_;
+          }
+        }
+      }
+
       // Expire per-event deadlines.
       struct timespec now = cv_.get_now();
       for (auto it = deadlines_.begin(); it != deadlines_.end();) {
         if (cv_.timespec_ge(now, it->second)) {
           timeout_fired_.insert(it->first);
-          ready_set_.insert(it->first);
+          if (!it->first->in_ready_queue()) {
+            it->first->set_in_ready_queue(true);
+            ready_queue_.push(it->first);
+            ++ready_count_;
+          }
           it = deadlines_.erase(it);
         } else {
           ++it;
@@ -108,18 +205,23 @@ class EventPoll {
       int count = 0;
       for (auto it = timeout_fired_.begin();
            it != timeout_fired_.end() && count < max_ready;) {
-        ready[count++] = *it;
-        ready_set_.erase(*it);
+        auto *s = *it;
+        ready[count++] = s;
+        if (s->in_ready_queue()) {
+          s->set_in_ready_queue(false);
+          if (ready_count_ > 0) --ready_count_;
+        }
         it = timeout_fired_.erase(it);
       }
-      for (auto it = ready_set_.begin();
-           count < max_ready && it != ready_set_.end();) {
-        auto *s = *it;
+
+      while (!ready_queue_.empty() && count < max_ready) {
+        auto *s = ready_queue_.pop();
+        if (!s) continue;
+        if (!s->in_ready_queue()) continue;
+        s->set_in_ready_queue(false);
+        if (ready_count_ > 0) --ready_count_;
         if (s->is_ready()) {
           ready[count++] = s;
-          ++it;
-        } else {
-          it = ready_set_.erase(it);
         }
       }
 
@@ -159,7 +261,7 @@ class EventPoll {
 
       if (!has_wake_time) {
         // Block forever until notified.
-        cv_.wait(mu_, [this] { return !ready_set_.empty() || stop_; });
+        cv_.wait(mu_, [this] { return ready_count_ > 0 || stop_; });
       } else {
         // Wait until the earliest deadline.
         now = cv_.get_now();
@@ -167,7 +269,7 @@ class EventPoll {
         uint32_t remaining_ms = cv_.timespec_diff_ms(now, wake_time);
         if (remaining_ms == 0) remaining_ms = 1;
         cv_.wait_for(mu_, remaining_ms,
-                     [this] { return !ready_set_.empty() || stop_; });
+                     [this] { return ready_count_ > 0 || stop_; });
       }
 
       if (stop_) {
@@ -184,19 +286,31 @@ class EventPoll {
   }
 
   void NotifyReady(EventSource *source) {
-    base::LockGuard<base::Mutex> lk(mu_);
-    ready_set_.insert(source);
-    cv_.notify_one();
+    bool needs_notify = false;
+    {
+      base::LockGuard<base::Mutex> lk(mu_);
+      if (!source->in_ready_queue()) {
+        source->set_in_ready_queue(true);
+        ready_queue_.push(source);
+        ++ready_count_;
+        needs_notify = true;
+      }
+    }
+    if (needs_notify) {
+      cv_.notify_one();
+    }
   }
 
  private:
   base::Mutex mu_;
   base::ConditionVariable cv_;
   std::list<EventSource *> sources_;
-  std::unordered_set<EventSource *> ready_set_;
+  RingBuffer ready_queue_;
+  size_t ready_count_{0};
   std::unordered_map<EventSource *, struct timespec> deadlines_;
   std::unordered_set<EventSource *> timeout_fired_;
   std::atomic<bool> stop_{false};
 };
 
 }  // namespace uevent
+
