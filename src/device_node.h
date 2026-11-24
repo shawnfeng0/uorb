@@ -4,6 +4,7 @@
 
 #include <atomic>
 
+#include "base/condition_variable.h"
 #include "base/intrusive_list/forward_list.h"
 #include "base/intrusive_list/list.h"
 #include "base/mutex.h"
@@ -17,10 +18,14 @@ namespace detail {
 
 // Function-pointer based callback entry for DeviceNode's publish notification.
 // Embedded in ReceiverLocal for O(1) registration and O(1) unregistration.
+// A stack-allocated entry with on_publish == nullptr is used as an intrusive
+// traversal cursor during out-of-lock callback dispatch in Publish().
 struct CallbackEntry {
   orb_subscriber_callback_fn on_publish{nullptr};
   orb_callback_ctx ctx{};
   intrusive_list::list_node node{};
+  uint32_t active_calls{0};       // protected by DeviceNode::callback_lock_
+  bool waiting_unregister{false}; // protected by DeviceNode::callback_lock_
 };
 
 }  // namespace detail
@@ -68,29 +73,8 @@ class DeviceNode {
   inline bool IsSameWith(const orb_metadata &meta) const { return &meta_ == &meta; }
 
   // add item to list of work items to schedule on node update
-  bool RegisterCallback(detail::CallbackEntry *entry) {
-    if (!entry || !entry->on_publish) {
-      return false;
-    }
-
-    base::LockGuard<base::Mutex> lg(callback_lock_);
-    receiver_list_.push_front(*entry);
-    callback_count_.fetch_add(1, std::memory_order_seq_cst);
-    return true;
-  }
-
-  bool UnregisterCallback(detail::CallbackEntry *entry) {
-    if (!entry) {
-      return false;
-    }
-
-    base::LockGuard<base::Mutex> lg(callback_lock_);
-    if (receiver_list_.remove_if_exists(*entry)) {
-      callback_count_.fetch_sub(1, std::memory_order_release);
-      return true;
-    }
-    return false;
-  }
+  bool RegisterCallback(detail::CallbackEntry *entry);
+  bool UnregisterCallback(detail::CallbackEntry *entry);
 
   // Returns the number of updated data relative to the parameter 'generation'
   unsigned updates_available(unsigned generation) const;
@@ -118,11 +102,15 @@ class DeviceNode {
   friend uORBTest::UnitTest;
 
   static constexpr uint8_t kMaxCounterValue = 0x7F;
+  static constexpr uint32_t kMaxSyncCallbackDepth = 16;
+
+  void DispatchCallbacks(const void *data);
 
   // --- Group 1: Writer-only mutex (isolated from lock-free Copy() readers) ---
   // Lock ordering:
   //   DeviceMaster::lock_  →  data_lock_     (node lookup)
-  //   callback_lock_       →  (Copy is lock-free, never acquires data_lock_)
+  //   callback_lock_       →  NEVER held across user callbacks (out-of-lock dispatch)
+  //   Copy()               →  100% lock-free (never acquires data_lock_ or callback_lock_)
   // data_lock_ only serializes concurrent writers in Publish(). Keeping it at
   // the front prevents writer lock-contention cache traffic from invalidating
   // the reader-hot fields in Group 3 (buffer_, slot geometry, generation_).
@@ -131,7 +119,8 @@ class DeviceNode {
   // --- Group 2: Cold / low-frequency callback & lifecycle fields ---
   // Naturally separates Group 1 (writer mutex) from Group 3 (reader-hot block)
   // across cache lines without adding alignas() padding overhead on MCUs.
-  mutable base::Mutex callback_lock_{};  // protects: receiver_list_
+  mutable base::Mutex callback_lock_{};  // protects: receiver_list_, active_calls
+  base::ConditionVariable callback_cv_{};
   intrusive_list::list<detail::CallbackEntry, &detail::CallbackEntry::node> receiver_list_;
   intrusive_list::forward_list_node device_list_node_{};
   std::atomic<uint32_t> subscriber_count_{0};

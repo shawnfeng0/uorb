@@ -134,6 +134,22 @@ class list {
   void push_back(T &item) { internal::list_add_tail(get_node(&item), &head_); }
 
   /**
+   * insert item immediately after pos (which must already be in this list).
+   */
+  void insert_after(T &pos, T &item) {
+    Node *p = get_node(&pos);
+    internal::_list_add(get_node(&item), p, p->next);
+  }
+
+  /**
+   * return the element immediately following pos, or nullptr if pos is at the tail.
+   */
+  T *next_of(T &pos) {
+    Node *n = get_node(&pos)->next;
+    return (n == &head_) ? nullptr : get_owner(n);
+  }
+
+  /**
    * Note that the node must already be in a list
    * @param item item to remove
    * @return true When the deletion is successful
