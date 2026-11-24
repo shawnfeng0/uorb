@@ -120,13 +120,19 @@ class DeviceNode {
   static constexpr uint8_t kMaxCounterValue = 0x7F;
 
   const orb_metadata &meta_; /**< object metadata information */
-  uint8_t *data_{nullptr};   /**< allocated object buffer */
+
+  // Lock-free reader / mutex-serialized writer slot storage (single allocation):
+  //   [0 .. seq_offset_ - 1]         : physical_slots_ * payload_words_ std::atomic<size_t>
+  //   [seq_offset_ .. total_bytes-1] : physical_slots_ std::atomic<uint32_t> per-slot seq tags
+  // physical_slots_ == 2 for queue_size_ == 1 (double buffer) and == queue_size_
+  // for queue_size_ >= 2 (zero extra slots).
+  std::atomic<uint8_t *> buffer_{nullptr};
 
   // Lock ordering:
-  //   DeviceMaster::lock_  →  data_lock_  (node lookup)
-  //   callback_lock_       →  data_lock_  (callbacks calling Copy)
-  // data_lock_ and callback_lock_ are NEVER held simultaneously in Publish().
-  mutable base::Mutex data_lock_{};      // protects: data_, generation_ writes
+  //   DeviceMaster::lock_  →  data_lock_     (node lookup)
+  //   callback_lock_       →  (Copy is lock-free, never acquires data_lock_)
+  // data_lock_ only serializes concurrent writers in Publish().
+  mutable base::Mutex data_lock_{};      // protects: buffer_ allocation & writes, generation_ writes
   mutable base::Mutex callback_lock_{};  // protects: receiver_list_
 
   intrusive_list::list<detail::CallbackEntry, &detail::CallbackEntry::node> receiver_list_;
@@ -139,10 +145,13 @@ class DeviceNode {
   std::atomic<bool> has_published_{false};  /**< true once at least one publish completed */
   std::atomic<bool> has_untracked_subscriber_{false};
   std::atomic<bool> has_untracked_publisher_{false};
-  const uint16_t item_size_;   /**< cached object size */
-  const uint16_t queue_size_;  /**< maximum number of elements in the queue */
-  const uint16_t queue_mask_;  /**< queue_size_ - 1 (queue_size_ is power of 2) */
-  const uint8_t instance_;     /**< orb multi instance identifier */
+  const uint32_t physical_slots_; /**< (queue_size_ == 1) ? 2 : queue_size_ (power of 2, >= 2) */
+  const uint32_t physical_mask_;  /**< physical_slots_ - 1 */
+  const size_t payload_words_;    /**< ceil(item_size_ / sizeof(size_t)) */
+  const size_t seq_offset_;       /**< byte offset of per-slot uint32_t seq array in buffer_ */
+  const uint16_t item_size_;      /**< cached object size */
+  const uint16_t queue_size_;     /**< logical maximum number of elements in the queue */
+  const uint8_t instance_;        /**< orb multi instance identifier */
 
   DeviceNode(const struct orb_metadata &meta, uint8_t instance);
   ~DeviceNode();

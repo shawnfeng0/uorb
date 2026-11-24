@@ -76,11 +76,15 @@ DeviceMaster::lock_  →  data_lock_     (node lookup)
 callback_lock_       →  data_lock_     (callbacks calling Copy)
 ```
 
+- `data_lock_` only serializes concurrent writers in `Publish()`. `Copy()` is
+  completely **lock-free** using per-slot 4-byte `std::atomic<uint32_t>`
+  SeqLock tags (`physical_slots = (queue_size == 1) ? 2 : queue_size`, single
+  allocation with `std::atomic<size_t>` payload words), so readers never block
+  writers or each other.
 - `data_lock_` and `callback_lock_` are **NEVER held simultaneously** in
   `Publish()`. Publish writes data under `data_lock_`, releases it, then
   invokes callbacks under `callback_lock_`.
-- Callbacks executing under `callback_lock_` may call `Copy()` which
-  acquires `data_lock_`. This is safe: `callback_lock_ → data_lock_`.
+- Callbacks executing under `callback_lock_` may safely call `Copy()` (lock-free).
 - **Do NOT** call `Publish()` on the same topic from a callback — that
   would acquire `data_lock_` then `callback_lock_`, creating a lock-order
   violation.

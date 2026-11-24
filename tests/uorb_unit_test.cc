@@ -44,6 +44,7 @@
 #include <chrono>
 #include <cstdarg>
 #include <cstdio>
+#include <cstring>
 #include <thread>
 #include <vector>
 
@@ -1407,6 +1408,139 @@ TEST_F(UnitTest, generated_msg_respects_orb_durability_constant) {
   EXPECT_TRUE(sub.Updated());
   EXPECT_TRUE(sub.Update(&recv));
   EXPECT_EQ(recv.val, 22);
+}
+
+TEST_F(UnitTest, lock_free_copy_never_observes_torn_large_payload) {
+  struct OddSizePayload {
+    uint64_t seq;
+    uint64_t check_xor;
+    uint8_t bytes[131];  // intentionally non-multiple of sizeof(size_t)
+  };
+  static const struct orb_metadata torn_test_topic = {
+      "orb_torn_read_test", sizeof(OddSizePayload), 0, "", 1, ORB_DURABILITY_DURABLE, {}};
+
+  orb_publisher_t pub = ORB_PUBLISHER_INITIALIZER;
+  ASSERT_EQ(orb_publisher_create(&pub, &torn_test_topic), ORB_OK);
+
+  OddSizePayload init{};
+  init.seq = 1;
+  init.check_xor = 1 ^ 0xA5A5A5A55A5A5A5AULL;
+  std::memset(init.bytes, 1, sizeof(init.bytes));
+  ASSERT_EQ(orb_publisher_publish(&pub, &init), ORB_OK);
+
+  constexpr int kWriters = 2;
+  constexpr int kReaders = 4;
+  constexpr int kWritesPerThread = 2000;
+  std::atomic<bool> writers_done{false};
+  std::atomic<int> torn_count{0};
+  std::atomic<int> total_reads{0};
+
+  std::vector<std::thread> readers;
+  readers.reserve(kReaders);
+  for (int r = 0; r < kReaders; ++r) {
+    readers.emplace_back([&]() {
+      orb_subscriber_t sub = ORB_SUBSCRIBER_INITIALIZER;
+      ASSERT_EQ(orb_subscriber_create(&sub, &torn_test_topic), ORB_OK);
+      OddSizePayload msg{};
+      int reads = 0;
+      while (!writers_done.load(std::memory_order_acquire) || reads < 10) {
+        if (orb_subscriber_copy(&sub, &msg) == ORB_OK) {
+          ++reads;
+          if ((msg.seq ^ 0xA5A5A5A55A5A5A5AULL) != msg.check_xor) {
+            torn_count.fetch_add(1, std::memory_order_relaxed);
+          }
+          const uint8_t expected_byte = static_cast<uint8_t>(msg.seq & 0xFFu);
+          for (size_t i = 0; i < sizeof(msg.bytes); ++i) {
+            if (msg.bytes[i] != expected_byte) {
+              torn_count.fetch_add(1, std::memory_order_relaxed);
+              break;
+            }
+          }
+        }
+      }
+      total_reads.fetch_add(reads, std::memory_order_relaxed);
+      EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
+    });
+  }
+
+  std::vector<std::thread> writers;
+  writers.reserve(kWriters);
+  for (int w = 0; w < kWriters; ++w) {
+    writers.emplace_back([&, w]() {
+      OddSizePayload msg{};
+      for (int i = 1; i <= kWritesPerThread; ++i) {
+        const uint64_t seq = static_cast<uint64_t>(w) * 1000000ULL + static_cast<uint64_t>(i);
+        msg.seq = seq;
+        msg.check_xor = seq ^ 0xA5A5A5A55A5A5A5AULL;
+        std::memset(msg.bytes, static_cast<int>(seq & 0xFFu), sizeof(msg.bytes));
+        EXPECT_EQ(orb_publisher_publish(&pub, &msg), ORB_OK);
+      }
+    });
+  }
+
+  for (auto &t : writers) t.join();
+  writers_done.store(true, std::memory_order_release);
+  for (auto &t : readers) t.join();
+
+  EXPECT_EQ(torn_count.load(), 0);
+  EXPECT_GT(total_reads.load(), 0);
+  EXPECT_EQ(orb_publisher_destroy(&pub), ORB_OK);
+}
+
+TEST_F(UnitTest, lock_free_copy_queued_zero_extra_slots_and_preemption_skip) {
+  static const struct orb_metadata queued_topic = {
+      "orb_lock_free_q4_test", sizeof(orb_test_s), 0, "", 4, ORB_DURABILITY_DURABLE, {}};
+
+  orb_publisher_t pub = ORB_PUBLISHER_INITIALIZER;
+  orb_subscriber_t sub = ORB_SUBSCRIBER_INITIALIZER;
+  ASSERT_EQ(orb_publisher_create(&pub, &queued_topic), ORB_OK);
+  ASSERT_EQ(orb_subscriber_create(&sub, &queued_topic), ORB_OK);
+
+  auto *node = uorb::DeviceMaster::get_instance().GetDeviceNode(queued_topic, 0);
+  ASSERT_NE(node, nullptr);
+  // Option B: queue_size >= 2 uses zero extra physical slots.
+  EXPECT_EQ(physical_slots(*node), 4u);
+
+  // Fill all 4 logical slots; verify full depth when writer is idle.
+  for (int i = 10; i < 14; ++i) {
+    orb_test_s msg{};
+    msg.val = i;
+    ASSERT_EQ(orb_publisher_publish(&pub, &msg), ORB_OK);
+  }
+  for (int i = 10; i < 14; ++i) {
+    orb_test_s got{};
+    ASSERT_EQ(orb_subscriber_copy(&sub, &got), ORB_OK);
+    EXPECT_EQ(got.val, i);
+  }
+
+  // Publish 4 more items (20..23), then simulate a low-priority writer preempted
+  // mid-Publish of the 5th item (overwriting oldest slot holding 20).
+  for (int i = 20; i < 24; ++i) {
+    orb_test_s msg{};
+    msg.val = i;
+    ASSERT_EQ(orb_publisher_publish(&pub, &msg), ORB_OK);
+  }
+  simulate_in_progress_write(*node);
+
+  // A high-priority reader preempting the writer must NOT livelock: it skips
+  // the in-progress oldest slot (20) and cleanly reads 21, 22, 23.
+  orb_test_s got{};
+  ASSERT_EQ(orb_subscriber_copy(&sub, &got), ORB_OK);
+  EXPECT_EQ(got.val, 21);
+  ASSERT_EQ(orb_subscriber_copy(&sub, &got), ORB_OK);
+  EXPECT_EQ(got.val, 22);
+  ASSERT_EQ(orb_subscriber_copy(&sub, &got), ORB_OK);
+  EXPECT_EQ(got.val, 23);
+
+  // Restore slot by completing a real publish and verify normal operation resumes.
+  orb_test_s final_msg{};
+  final_msg.val = 99;
+  ASSERT_EQ(orb_publisher_publish(&pub, &final_msg), ORB_OK);
+  ASSERT_EQ(orb_subscriber_copy(&sub, &got), ORB_OK);
+  EXPECT_EQ(got.val, 99);
+
+  EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
+  EXPECT_EQ(orb_publisher_destroy(&pub), ORB_OK);
 }
 
 }  // namespace uORBTest

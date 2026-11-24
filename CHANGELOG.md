@@ -36,6 +36,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Refresh `ARCHITECTURE.md` and getting started docs (English and Chinese) to reflect new API.
 - Add O(1) lock-free `DeviceNode` lookup via `orb_metadata::instances` array.
 - Make `DeviceNode` counters (`subscriber_count_`, `publisher_count_`, `initial_generation()`, `FillStatus()`) lock-free using wait-free atomics; add Dekker fast-path in `Publish()` to skip `callback_lock_` when no callbacks are registered.
+- Make `DeviceNode::Copy()` 100% lock-free using per-slot 4-byte `std::atomic<uint32_t>` SeqLock tags (`physical_slots = (queue_size == 1) ? 2 : queue_size`, single allocation, zero extra slots for `queue_size >= 2`) and relaxed atomic word copies (TSan/UBSan clean, wait-free against single-core RTOS preemption, no `sched_yield()` required).
 - Switch `DeviceNode::receiver_list_` to a doubly-linked intrusive list for O(1) callback unregistration and invoke user callbacks directly without lambda indirection.
 - Replace `std::list` in `EventPoll` with a zero-allocation intrusive doubly-linked list, coalesce notifications via atomic `in_ready_queue_` fast-path, only signal condition variables when waiters are blocked, and lazily fetch clocks for timeouts.
 - Consolidate all unit and integration tests into a single `uorb_test` executable.

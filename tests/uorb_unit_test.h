@@ -63,7 +63,29 @@ class uORBTest::UnitTest : public testing::Test {
  public:
   // Assist in testing the wrap-around situation
   static void set_generation(uorb::DeviceNode &node, unsigned generation) {
-    node.generation_ = generation;
+    uint8_t *buf = node.buffer_.load(std::memory_order_acquire);
+    if (buf != nullptr) {
+      auto *seq_base = reinterpret_cast<std::atomic<uint32_t> *>(buf + node.seq_offset_);
+      for (uint32_t offset = 0; offset < node.queue_size_; ++offset) {
+        const uint32_t g = generation - node.queue_size_ + offset;
+        seq_base[g & node.physical_mask_].store((g << 1u) + 2u, std::memory_order_release);
+      }
+    }
+    node.generation_.store(generation, std::memory_order_release);
+  }
+
+  // White-box helpers for testing lock-free slot layout and single-core preemption
+  static uint32_t physical_slots(const uorb::DeviceNode &node) {
+    return node.physical_slots_;
+  }
+
+  static void simulate_in_progress_write(uorb::DeviceNode &node) {
+    uint8_t *buf = node.buffer_.load(std::memory_order_acquire);
+    ASSERT_NE(buf, nullptr);
+    auto *seq_base = reinterpret_cast<std::atomic<uint32_t> *>(buf + node.seq_offset_);
+    const uint32_t cur_gen = node.generation_.load(std::memory_order_acquire);
+    const size_t slot = cur_gen & node.physical_mask_;
+    seq_base[slot].store((cur_gen << 1u) + 1u, std::memory_order_release);
   }
 
   template <typename S>
