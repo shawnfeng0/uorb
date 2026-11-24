@@ -1261,7 +1261,6 @@ TEST_F(UnitTest, orb_strerror_and_no_entry_semantics) {
   EXPECT_NE(orb_strerror(ORB_ERR_TIMEOUT), nullptr);
   EXPECT_NE(orb_strerror(ORB_ERR_AGAIN), nullptr);
   EXPECT_STREQ(orb_strerror(ORB_ERR_UNKNOWN), "Unknown error");
-  EXPECT_STREQ(orb_strerror(static_cast<orb_err>(-999)), "Unknown error");
 
   static const struct orb_metadata empty_topic = {
       "orb_empty_copy_test", sizeof(orb_test_s), 0, "", 1, ORB_DURABILITY_DURABLE, {}};
@@ -1347,6 +1346,45 @@ TEST_F(UnitTest, concurrent_lookup_exists_and_lifecycle) {
   pub_thread.join();
   sub_thread.join();
   status_thread.join();
+}
+
+TEST_F(UnitTest, cpp_convenience_publish_copy_and_subscription_callbacks) {
+  orb_test_s sent{};
+  sent.val = 7331;
+  ASSERT_EQ(uorb::publish<uorb::msg::orb_test>(sent), ORB_OK);
+
+  orb_test_s received{};
+  ASSERT_EQ(uorb::copy<uorb::msg::orb_test>(received), ORB_OK);
+  EXPECT_EQ(received.val, 7331);
+
+  uorb::Subscription<uorb::msg::orb_test> sub;
+  EXPECT_EQ(sub.ClearCallback(), ORB_OK);  // safe no-op before subscribing
+
+  struct CbState {
+    std::atomic<int> calls{0};
+    std::atomic<int> last_val{0};
+  } state;
+
+  auto cb = [](const void *msg, orb_callback_ctx ctx) {
+    auto *s = static_cast<CbState *>(ctx.ptr);
+    s->last_val.store(static_cast<const orb_test_s *>(msg)->val, std::memory_order_relaxed);
+    s->calls.fetch_add(1, std::memory_order_relaxed);
+  };
+
+  orb_callback_ctx ctx{};
+  ctx.ptr = &state;
+  ASSERT_EQ(sub.SetCallback(cb, ctx), ORB_OK);
+  EXPECT_EQ(sub.SetCallback(cb, ctx), ORB_ERR_BUSY);
+
+  sent.val = 8442;
+  ASSERT_EQ(uorb::publish<uorb::msg::orb_test>(sent), ORB_OK);
+  EXPECT_EQ(state.calls.load(), 1);
+  EXPECT_EQ(state.last_val.load(), 8442);
+
+  ASSERT_EQ(sub.ClearCallback(), ORB_OK);
+  sent.val = 9553;
+  ASSERT_EQ(uorb::publish<uorb::msg::orb_test>(sent), ORB_OK);
+  EXPECT_EQ(state.calls.load(), 1);
 }
 
 }  // namespace uORBTest

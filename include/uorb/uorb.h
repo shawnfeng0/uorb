@@ -553,4 +553,24 @@ static inline orb_abstime_us orb_elapsed_time_us(const orb_abstime_us then) {
 
 #ifdef __cplusplus
 }
+
+namespace uorb {
+
+/**
+ * Type-safe C++ convenience wrapper around orb_publisher_publish_once().
+ */
+template <const orb_metadata &meta>
+inline orb_err publish(const typename msg::TypeMap<meta>::type &data) {
+  return orb_publisher_publish_once(&meta, &data);
+}
+
+/**
+ * Type-safe C++ convenience wrapper around orb_subscriber_copy_once().
+ */
+template <const orb_metadata &meta>
+inline orb_err copy(typename msg::TypeMap<meta>::type &out) {
+  return orb_subscriber_copy_once(&meta, &out);
+}
+
+}  // namespace uorb
 #endif

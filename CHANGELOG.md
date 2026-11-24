@@ -13,6 +13,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Pass published message pointer to subscriber callbacks via `on_publish(msg, ctx)`.
 - Add notification drain mechanism in `EventSource` (mutex-protected) to prevent use-after-free during `EventPoll` destruction.
 - Expand test coverage with edge-case and stress tests across all components.
+- Add epoll-style `uevent_data_t` user payload on `uevent_source_t` and upgrade `uorb::EventLoop` to O(1) direct pointer dispatch without `std::function` or hash map lookup.
+- Add `orb_strerror()` and return `ORB_ERR_NO_ENTRY` when copying from an unpublished topic or querying a non-existent topic instance.
+- Add topic durability policy (`ORB_DURABILITY_DURABLE` / `ORB_DURABILITY_VOLATILE`) in `orb_metadata` and `ORB_DEFINE`.
+- Add C++ convenience helpers `uorb::publish<Topic>()` / `uorb::copy<Topic>()` and `Subscription::SetCallback()` / `ClearCallback()`.
 
 ### Changed
 

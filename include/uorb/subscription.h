@@ -35,6 +35,23 @@ class SubscriptionBase {
 
   orb_subscriber_t *handle() { return Subscribe() ? &handle_ : nullptr; }
 
+  /// Register a synchronous publish callback on this subscription.
+  orb_err SetCallback(orb_subscriber_callback_fn cb, orb_callback_ctx ctx) {
+    auto *h = handle();
+    if (!h) {
+      return ORB_ERR_NO_MEM;
+    }
+    return orb_subscriber_set_callback(h, cb, ctx);
+  }
+
+  /// Remove a previously registered publish callback.
+  orb_err ClearCallback() {
+    if (!handle_._handle) {
+      return ORB_OK;
+    }
+    return orb_subscriber_clear_callback(&handle_);
+  }
+
   /// Check if there is a new update.
   bool Updated() { return Subscribe() && orb_subscriber_check_update(&handle_); }
 
