@@ -173,7 +173,7 @@ extern "C" {
  * - Publish callback: orb_subscriber_set_callback(),
  *   orb_subscriber_clear_callback().
  * - Introspection: orb_exists(), orb_group_count(),
- *   orb_get_topic_status(), orb_version().
+ *   orb_get_topic_status(), orb_version(), orb_strerror().
  * - Time: orb_absolute_time_us(), orb_elapsed_time_us().
  */
 
@@ -495,6 +495,13 @@ orb_err orb_get_topic_status(const struct orb_metadata *meta, unsigned int insta
  * @return version string
  */
 const char *orb_version(void);
+
+/**
+ * Convert an orb_err code to a human-readable string.
+ * @param err Error code
+ * @return Static null-terminated description string (never NULL)
+ */
+const char *orb_strerror(orb_err err);
 
 /**
  * Absolute time, in microsecond units.

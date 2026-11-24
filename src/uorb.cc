@@ -83,7 +83,7 @@ orb_err orb_publisher_publish(orb_publisher_t *pub, const void *data) {
   }
 
   auto &dev = *reinterpret_cast<uorb::DeviceNode *>(pub->_handle);
-  return dev.Publish(data) ? ORB_OK : ORB_ERR_UNKNOWN;
+  return dev.Publish(data) ? ORB_OK : ORB_ERR_NO_MEM;
 }
 
 orb_err orb_publisher_publish_once(const struct orb_metadata *meta, const void *data) {
@@ -99,7 +99,7 @@ orb_err orb_publisher_publish_once(const struct orb_metadata *meta, const void *
   }
 
   dev->mark_untracked_publisher();
-  return dev->Publish(data) ? ORB_OK : ORB_ERR_UNKNOWN;
+  return dev->Publish(data) ? ORB_OK : ORB_ERR_NO_MEM;
 }
 
 orb_err orb_subscriber_create(orb_subscriber_t *sub, const struct orb_metadata *meta) {
@@ -151,7 +151,7 @@ orb_err orb_subscriber_copy(orb_subscriber_t *sub, void *buffer) {
 
   auto &r = *reinterpret_cast<ReceiverLocal *>(sub->_handle);
 
-  return r.Copy(buffer) ? ORB_OK : ORB_ERR_UNKNOWN;
+  return r.Copy(buffer) ? ORB_OK : ORB_ERR_NO_ENTRY;
 }
 
 orb_err orb_subscriber_copy_once(const struct orb_metadata *meta, void *buffer) {
@@ -168,7 +168,7 @@ orb_err orb_subscriber_copy_once(const struct orb_metadata *meta, void *buffer) 
 
   dev->mark_untracked_subscriber();
   unsigned last_generation_ = dev->initial_generation();
-  return dev->Copy(buffer, &last_generation_) ? ORB_OK : ORB_ERR_UNKNOWN;
+  return dev->Copy(buffer, &last_generation_) ? ORB_OK : ORB_ERR_NO_ENTRY;
 }
 
 bool orb_subscriber_check_update(orb_subscriber_t *sub) {
@@ -248,7 +248,31 @@ orb_err orb_get_topic_status(const struct orb_metadata *meta, unsigned int insta
   }
 
   auto &master = DeviceMaster::get_instance();
-  return master.GetTopicStatus(*meta, instance, status) ? ORB_OK : ORB_ERR_UNKNOWN;
+  return master.GetTopicStatus(*meta, instance, status) ? ORB_OK : ORB_ERR_NO_ENTRY;
 }
 
 const char *orb_version(void) { return UORB_GIT_TAG; }
+
+const char *orb_strerror(orb_err err) {
+  switch (err) {
+    case ORB_OK:
+      return "OK";
+    case ORB_ERR_INVALID:
+      return "Invalid argument";
+    case ORB_ERR_NO_MEM:
+      return "Out of memory";
+    case ORB_ERR_BUSY:
+      return "Resource busy";
+    case ORB_ERR_EXIST:
+      return "Already exists";
+    case ORB_ERR_NO_ENTRY:
+      return "Not found / no data";
+    case ORB_ERR_TIMEOUT:
+      return "Timed out";
+    case ORB_ERR_AGAIN:
+      return "Try again";
+    case ORB_ERR_UNKNOWN:
+    default:
+      return "Unknown error";
+  }
+}

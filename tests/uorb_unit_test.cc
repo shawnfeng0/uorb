@@ -1082,9 +1082,9 @@ TEST_F(UnitTest, orb_get_topic_status_reports_fields) {
   EXPECT_GE(status.subscriber_count, 1);
   EXPECT_GT(status.queue_size, 0);
 
-  // Non-existent instance should return ORB_ERR_UNKNOWN
+  // Non-existent instance should return ORB_ERR_NO_ENTRY
   orb_status status2{};
-  EXPECT_EQ(orb_get_topic_status(ORB_ID(orb_test), 3, &status2), ORB_ERR_UNKNOWN);
+  EXPECT_EQ(orb_get_topic_status(ORB_ID(orb_test), 3, &status2), ORB_ERR_NO_ENTRY);
 
   EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
   EXPECT_EQ(orb_publisher_destroy(&pub), ORB_OK);
@@ -1246,9 +1246,30 @@ TEST_F(UnitTest, copy_once_on_never_published_topic) {
   buffer.val = 12345;  // Set non-zero to detect if overwritten
 
   // Call copy_once on a topic that has never been published.
-  // Should not crash. Returns ORB_ERR_UNKNOWN since no data has been published.
+  // Should not crash. Returns ORB_ERR_NO_ENTRY since no data has been published.
   orb_err result = orb_subscriber_copy_once(&never_published_topic, &buffer);
-  EXPECT_EQ(result, ORB_ERR_UNKNOWN);
+  EXPECT_EQ(result, ORB_ERR_NO_ENTRY);
+}
+
+TEST_F(UnitTest, orb_strerror_and_no_entry_semantics) {
+  EXPECT_STREQ(orb_strerror(ORB_OK), "OK");
+  EXPECT_NE(orb_strerror(ORB_ERR_INVALID), nullptr);
+  EXPECT_NE(orb_strerror(ORB_ERR_NO_MEM), nullptr);
+  EXPECT_NE(orb_strerror(ORB_ERR_BUSY), nullptr);
+  EXPECT_NE(orb_strerror(ORB_ERR_EXIST), nullptr);
+  EXPECT_NE(orb_strerror(ORB_ERR_NO_ENTRY), nullptr);
+  EXPECT_NE(orb_strerror(ORB_ERR_TIMEOUT), nullptr);
+  EXPECT_NE(orb_strerror(ORB_ERR_AGAIN), nullptr);
+  EXPECT_STREQ(orb_strerror(ORB_ERR_UNKNOWN), "Unknown error");
+  EXPECT_STREQ(orb_strerror(static_cast<orb_err>(-999)), "Unknown error");
+
+  static const struct orb_metadata empty_topic = {
+      "orb_empty_copy_test", sizeof(orb_test_s), 0, "", 1, {}};
+  orb_subscriber_t sub = ORB_SUBSCRIBER_INITIALIZER;
+  ASSERT_EQ(orb_subscriber_create(&sub, &empty_topic), ORB_OK);
+  orb_test_s buf{};
+  EXPECT_EQ(orb_subscriber_copy(&sub, &buf), ORB_ERR_NO_ENTRY);
+  EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
 }
 
 TEST_F(UnitTest, concurrent_lookup_exists_and_lifecycle) {
