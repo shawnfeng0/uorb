@@ -1022,3 +1022,68 @@ TEST(UeventTest, UserDataCarriedThroughLoop) {
   uevent_source_destroy(&src_ptr);
   uevent_destroy(&base);
 }
+
+// ---- Manual event source ----
+
+TEST(UeventTest, ManualSourceTriggerResetAndCrossThreadWakeup) {
+  uevent_source_t manual = UEVENT_SOURCE_INITIALIZER;
+  ASSERT_EQ(uevent_manual_source_create(&manual), 0);
+  ASSERT_NE(manual._handle, nullptr);
+  manual.data.u32 = 77U;
+
+  uevent_t base = UEVENT_INITIALIZER;
+  ASSERT_EQ(uevent_create(&base), 0);
+  ASSERT_EQ(uevent_add(&base, &manual, 0), 0);
+
+  uevent_source_t ready[1] = {UEVENT_SOURCE_INITIALIZER};
+  EXPECT_EQ(uevent_loop(&base, ready, 1, 0), 0);
+
+  // Trigger from another thread while blocked.
+  std::thread trigger_thread([&]() {
+    std::this_thread::sleep_for(std::chrono::milliseconds(25));
+    EXPECT_EQ(uevent_manual_source_trigger(&manual), 0);
+  });
+
+  ASSERT_EQ(uevent_loop(&base, ready, 1, 500), 1);
+  EXPECT_EQ(ready[0]._handle, manual._handle);
+  EXPECT_EQ(ready[0].data.u32, 77U);
+  trigger_thread.join();
+
+  // Level-triggered: still ready until reset.
+  ASSERT_EQ(uevent_loop(&base, ready, 1, 0), 1);
+  ASSERT_EQ(uevent_manual_source_reset(&manual), 0);
+  EXPECT_EQ(uevent_loop(&base, ready, 1, 0), 0);
+
+  ASSERT_EQ(uevent_remove(&base, &manual), 0);
+  uevent_source_destroy(&manual);
+  uevent_destroy(&base);
+}
+
+TEST(UeventTest, ManualSourceRejectsInvalidAndNonManualHandles) {
+  errno = 0;
+  EXPECT_EQ(uevent_manual_source_create(nullptr), -1);
+  EXPECT_EQ(errno, EINVAL);
+
+  errno = 0;
+  EXPECT_EQ(uevent_manual_source_trigger(nullptr), -1);
+  EXPECT_EQ(errno, EINVAL);
+
+  errno = 0;
+  EXPECT_EQ(uevent_manual_source_reset(nullptr), -1);
+  EXPECT_EQ(errno, EINVAL);
+
+  // Passing a regular callback-backed source must safely fail with EINVAL.
+  auto ready_fn = [](void *) -> bool { return false; };
+  uevent_source_t custom = UEVENT_SOURCE_INITIALIZER;
+  ASSERT_EQ(uevent_source_create(&custom, ready_fn, nullptr, nullptr, nullptr, nullptr), 0);
+
+  errno = 0;
+  EXPECT_EQ(uevent_manual_source_trigger(&custom), -1);
+  EXPECT_EQ(errno, EINVAL);
+
+  errno = 0;
+  EXPECT_EQ(uevent_manual_source_reset(&custom), -1);
+  EXPECT_EQ(errno, EINVAL);
+
+  uevent_source_destroy(&custom);
+}

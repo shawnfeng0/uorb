@@ -179,6 +179,36 @@ int uevent_remove(uevent_t *ev, uevent_source_t *src);
  */
 bool uevent_source_is_bound(uevent_source_t *src);
 
+/**
+ * Create a manual (software-triggered) event source.
+ *
+ * Thread-safe. Useful for waking a blocked uevent_loop() from another thread
+ * without writing custom ready/register callbacks. Remove via uevent_remove()
+ * and destroy via uevent_source_destroy().
+ *
+ * @param src event source handle to initialize
+ * @return 0 on success, -1 on error
+ */
+int uevent_manual_source_create(uevent_source_t *src);
+
+/**
+ * Trigger a manual event source (marks ready and wakes any waiting loop).
+ * Thread-safe.
+ *
+ * @param src manual event source handle
+ * @return 0 on success, -1 if src is invalid or not a manual source (errno = EINVAL)
+ */
+int uevent_manual_source_trigger(uevent_source_t *src);
+
+/**
+ * Reset a manual event source to the not-ready state.
+ * Thread-safe.
+ *
+ * @param src manual event source handle
+ * @return 0 on success, -1 if src is invalid or not a manual source (errno = EINVAL)
+ */
+int uevent_manual_source_reset(uevent_source_t *src);
+
 #ifdef __cplusplus
 }
 #endif

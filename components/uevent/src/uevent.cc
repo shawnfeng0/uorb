@@ -56,6 +56,28 @@ class CEventSource final : public uevent::EventSource {
   std::atomic<bool> registered_{false};
 };
 
+// ManualEventSource: built-in thread-safe software-triggered event source.
+class ManualEventSource final : public uevent::EventSource {
+ public:
+  bool is_ready() const override {
+    return ready_.load(std::memory_order_acquire);
+  }
+
+  bool Trigger() override {
+    ready_.store(true, std::memory_order_release);
+    notify_waiters();
+    return true;
+  }
+
+  bool Reset() override {
+    ready_.store(false, std::memory_order_release);
+    return true;
+  }
+
+ private:
+  std::atomic<bool> ready_{false};
+};
+
 }  // anonymous namespace
 
 // ---- C API implementation ----
@@ -175,4 +197,43 @@ int uevent_remove(uevent_t *ev, uevent_source_t *src) {
 bool uevent_source_is_bound(uevent_source_t *src) {
   if (!src || !src->_handle) return false;
   return reinterpret_cast<uevent::EventSource *>(src->_handle)->HasWakeup();
+}
+
+int uevent_manual_source_create(uevent_source_t *src) {
+  if (!src) {
+    errno = EINVAL;
+    return -1;
+  }
+  auto *source = new (std::nothrow) ManualEventSource();
+  if (!source) {
+    errno = ENOMEM;
+    return -1;
+  }
+  src->_handle = source;
+  src->data.u64 = 0;
+  return 0;
+}
+
+int uevent_manual_source_trigger(uevent_source_t *src) {
+  if (!src || !src->_handle) {
+    errno = EINVAL;
+    return -1;
+  }
+  if (!reinterpret_cast<uevent::EventSource *>(src->_handle)->Trigger()) {
+    errno = EINVAL;
+    return -1;
+  }
+  return 0;
+}
+
+int uevent_manual_source_reset(uevent_source_t *src) {
+  if (!src || !src->_handle) {
+    errno = EINVAL;
+    return -1;
+  }
+  if (!reinterpret_cast<uevent::EventSource *>(src->_handle)->Reset()) {
+    errno = EINVAL;
+    return -1;
+  }
+  return 0;
 }

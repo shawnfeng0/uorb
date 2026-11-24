@@ -83,6 +83,11 @@ class EventSource {
 
   virtual bool is_ready() const = 0;
 
+  // Optional manual-trigger hooks (implemented by ManualEventSource).
+  // Avoids RTTI so uevent stays compatible with -fno-rtti builds.
+  virtual bool Trigger() { return false; }
+  virtual bool Reset() { return false; }
+
   // Wake the EventPoll blocked in Wait(). Call this from the event-producing
   // path (e.g., publisher thread). Thread-safe.
   void notify_waiters();
