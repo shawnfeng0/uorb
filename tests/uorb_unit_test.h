@@ -40,6 +40,7 @@
 #include <uorb/topics/orb_test_large.h>
 #include <uorb/topics/orb_test_medium.h>
 #include <uorb/topics/orb_test_queue_poll.h>
+#include <uorb/topics/orb_test_volatile.h>
 #include <uorb/uorb.h>
 #include <uorb_uevent/uorb_uevent.h>
 

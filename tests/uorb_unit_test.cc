@@ -1387,4 +1387,26 @@ TEST_F(UnitTest, cpp_convenience_publish_copy_and_subscription_callbacks) {
   EXPECT_EQ(state.calls.load(), 1);
 }
 
+TEST_F(UnitTest, generated_msg_respects_orb_durability_constant) {
+  EXPECT_EQ(ORB_ID(orb_test)->o_durability, ORB_DURABILITY_DURABLE);
+  EXPECT_EQ(ORB_ID(orb_test_volatile)->o_durability, ORB_DURABILITY_VOLATILE);
+  EXPECT_EQ(ORB_ID(orb_test_volatile)->o_queue_size, 4U);
+
+  orb_test_volatile_s sent{};
+  sent.val = 11;
+  ASSERT_EQ(uorb::publish<uorb::msg::orb_test_volatile>(sent), ORB_OK);
+
+  orb_test_volatile_s recv{};
+  EXPECT_EQ(uorb::copy<uorb::msg::orb_test_volatile>(recv), ORB_ERR_NO_ENTRY);
+
+  uorb::Subscription<uorb::msg::orb_test_volatile> sub;
+  EXPECT_FALSE(sub.Updated());
+
+  sent.val = 22;
+  ASSERT_EQ(uorb::publish<uorb::msg::orb_test_volatile>(sent), ORB_OK);
+  EXPECT_TRUE(sub.Updated());
+  EXPECT_TRUE(sub.Update(&recv));
+  EXPECT_EQ(recv.val, 22);
+}
+
 }  // namespace uORBTest
