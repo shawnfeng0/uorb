@@ -962,3 +962,63 @@ TEST(UeventTest, PerEventTimeoutThenNotifyCleanlyDelivers) {
   uevent_source_destroy(&src);
   uevent_destroy(&base);
 }
+
+// ---- User data carried through uevent_add / uevent_loop ----
+
+TEST(UeventTest, UserDataCarriedThroughLoop) {
+  struct Ctx {
+    std::atomic<bool> ready{true};
+  };
+  Ctx ctx1, ctx2, ctx3;
+  auto ready_fn = [](void *p) -> bool {
+    return static_cast<Ctx *>(p)->ready.load();
+  };
+
+  uevent_source_t src_u32 = UEVENT_SOURCE_INITIALIZER;
+  uevent_source_t src_u64 = UEVENT_SOURCE_INITIALIZER;
+  uevent_source_t src_ptr = UEVENT_SOURCE_INITIALIZER;
+  ASSERT_EQ(uevent_source_create(&src_u32, ready_fn, nullptr, nullptr, nullptr, &ctx1), 0);
+  ASSERT_EQ(uevent_source_create(&src_u64, ready_fn, nullptr, nullptr, nullptr, &ctx2), 0);
+  ASSERT_EQ(uevent_source_create(&src_ptr, ready_fn, nullptr, nullptr, nullptr, &ctx3), 0);
+
+  int tag_obj = 1234;
+  src_u32.data.u32 = 42U;
+  src_u64.data.u64 = 0x123456789ABCDEF0ULL;
+  src_ptr.data.ptr = &tag_obj;
+
+  uevent_t base = UEVENT_INITIALIZER;
+  ASSERT_EQ(uevent_create(&base), 0);
+  ASSERT_EQ(uevent_add(&base, &src_u32, 0), 0);
+  ASSERT_EQ(uevent_add(&base, &src_u64, 0), 0);
+  ASSERT_EQ(uevent_add(&base, &src_ptr, 0), 0);
+
+  uevent_source_t ready[3] = {UEVENT_SOURCE_INITIALIZER,
+                              UEVENT_SOURCE_INITIALIZER,
+                              UEVENT_SOURCE_INITIALIZER};
+  ASSERT_EQ(uevent_loop(&base, ready, 3, 0), 3);
+
+  bool got_u32 = false, got_u64 = false, got_ptr = false;
+  for (int i = 0; i < 3; ++i) {
+    if (ready[i]._handle == src_u32._handle) {
+      EXPECT_EQ(ready[i].data.u32, 42U);
+      got_u32 = true;
+    } else if (ready[i]._handle == src_u64._handle) {
+      EXPECT_EQ(ready[i].data.u64, 0x123456789ABCDEF0ULL);
+      got_u64 = true;
+    } else if (ready[i]._handle == src_ptr._handle) {
+      EXPECT_EQ(ready[i].data.ptr, &tag_obj);
+      got_ptr = true;
+    }
+  }
+  EXPECT_TRUE(got_u32);
+  EXPECT_TRUE(got_u64);
+  EXPECT_TRUE(got_ptr);
+
+  ASSERT_EQ(uevent_remove(&base, &src_u32), 0);
+  ASSERT_EQ(uevent_remove(&base, &src_u64), 0);
+  ASSERT_EQ(uevent_remove(&base, &src_ptr), 0);
+  uevent_source_destroy(&src_u32);
+  uevent_source_destroy(&src_u64);
+  uevent_source_destroy(&src_ptr);
+  uevent_destroy(&base);
+}

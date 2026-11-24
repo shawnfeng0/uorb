@@ -66,6 +66,11 @@ int main(void) {
     return 1;
   }
 
+  enum {
+    SRC_EXAMPLE_STRING = 1,
+    SRC_SENSOR_ACCEL = 2,
+  };
+
   uevent_source_t string_src = UEVENT_SOURCE_INITIALIZER;
   uevent_source_t accel_src = UEVENT_SOURCE_INITIALIZER;
   uorb_subscriber_create_source(&string_src, &string_sub);
@@ -79,6 +84,8 @@ int main(void) {
     orb_subscriber_destroy(&accel_sub);
     return 1;
   }
+  string_src.data.u32 = SRC_EXAMPLE_STRING;
+  accel_src.data.u32 = SRC_SENSOR_ACCEL;
   if (uevent_add(&base, &string_src, 0) != 0 || uevent_add(&base, &accel_src, 0) != 0) {
     printf("Failed to add event sources\n");
     uorb_subscriber_destroy_source(&string_src);
@@ -102,17 +109,24 @@ int main(void) {
     }
 
     for (int ready_index = 0; ready_index < ready_count; ++ready_index) {
-      if (ready[ready_index]._handle == string_src._handle) {
-        struct example_string_s message = {0};
-        if (orb_subscriber_copy(&string_sub, &message) == ORB_OK) {
-          printf("example_string: %s\n", message.str );
+      switch (ready[ready_index].data.u32) {
+        case SRC_EXAMPLE_STRING: {
+          struct example_string_s message = {0};
+          if (orb_subscriber_copy(&string_sub, &message) == ORB_OK) {
+            printf("example_string: %s\n", message.str);
+          }
+          break;
         }
-      } else if (ready[ready_index]._handle == accel_src._handle) {
-        struct sensor_accel_s sample = {0};
-        if (orb_subscriber_copy(&accel_sub, &sample) == ORB_OK) {
-          printf("sensor_accel: (%.2f, %.2f, %.2f), temp: %.2f\n", sample.x,
-                      sample.y, sample.z, sample.temperature);
+        case SRC_SENSOR_ACCEL: {
+          struct sensor_accel_s sample = {0};
+          if (orb_subscriber_copy(&accel_sub, &sample) == ORB_OK) {
+            printf("sensor_accel: (%.2f, %.2f, %.2f), temp: %.2f\n", sample.x,
+                   sample.y, sample.z, sample.temperature);
+          }
+          break;
         }
+        default:
+          break;
       }
     }
   }

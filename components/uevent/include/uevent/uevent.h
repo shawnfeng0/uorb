@@ -8,6 +8,7 @@
 
 #include <errno.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -24,14 +25,25 @@ typedef struct {
 #define UEVENT_INITIALIZER {NULL}
 
 /**
+ * User-defined event payload carried by uevent_source_t (similar to epoll_data_t).
+ * Set before uevent_add() and returned unchanged in ready[i].data by uevent_loop().
+ */
+typedef union {
+  void *ptr;
+  uint32_t u32;
+  uint64_t u64;
+} uevent_data_t;
+
+/**
  * Event source handle (anything that can signal readiness).
- * Opaque handle with private void* pointer.
+ * Opaque handle with private void* pointer and caller-owned user data.
  */
 typedef struct {
-  void* _handle;
+  void *_handle;
+  uevent_data_t data;
 } uevent_source_t;
 
-#define UEVENT_SOURCE_INITIALIZER {NULL}
+#define UEVENT_SOURCE_INITIALIZER {NULL, {NULL}}
 
 /**
  * Callback to check whether an event source has data ready.

@@ -42,30 +42,33 @@ void uorb_subscriber_destroy_source(uevent_source_t *src);
 }
 
 #include <atomic>
-#include <functional>
-#include <unordered_map>
+#include <memory>
+#include <new>
+#include <type_traits>
 #include <utility>
+#include <vector>
 
 namespace uorb {
 
 /**
  * EventLoop: C++ wrapper around the generic event loop C API.
- * Provides type-safe callback dispatch for uORB subscriptions.
+ * Provides type-safe callback dispatch for uORB subscriptions without
+ * std::function or hash map lookup overhead.
  *
  * Thread safety: Not thread-safe, except for Quit() which is thread-safe
  * and may be called from any thread. Subscribe, RunOnce, Run, and the
  * destructor must be called from the same thread. The callback dispatch
- * lambda is invoked from RunOnce/Run, so it also runs on the caller's thread.
+ * runs on the caller's thread inside RunOnce/Run.
  */
 class EventLoop {
  public:
   EventLoop() { uevent_create(&base_); }
   ~EventLoop() {
     if (!base_._handle) return;
-    for (auto &kv : entries_) {
-      uevent_remove(&base_, &kv.second.source);
-      orb_subscriber_destroy(&kv.second.sub);
-      uorb_subscriber_destroy_source(&kv.second.source);
+    for (auto &entry : entries_) {
+      uevent_remove(&base_, &entry->source);
+      orb_subscriber_destroy(&entry->sub);
+      uorb_subscriber_destroy_source(&entry->source);
     }
     uevent_destroy(&base_);
   }
@@ -88,23 +91,24 @@ class EventLoop {
       return false;
     }
 
-    if (uevent_add(&base_, &source, 0) != 0) {
+    using MsgType = typename msg::TypeMap<meta>::type;
+    using Callable = typename std::decay<Callback>::type;
+    std::unique_ptr<EntryBase> entry(
+        new (std::nothrow) TypedEntry<MsgType, Callable>(sub, source, std::forward<Callback>(cb)));
+    if (!entry) {
       uorb_subscriber_destroy_source(&source);
       orb_subscriber_destroy(&sub);
       return false;
     }
 
-    auto dispatch = [sub, cb = std::forward<Callback>(cb)]() mutable {
-      if (orb_subscriber_check_update(&sub)) {
-        using MsgType = typename msg::TypeMap<meta>::type;
-        MsgType msg;
-        if (orb_subscriber_copy(&sub, &msg) == ORB_OK) {
-          cb(msg);
-        }
-      }
-    };
+    entry->source.data.ptr = entry.get();
+    if (uevent_add(&base_, &entry->source, 0) != 0) {
+      uorb_subscriber_destroy_source(&entry->source);
+      orb_subscriber_destroy(&entry->sub);
+      return false;
+    }
 
-    entries_.emplace(source._handle, Entry{sub, source, std::move(dispatch)});
+    entries_.push_back(std::move(entry));
     return true;
   }
 
@@ -116,9 +120,9 @@ class EventLoop {
     if (n <= 0) return n;
 
     for (int i = 0; i < n; ++i) {
-      auto it = entries_.find(ready[i]._handle);
-      if (it != entries_.end()) {
-        it->second.dispatch();
+      auto *entry = static_cast<EntryBase *>(ready[i].data.ptr);
+      if (entry) {
+        entry->Dispatch();
       }
     }
     return n;
@@ -152,14 +156,35 @@ class EventLoop {
   }
 
  private:
-  struct Entry {
+  struct EntryBase {
+    EntryBase(orb_subscriber_t s, uevent_source_t src) : sub(s), source(src) {}
+    virtual ~EntryBase() = default;
+    virtual void Dispatch() = 0;
+
     orb_subscriber_t sub;
     uevent_source_t source;
-    std::function<void()> dispatch;
+  };
+
+  template <typename MsgType, typename Callable>
+  struct TypedEntry final : EntryBase {
+    template <typename G>
+    TypedEntry(orb_subscriber_t s, uevent_source_t src, G &&g)
+        : EntryBase(s, src), cb(std::forward<G>(g)) {}
+
+    void Dispatch() override {
+      if (orb_subscriber_check_update(&sub)) {
+        MsgType msg;
+        if (orb_subscriber_copy(&sub, &msg) == ORB_OK) {
+          cb(msg);
+        }
+      }
+    }
+
+    Callable cb;
   };
 
   uevent_t base_ = UEVENT_INITIALIZER;
-  std::unordered_map<void*, Entry> entries_;
+  std::vector<std::unique_ptr<EntryBase>> entries_;
   std::atomic<bool> quit_requested_{false};
 };
 

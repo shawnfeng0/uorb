@@ -113,7 +113,15 @@ class EventPoll {
   EventPoll &operator=(const EventPoll &) = delete;
 
   bool Add(EventSource &source, int timeout_ms = 0) {
-    if (source.HasWakeup(this)) return true;
+    return Add(source, timeout_ms, source.user_data());
+  }
+
+  bool Add(EventSource &source, int timeout_ms, uevent_data_t data) {
+    if (source.HasWakeup(this)) {
+      base::LockGuard<base::Mutex> lk(mu_);
+      source.set_user_data(data);
+      return true;
+    }
     if (source.HasWakeup()) {
       errno = EBUSY;
       return false;
@@ -123,6 +131,7 @@ class EventPoll {
     bool needs_notify = false;
     {
       base::LockGuard<base::Mutex> lk(mu_);
+      source.set_user_data(data);
       LinkSource(&source);
       ready_queue_.Reserve(source_count_);
       if (source.is_ready() && !source.in_ready_queue()) {

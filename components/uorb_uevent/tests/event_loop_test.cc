@@ -438,4 +438,27 @@ TEST(EventLoopTest, ManySubscriptionsStress) {
   EXPECT_EQ(call_count.load(), kNumSubs);
 }
 
+// Subscribe() accepts move-only callables (no std::function copyability requirement).
+TEST(EventLoopTest, SubscribeAcceptsMoveOnlyCallback) {
+  uorb::EventLoop loop;
+  ASSERT_TRUE(loop);
+
+  std::unique_ptr<int> state(new int(10));
+  int observed = 0;
+  ASSERT_TRUE(loop.Subscribe<uorb::msg::orb_test>(
+      [ptr = std::move(state), &observed](const orb_test_s &msg) {
+        observed = msg.val + *ptr;
+      }));
+
+  DrainPendingEvents(loop);
+  observed = 0;
+
+  uorb::PublicationData<uorb::msg::orb_test> pub;
+  pub.data().val = 32;
+  ASSERT_EQ(pub.Publish(), ORB_OK);
+
+  ASSERT_EQ(loop.RunOnce(100), 1);
+  EXPECT_EQ(observed, 42);
+}
+
 }  // namespace uORBTest

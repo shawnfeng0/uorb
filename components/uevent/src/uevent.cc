@@ -6,6 +6,7 @@
 #include <uevent/uevent.h>
 
 #include <new>
+#include <vector>
 
 #include "event_poll.h"
 
@@ -84,16 +85,25 @@ void uevent_destroy(uevent_t *ev) {
 }
 
 int uevent_loop(uevent_t *ev, uevent_source_t *ready, int max_ready, int timeout_ms) {
-  static_assert(sizeof(uevent_source_t) == sizeof(void *),
-                "uevent_source_t must have same layout as void* for reinterpret_cast safety");
   if (!ev || !ev->_handle || !ready || max_ready <= 0) {
     errno = EINVAL;
     return -1;
   }
   auto *poll = reinterpret_cast<uevent::EventPoll *>(ev->_handle);
-  // uevent_source_t is { void* _handle }, same layout as void*,
-  // so reinterpret to EventSource** is safe.
-  return poll->Wait(reinterpret_cast<uevent::EventSource **>(ready), max_ready, timeout_ms);
+  constexpr int kStackCap = 64;
+  uevent::EventSource *stack_buf[kStackCap];
+  uevent::EventSource **buf = stack_buf;
+  std::vector<uevent::EventSource *> heap_buf;
+  if (max_ready > kStackCap) {
+    heap_buf.resize(static_cast<size_t>(max_ready));
+    buf = heap_buf.data();
+  }
+  const int n = poll->Wait(buf, max_ready, timeout_ms);
+  for (int i = 0; i < n; ++i) {
+    ready[i]._handle = buf[i];
+    ready[i].data = buf[i]->user_data();
+  }
+  return n;
 }
 
 int uevent_loopbreak(uevent_t *ev) {
@@ -122,6 +132,7 @@ int uevent_source_create(uevent_source_t *src,
     return -1;
   }
   src->_handle = source;
+  src->data.u64 = 0;
   return 0;
 }
 
@@ -129,6 +140,7 @@ void uevent_source_destroy(uevent_source_t *src) {
   if (!src || !src->_handle) return;
   delete reinterpret_cast<CEventSource *>(src->_handle);
   src->_handle = nullptr;
+  src->data.u64 = 0;
 }
 
 void uevent_source_notify(uevent_source_t *src) {
@@ -143,7 +155,7 @@ int uevent_add(uevent_t *ev, uevent_source_t *src, int timeout_ms) {
   }
   auto *poll = reinterpret_cast<uevent::EventPoll *>(ev->_handle);
   auto *es = reinterpret_cast<uevent::EventSource *>(src->_handle);
-  return poll->Add(*es, timeout_ms) ? 0 : -1;
+  return poll->Add(*es, timeout_ms, src->data) ? 0 : -1;
 }
 
 int uevent_remove(uevent_t *ev, uevent_source_t *src) {

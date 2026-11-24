@@ -1,5 +1,7 @@
 #pragma once
 
+#include <uevent/uevent.h>
+
 #include <atomic>
 #include <cerrno>
 #include <pthread.h>
@@ -75,6 +77,9 @@ class EventSource {
     in_ready_queue_.store(v, std::memory_order_release);
   }
 
+  uevent_data_t user_data() const { return user_data_; }
+  void set_user_data(uevent_data_t data) { user_data_ = data; }
+
   virtual bool is_ready() const = 0;
 
   // Wake the EventPoll blocked in Wait(). Call this from the event-producing
@@ -91,6 +96,7 @@ class EventSource {
   ;  // serializes notify_waiters() vs ClearWakeup()
   std::atomic<EventPoll *> wakeup_{nullptr};
   std::atomic<bool> in_ready_queue_{false};
+  uevent_data_t user_data_{nullptr};
 
   // Intrusive doubly-linked list links owned by EventPoll (guarded by EventPoll::mu_).
   EventSource *poll_prev_{nullptr};
