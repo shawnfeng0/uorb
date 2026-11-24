@@ -40,6 +40,22 @@ typedef enum {
 #define ORB_MULTI_MAX_INSTANCES 4
 
 /**
+ * Topic durability policy.
+ *
+ * - ORB_DURABILITY_DURABLE (default): state topics where late subscribers
+ *   immediately see the most recently published sample as an update, and
+ *   orb_subscriber_copy_once() returns the latest sample.
+ * - ORB_DURABILITY_VOLATILE: event/stream topics where historical samples are
+ *   not delivered to late subscribers (orb_subscriber_check_update() starts
+ *   false until a new publication arrives, and orb_subscriber_copy_once()
+ *   returns ORB_ERR_NO_ENTRY).
+ */
+typedef enum {
+  ORB_DURABILITY_DURABLE = 0,
+  ORB_DURABILITY_VOLATILE = 1,
+} orb_durability_t;
+
+/**
  * Object metadata.
  */
 struct orb_metadata {
@@ -48,6 +64,7 @@ struct orb_metadata {
   const uint16_t o_size_no_padding; /**< object size w/o padding (external logger contract, not used by library) */
   const char *o_fields;             /**< semicolon separated list of fields (with type) */
   uint16_t o_queue_size;            /**< maximum number of queued samples */
+  uint8_t o_durability;             /**< orb_durability_t (default: ORB_DURABILITY_DURABLE) */
 #ifdef __cplusplus
   mutable std::atomic<void *> instances[ORB_MULTI_MAX_INSTANCES]{};
 #else
@@ -140,14 +157,21 @@ struct TypeMap;
   static_assert(std::is_standard_layout<_struct>::value,                                          \
                 "uORB topic type must use standard layout; virtual functions, mixed access "      \
                 "control, and non-standard object layout are unsupported")
-#define ORB_DEFINE_3(_name, _struct, _queue_size) ORB_DEFINE_5(_name, _struct, 0, "", _queue_size)
-#define ORB_DEFINE_5(_name, _struct, _size_no_padding, _fields, _queue_size)                                          \
-  ORB_CHECK_TOPIC_TYPE(_struct);                                                                                      \
-  const struct orb_metadata uorb::msg::_name = {#_name, sizeof(_struct), _size_no_padding, _fields, _queue_size, {}}; \
-  const struct orb_metadata *__orb_##_name = &uorb::msg::_name;                                                       \
+#define ORB_DEFINE_3(_name, _struct, _queue_size) \
+  ORB_DEFINE_6(_name, _struct, 0, "", _queue_size, ORB_DURABILITY_DURABLE)
+#define ORB_DEFINE_4(_name, _struct, _queue_size, _durability) \
+  ORB_DEFINE_6(_name, _struct, 0, "", _queue_size, _durability)
+#define ORB_DEFINE_5(_name, _struct, _size_no_padding, _fields, _queue_size) \
+  ORB_DEFINE_6(_name, _struct, _size_no_padding, _fields, _queue_size, ORB_DURABILITY_DURABLE)
+#define ORB_DEFINE_6(_name, _struct, _size_no_padding, _fields, _queue_size, _durability)                                    \
+  ORB_CHECK_TOPIC_TYPE(_struct);                                                                                             \
+  const struct orb_metadata uorb::msg::_name = {                                                                             \
+      #_name, sizeof(_struct), _size_no_padding, _fields, _queue_size, static_cast<uint8_t>(_durability), {}};               \
+  const struct orb_metadata *__orb_##_name = &uorb::msg::_name;                                                              \
   struct hack
-#define ORB_DEFINE_SELECT(_1, _2, _3, _4, _5, NAME, ...) NAME
-#define ORB_DEFINE(...) ORB_DEFINE_SELECT(__VA_ARGS__, ORB_DEFINE_5, invalid, ORB_DEFINE_3)(__VA_ARGS__)
+#define ORB_DEFINE_SELECT(_1, _2, _3, _4, _5, _6, NAME, ...) NAME
+#define ORB_DEFINE(...) \
+  ORB_DEFINE_SELECT(__VA_ARGS__, ORB_DEFINE_6, ORB_DEFINE_5, ORB_DEFINE_4, ORB_DEFINE_3)(__VA_ARGS__)
 #else
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
 #define ORB_DEFINE(...) _Static_assert(0, "ORB_DEFINE is only supported in C++ translation units")

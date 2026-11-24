@@ -1241,7 +1241,7 @@ TEST_F(UnitTest, publish_once_without_subscribers) {
 
 TEST_F(UnitTest, copy_once_on_never_published_topic) {
   static const struct orb_metadata never_published_topic = {
-      "orb_never_published_test", sizeof(orb_test_large_s), 0, "", 1, {}};
+      "orb_never_published_test", sizeof(orb_test_large_s), 0, "", 1, ORB_DURABILITY_DURABLE, {}};
   orb_test_large_s buffer{};
   buffer.val = 12345;  // Set non-zero to detect if overwritten
 
@@ -1264,12 +1264,47 @@ TEST_F(UnitTest, orb_strerror_and_no_entry_semantics) {
   EXPECT_STREQ(orb_strerror(static_cast<orb_err>(-999)), "Unknown error");
 
   static const struct orb_metadata empty_topic = {
-      "orb_empty_copy_test", sizeof(orb_test_s), 0, "", 1, {}};
+      "orb_empty_copy_test", sizeof(orb_test_s), 0, "", 1, ORB_DURABILITY_DURABLE, {}};
   orb_subscriber_t sub = ORB_SUBSCRIBER_INITIALIZER;
   ASSERT_EQ(orb_subscriber_create(&sub, &empty_topic), ORB_OK);
   orb_test_s buf{};
   EXPECT_EQ(orb_subscriber_copy(&sub, &buf), ORB_ERR_NO_ENTRY);
   EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
+}
+
+TEST_F(UnitTest, volatile_topic_skips_historical_samples_and_rejects_copy_once) {
+  static const struct orb_metadata volatile_topic = {
+      "orb_volatile_test", sizeof(orb_test_s), 0, "", 4, ORB_DURABILITY_VOLATILE, {}};
+
+  orb_publisher_t pub = ORB_PUBLISHER_INITIALIZER;
+  ASSERT_EQ(orb_publisher_create(&pub, &volatile_topic), ORB_OK);
+
+  // Publish before any subscriber exists.
+  orb_test_s sent{};
+  sent.val = 100;
+  ASSERT_EQ(orb_publisher_publish(&pub, &sent), ORB_OK);
+
+  // copy_once on a volatile topic must return ORB_ERR_NO_ENTRY.
+  orb_test_s recv{};
+  recv.val = -1;
+  EXPECT_EQ(orb_subscriber_copy_once(&volatile_topic, &recv), ORB_ERR_NO_ENTRY);
+  EXPECT_EQ(recv.val, -1);
+
+  // Late subscriber must NOT see historical publication as an update.
+  orb_subscriber_t sub = ORB_SUBSCRIBER_INITIALIZER;
+  ASSERT_EQ(orb_subscriber_create(&sub, &volatile_topic), ORB_OK);
+  EXPECT_FALSE(orb_subscriber_check_update(&sub));
+
+  // New publication after subscribing must be visible and delivered.
+  sent.val = 200;
+  ASSERT_EQ(orb_publisher_publish(&pub, &sent), ORB_OK);
+  EXPECT_TRUE(orb_subscriber_check_update(&sub));
+  ASSERT_EQ(orb_subscriber_copy(&sub, &recv), ORB_OK);
+  EXPECT_EQ(recv.val, 200);
+  EXPECT_FALSE(orb_subscriber_check_update(&sub));
+
+  EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
+  EXPECT_EQ(orb_publisher_destroy(&pub), ORB_OK);
 }
 
 TEST_F(UnitTest, concurrent_lookup_exists_and_lifecycle) {

@@ -159,6 +159,10 @@ orb_err orb_subscriber_copy_once(const struct orb_metadata *meta, void *buffer) 
     return ORB_ERR_INVALID;
   }
 
+  if (meta->o_durability == ORB_DURABILITY_VOLATILE) {
+    return ORB_ERR_NO_ENTRY;
+  }
+
   auto &device_master = DeviceMaster::get_instance();
   DeviceNode *dev = nullptr;
   orb_err err = device_master.OpenDeviceNode(*meta, 0, &dev);

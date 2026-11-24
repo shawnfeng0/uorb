@@ -130,7 +130,11 @@ unsigned uorb::DeviceNode::initial_generation() const {
   const bool published = has_published_.load(std::memory_order_acquire);
   const unsigned gen = generation_.load(std::memory_order_acquire);
 
-  // If there are any previous publications allow the subscriber to read the latest one
+  if (meta_.o_durability == ORB_DURABILITY_VOLATILE) {
+    return gen;
+  }
+
+  // Durable topic: if there are any previous publications allow the subscriber to read the latest one
   return (published || gen != 0) ? (gen - 1) : 0;
 }
 
