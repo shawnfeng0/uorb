@@ -18,20 +18,14 @@ using namespace uorb;
 struct ReceiverLocal {
   DeviceNode &dev;
   unsigned last_generation;
-  orb_subscriber_callback_fn publish_cb;
-  orb_callback_ctx publish_cb_ctx;
+  bool callback_registered;
   detail::CallbackEntry callback_entry;
 
-  explicit ReceiverLocal(DeviceNode &device_node) : dev(device_node) {
-    last_generation = device_node.initial_generation();
+  explicit ReceiverLocal(DeviceNode &device_node)
+      : dev(device_node),
+        last_generation(device_node.initial_generation()),
+        callback_registered(false) {
     device_node.add_subscriber();
-    publish_cb = nullptr;
-    publish_cb_ctx = {};
-    callback_entry.on_publish = [](const void *msg, void *ctx) {
-      auto *self = static_cast<ReceiverLocal *>(ctx);
-      if (self->publish_cb) self->publish_cb(msg, self->publish_cb_ctx);
-    };
-    callback_entry.ctx = this;
   }
 
   ~ReceiverLocal() {
@@ -141,10 +135,10 @@ orb_err orb_subscriber_destroy(orb_subscriber_t *sub) {
 
   auto *r = reinterpret_cast<ReceiverLocal *>(sub->_handle);
 
-  // Always unregister — safe even if not in the list (forward_list::remove is a no-op).
-  // This avoids a race where clear_callback sets publish_cb=nullptr before destroy
-  // checks it, which would skip UnregisterCallback and leave a dangling entry.
-  r->dev.UnregisterCallback(&r->callback_entry);
+  if (r->callback_registered) {
+    r->dev.UnregisterCallback(&r->callback_entry);
+    r->callback_registered = false;
+  }
   delete r;
   sub->_handle = nullptr;
   return ORB_OK;
@@ -189,23 +183,21 @@ bool orb_subscriber_check_update(orb_subscriber_t *sub) {
 
 orb_err orb_subscriber_set_callback(orb_subscriber_t *sub, orb_subscriber_callback_fn cb,
                                     orb_callback_ctx ctx) {
-  if (!sub || !sub->_handle) {
-    return ORB_ERR_INVALID;
-  }
-  if (!cb) {
+  if (!sub || !sub->_handle || !cb) {
     return ORB_ERR_INVALID;
   }
   auto *r = reinterpret_cast<ReceiverLocal *>(sub->_handle);
-  if (r->publish_cb) {
+  if (r->callback_registered) {
     return ORB_ERR_BUSY;
   }
-  r->publish_cb = cb;
-  r->publish_cb_ctx = ctx;
+  r->callback_entry.on_publish = cb;
+  r->callback_entry.ctx = ctx;
   if (!r->dev.RegisterCallback(&r->callback_entry)) {
-    r->publish_cb = nullptr;
-    r->publish_cb_ctx = {};
+    r->callback_entry.on_publish = nullptr;
+    r->callback_entry.ctx = {};
     return ORB_ERR_UNKNOWN;
   }
+  r->callback_registered = true;
   return ORB_OK;
 }
 
@@ -214,11 +206,14 @@ orb_err orb_subscriber_clear_callback(orb_subscriber_t *sub) {
     return ORB_ERR_INVALID;
   }
   auto *r = reinterpret_cast<ReceiverLocal *>(sub->_handle);
-  if (!r->publish_cb) return ORB_OK;
+  if (!r->callback_registered) {
+    return ORB_OK;
+  }
   bool ok = r->dev.UnregisterCallback(&r->callback_entry);
   if (ok) {
-    r->publish_cb = nullptr;
-    r->publish_cb_ctx = {};
+    r->callback_registered = false;
+    r->callback_entry.on_publish = nullptr;
+    r->callback_entry.ctx = {};
   }
   return ok ? ORB_OK : ORB_ERR_UNKNOWN;
 }

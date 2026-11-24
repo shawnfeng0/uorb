@@ -11,6 +11,7 @@
 #include <time.h>
 
 #ifdef __cplusplus
+#include <atomic>
 #include <type_traits>
 #endif
 
@@ -34,6 +35,11 @@ typedef enum {
 } orb_err;
 
 /**
+ * Maximum number of multi topic instances
+ */
+#define ORB_MULTI_MAX_INSTANCES 4
+
+/**
  * Object metadata.
  */
 struct orb_metadata {
@@ -42,6 +48,11 @@ struct orb_metadata {
   const uint16_t o_size_no_padding; /**< object size w/o padding (external logger contract, not used by library) */
   const char *o_fields;             /**< semicolon separated list of fields (with type) */
   uint16_t o_queue_size;            /**< maximum number of queued samples */
+#ifdef __cplusplus
+  mutable std::atomic<void *> instances[ORB_MULTI_MAX_INSTANCES]{};
+#else
+  void *instances[ORB_MULTI_MAX_INSTANCES];
+#endif
 };
 
 /**
@@ -66,11 +77,6 @@ struct TypeMap;
 }
 }  // namespace uorb
 #endif
-
-/**
- * Maximum number of multi topic instances
- */
-#define ORB_MULTI_MAX_INSTANCES 4
 
 /**
  * Generates a pointer to the uORB metadata structure for
@@ -135,10 +141,10 @@ struct TypeMap;
                 "uORB topic type must use standard layout; virtual functions, mixed access "      \
                 "control, and non-standard object layout are unsupported")
 #define ORB_DEFINE_3(_name, _struct, _queue_size) ORB_DEFINE_5(_name, _struct, 0, "", _queue_size)
-#define ORB_DEFINE_5(_name, _struct, _size_no_padding, _fields, _queue_size)                                      \
-  ORB_CHECK_TOPIC_TYPE(_struct);                                                                                  \
-  const struct orb_metadata uorb::msg::_name = {#_name, sizeof(_struct), _size_no_padding, _fields, _queue_size}; \
-  const struct orb_metadata *__orb_##_name = &uorb::msg::_name;                                                   \
+#define ORB_DEFINE_5(_name, _struct, _size_no_padding, _fields, _queue_size)                                          \
+  ORB_CHECK_TOPIC_TYPE(_struct);                                                                                      \
+  const struct orb_metadata uorb::msg::_name = {#_name, sizeof(_struct), _size_no_padding, _fields, _queue_size, {}}; \
+  const struct orb_metadata *__orb_##_name = &uorb::msg::_name;                                                       \
   struct hack
 #define ORB_DEFINE_SELECT(_1, _2, _3, _4, _5, NAME, ...) NAME
 #define ORB_DEFINE(...) ORB_DEFINE_SELECT(__VA_ARGS__, ORB_DEFINE_5, invalid, ORB_DEFINE_3)(__VA_ARGS__)

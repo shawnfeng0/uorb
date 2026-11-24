@@ -263,7 +263,7 @@ static void run_uevent_poll_many_subs(
   print_result(label, num_subs, loops, ms);
   print_ready_hint(num_subs, loops, ready_total, ms);
 
-  for (size_t i = 0; i < num_subs; ++i) {
+  for (int i = 0; i < num_subs; ++i) {
     uevent_remove(&poll, &sources[i]);
     uorb_subscriber_destroy_source(&sources[i]);
     orb_subscriber_destroy(&subs[i]);
@@ -327,7 +327,7 @@ static void run_uevent_poll_blocking(int num_subs, int duration_ms) {
   print_result("blocking uevent_poll (pub+wait+copy)", num_subs, loops,
                elapsed_ms(t0));
 
-  for (size_t i = 0; i < num_subs; ++i) {
+  for (int i = 0; i < num_subs; ++i) {
     uevent_remove(&poll, &sources[i]);
     uorb_subscriber_destroy_source(&sources[i]);
     orb_subscriber_destroy(&subs[i]);

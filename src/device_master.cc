@@ -1,8 +1,14 @@
 #include "device_master.h"
 
+#include <atomic>
 #include <new>
 
 #include "device_node.h"
+
+static_assert(sizeof(std::atomic<void *>) == sizeof(void *),
+              "std::atomic<void*> must match void* size for C/C++ ABI compatibility");
+static_assert(alignof(std::atomic<void *>) == alignof(void *),
+              "std::atomic<void*> must match void* alignment for C/C++ ABI compatibility");
 
 uorb::DeviceMaster uorb::DeviceMaster::instance_;
 
@@ -20,19 +26,20 @@ orb_err uorb::DeviceMaster::CreateAdvertiser(const orb_metadata &meta, unsigned 
   // - Single instance device
   // - Unregistered device
   do {
-    device_node = GetDeviceNodeLocked(meta, group_tries);
+    device_node = GetDeviceNodeLocked(meta, static_cast<uint8_t>(group_tries));
     if (device_node && (!device_node->publisher_count() || is_single_instance)) {
       device_node->add_publisher();
       break;  // Find a unadvertised device or single instance device
     }
 
     if (!device_node) {
-      device_node = new (std::nothrow) DeviceNode(meta, group_tries);
+      device_node = new (std::nothrow) DeviceNode(meta, static_cast<uint8_t>(group_tries));
       if (!device_node) {
         return ORB_ERR_NO_MEM;
       }
       device_node->add_publisher();
       node_list_.push_front(*device_node);
+      meta.instances[group_tries].store(device_node, std::memory_order_release);
       break;  // Create new device
     }
     group_tries++;
@@ -49,19 +56,19 @@ orb_err uorb::DeviceMaster::CreateAdvertiser(const orb_metadata &meta, unsigned 
 }
 
 uorb::DeviceNode *uorb::DeviceMaster::GetDeviceNode(const orb_metadata &meta, uint8_t instance) const {
-  base::LockGuard<base::Mutex> lg(lock_);
-  return GetDeviceNodeLocked(meta, instance);
+  if (instance >= ORB_MULTI_MAX_INSTANCES) {
+    return nullptr;
+  }
+  return static_cast<DeviceNode *>(meta.instances[instance].load(std::memory_order_acquire));
 }
 
 bool uorb::DeviceMaster::TopicExists(const orb_metadata &meta, uint8_t instance) const {
-  base::LockGuard<base::Mutex> lg(lock_);
-  auto *device_node = GetDeviceNodeLocked(meta, instance);
+  auto *device_node = GetDeviceNode(meta, instance);
   return device_node && device_node->publisher_count() > 0;
 }
 
 bool uorb::DeviceMaster::GetTopicStatus(const orb_metadata &meta, uint8_t instance, orb_status *status) const {
-  base::LockGuard<base::Mutex> lg(lock_);
-  auto *device_node = GetDeviceNodeLocked(meta, instance);
+  auto *device_node = GetDeviceNode(meta, instance);
   if (!device_node) {
     return false;
   }
@@ -74,10 +81,10 @@ bool uorb::DeviceMaster::GetTopicStatus(const orb_metadata &meta, uint8_t instan
 }
 
 uorb::DeviceNode *uorb::DeviceMaster::GetDeviceNodeLocked(const orb_metadata &meta, uint8_t instance) const {
-  for (auto &node : node_list_) {
-    if (node.IsSameWith(meta, instance)) return &node;
+  if (instance >= ORB_MULTI_MAX_INSTANCES) {
+    return nullptr;
   }
-  return nullptr;
+  return static_cast<DeviceNode *>(meta.instances[instance].load(std::memory_order_relaxed));
 }
 
 orb_err uorb::DeviceMaster::OpenDeviceNode(const orb_metadata &meta, unsigned int instance, DeviceNode **out) {
@@ -85,20 +92,28 @@ orb_err uorb::DeviceMaster::OpenDeviceNode(const orb_metadata &meta, unsigned in
     return ORB_ERR_INVALID;
   }
 
-  base::LockGuard<base::Mutex> lg(lock_);
-
-  DeviceNode *device_node = GetDeviceNodeLocked(meta, instance);
+  // Lock-free O(1) fast path: DeviceNodes are persistent once created.
+  auto *device_node = static_cast<DeviceNode *>(meta.instances[instance].load(std::memory_order_acquire));
   if (device_node) {
     *out = device_node;
     return ORB_OK;
   }
 
-  device_node = new (std::nothrow) DeviceNode(meta, instance);
+  base::LockGuard<base::Mutex> lg(lock_);
+
+  device_node = GetDeviceNodeLocked(meta, static_cast<uint8_t>(instance));
+  if (device_node) {
+    *out = device_node;
+    return ORB_OK;
+  }
+
+  device_node = new (std::nothrow) DeviceNode(meta, static_cast<uint8_t>(instance));
   if (!device_node) {
     return ORB_ERR_NO_MEM;
   }
 
   node_list_.push_front(*device_node);
+  meta.instances[instance].store(device_node, std::memory_order_release);
   *out = device_node;
   return ORB_OK;
 }

@@ -7,8 +7,8 @@
 namespace intrusive_list {
 
 struct list_node {
-  list_node* next;
-  list_node* prev;
+  list_node *next{nullptr};
+  list_node *prev{nullptr};
 };
 
 namespace internal {
@@ -112,14 +112,14 @@ static inline int list_is_singular(const Node *head) {
 /**
  * list double linked list.
  */
-template <typename T, decltype(auto) node_field>
+template <typename T, list_node T::*node_field>
 class list {
-  using Node = std::remove_reference_t<decltype((T *)nullptr->*node_field)>;
+  using Node = list_node;
 
   Node head_;
 
  public:
-  list() noexcept : head_({&head_, &head_}) {}
+  list() noexcept : head_{&head_, &head_} {}
 
   /**
    * insert item at the front of list.
@@ -140,7 +140,7 @@ class list {
    * @return false When the deletion fails
    */
   bool remove_if_exists(T &item) {
-    decltype(auto) node = get_node(&item);
+    Node *node = get_node(&item);
     if (node->next && node->prev) {
       internal::list_remove_self_from_list(node);
       return true;
@@ -204,7 +204,7 @@ class list {
   Iterator begin() { return Iterator{head_.next}; }
   Iterator begin() const { return Iterator{head_.next}; }
   Iterator end() { return Iterator{&head_}; }
-  Iterator end() const { return Iterator{&head_}; }
+  Iterator end() const { return Iterator{const_cast<Node *>(&head_)}; }
 
   Iterator erase(Iterator position) {
     Iterator ret = Iterator((position.node->next));

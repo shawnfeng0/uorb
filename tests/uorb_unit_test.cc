@@ -47,10 +47,6 @@
 #include <thread>
 #include <vector>
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
 namespace uORBTest {
 
 class TestableSubscriptionInterval final : public uorb::SubscriptionInterval<uorb::msg::orb_test> {
@@ -1244,13 +1240,57 @@ TEST_F(UnitTest, publish_once_without_subscribers) {
 }
 
 TEST_F(UnitTest, copy_once_on_never_published_topic) {
+  static const struct orb_metadata never_published_topic = {
+      "orb_never_published_test", sizeof(orb_test_large_s), 0, "", 1, {}};
   orb_test_large_s buffer{};
   buffer.val = 12345;  // Set non-zero to detect if overwritten
 
   // Call copy_once on a topic that has never been published.
   // Should not crash. Returns ORB_ERR_UNKNOWN since no data has been published.
-  orb_err result = orb_subscriber_copy_once(ORB_ID(orb_test_large), &buffer);
+  orb_err result = orb_subscriber_copy_once(&never_published_topic, &buffer);
   EXPECT_EQ(result, ORB_ERR_UNKNOWN);
+}
+
+TEST_F(UnitTest, concurrent_lookup_exists_and_lifecycle) {
+  constexpr int kIterations = 200;
+  std::atomic<bool> stop{false};
+
+  std::thread pub_thread([&]() {
+    orb_test_s msg{};
+    for (int i = 0; i < kIterations; ++i) {
+      orb_publisher_t pub = ORB_PUBLISHER_INITIALIZER;
+      ASSERT_EQ(orb_publisher_create(&pub, ORB_ID(orb_test)), ORB_OK);
+      msg.val = i;
+      EXPECT_EQ(orb_publisher_publish(&pub, &msg), ORB_OK);
+      EXPECT_EQ(orb_publisher_destroy(&pub), ORB_OK);
+    }
+    stop.store(true, std::memory_order_release);
+  });
+
+  std::thread sub_thread([&]() {
+    orb_test_s msg{};
+    while (!stop.load(std::memory_order_acquire)) {
+      orb_subscriber_t sub = ORB_SUBSCRIBER_INITIALIZER;
+      ASSERT_EQ(orb_subscriber_create(&sub, ORB_ID(orb_test)), ORB_OK);
+      if (orb_subscriber_check_update(&sub)) {
+        EXPECT_EQ(orb_subscriber_copy(&sub, &msg), ORB_OK);
+      }
+      EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
+    }
+  });
+
+  std::thread status_thread([&]() {
+    while (!stop.load(std::memory_order_acquire)) {
+      (void)orb_exists(ORB_ID(orb_test), 0);
+      (void)orb_group_count(ORB_ID(orb_test));
+      orb_status status{};
+      (void)orb_get_topic_status(ORB_ID(orb_test), 0, &status);
+    }
+  });
+
+  pub_thread.join();
+  sub_thread.join();
+  status_thread.join();
 }
 
 }  // namespace uORBTest
