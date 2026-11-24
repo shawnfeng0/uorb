@@ -47,25 +47,25 @@ This codebase targets embedded/RTOS platforms. The following are
 - `std::shared_ptr`, `std::function` — use raw pointers and function
   pointers.
 
-The two `base/mutex.h` files (one per library) both wrap
+The two internal mutex headers (one per library) both wrap
 `pthread_mutex_t` with `PTHREAD_MUTEX_INITIALIZER` support for static
 storage.
 
-## 4. Duplicate base/mutex.h — Include Path Collision
+## 4. Per-Library Base Headers (`base/` vs `uevent_base/`)
 
-There are **two separate copies** of `base/mutex.h`:
+To keep `uorb` and `uevent` independently buildable with zero shared
+dependencies, each library keeps its own private synchronization helpers
+under distinct include prefixes:
 
-- `src/base/mutex.h` — namespace `uorb::base`
-- `components/uevent/src/base/mutex.h` — namespace `uevent::base`
+- `src/base/` — namespace `uorb::base` (`#include "base/mutex.h"`)
+- `components/uevent/src/uevent_base/` — namespace `uevent::base`
+  (`#include "uevent_base/mutex.h"`)
 
-Both are private to their library. When the `uorb_uevent` test target
-has both include paths, `#include "base/mutex.h"` resolves to whichever
-path appears first (uorb's). This causes namespace errors if uevent
-code tries to include it through the header path.
-
-**Rule**: `uevent_source.h` must NOT include `base/mutex.h`. It uses raw
-`pthread_mutex_t` directly via `<pthread.h>`. The `.cc` file includes
-`base/mutex.h` correctly because it lives inside `components/uevent/src/`.
+Using distinct directory names prevents include-path collisions when test
+or bridge targets put both `src/` and `components/uevent/src/` on the
+include path. `uevent_source.h` (public header) still uses raw
+`pthread_mutex_t` directly via `<pthread.h>` so public headers do not
+depend on private `uevent_base/` headers.
 
 ## 5. Lock Ordering
 
@@ -205,10 +205,9 @@ map them to `errno` values. Callers test with `err != ORB_OK` or
    with `*_destroy`. For uevent sources, `uevent_remove()` must be
    called before `uevent_source_destroy()`.
 
-2. **Including wrong base/mutex.h**: When working in uevent code, do
-   not rely on include paths picking up uevent's `base/mutex.h` if the
-   compilation unit also has uorb's src in its include path. Prefer raw
-   `pthread_mutex_t` in headers shared across libraries.
+2. **Do not include private `uevent_base/` headers from public headers**:
+   Public headers like `uevent_source.h` must use raw `pthread_mutex_t`
+   via `<pthread.h>` rather than private `uevent_base/mutex.h`.
 
 3. **Using std primitives**: See RTOS constraints above. Always use
    `base::` wrappers or raw pthread.

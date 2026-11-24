@@ -11,8 +11,8 @@
 #include <cstring>
 #include <new>
 
-#include "base/mutex.h"
-#include "base/condition_variable.h"
+#include "uevent_base/mutex.h"
+#include "uevent_base/condition_variable.h"
 
 namespace uevent {
 
