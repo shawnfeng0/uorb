@@ -119,6 +119,29 @@ class DeviceNode {
 
   static constexpr uint8_t kMaxCounterValue = 0x7F;
 
+  // --- Group 1: Writer-only mutex (isolated from lock-free Copy() readers) ---
+  // Lock ordering:
+  //   DeviceMaster::lock_  →  data_lock_     (node lookup)
+  //   callback_lock_       →  (Copy is lock-free, never acquires data_lock_)
+  // data_lock_ only serializes concurrent writers in Publish(). Keeping it at
+  // the front prevents writer lock-contention cache traffic from invalidating
+  // the reader-hot fields in Group 3 (buffer_, slot geometry, generation_).
+  mutable base::Mutex data_lock_{};  // protects: buffer_ allocation & writes, generation_ writes
+
+  // --- Group 2: Cold / low-frequency callback & lifecycle fields ---
+  // Naturally separates Group 1 (writer mutex) from Group 3 (reader-hot block)
+  // across cache lines without adding alignas() padding overhead on MCUs.
+  mutable base::Mutex callback_lock_{};  // protects: receiver_list_
+  intrusive_list::list<detail::CallbackEntry, &detail::CallbackEntry::node> receiver_list_;
+  intrusive_list::forward_list_node device_list_node_{};
+  std::atomic<uint32_t> subscriber_count_{0};
+  std::atomic<uint32_t> publisher_count_{0};
+  std::atomic<uint32_t> callback_count_{0}; /**< number of registered callbacks */
+  std::atomic<bool> has_untracked_subscriber_{false};
+  std::atomic<bool> has_untracked_publisher_{false};
+
+  // --- Group 3: Reader-hot block (all fields touched by lock-free Copy()) ---
+  // Fits in a single cache line on 64B/128B CPUs, isolated from data_lock_.
   const orb_metadata &meta_; /**< object metadata information */
 
   // Lock-free reader / mutex-serialized writer slot storage (single allocation):
@@ -128,30 +151,15 @@ class DeviceNode {
   // for queue_size_ >= 2 (zero extra slots).
   std::atomic<uint8_t *> buffer_{nullptr};
 
-  // Lock ordering:
-  //   DeviceMaster::lock_  →  data_lock_     (node lookup)
-  //   callback_lock_       →  (Copy is lock-free, never acquires data_lock_)
-  // data_lock_ only serializes concurrent writers in Publish().
-  mutable base::Mutex data_lock_{};      // protects: buffer_ allocation & writes, generation_ writes
-  mutable base::Mutex callback_lock_{};  // protects: receiver_list_
-
-  intrusive_list::list<detail::CallbackEntry, &detail::CallbackEntry::node> receiver_list_;
-  intrusive_list::forward_list_node device_list_node_{};
-
-  std::atomic_uint32_t generation_{0};      /**< object generation count */
-  std::atomic<uint32_t> callback_count_{0}; /**< number of registered callbacks */
-  std::atomic<uint32_t> subscriber_count_{0};
-  std::atomic<uint32_t> publisher_count_{0};
-  std::atomic<bool> has_published_{false};  /**< true once at least one publish completed */
-  std::atomic<bool> has_untracked_subscriber_{false};
-  std::atomic<bool> has_untracked_publisher_{false};
   const uint32_t physical_slots_; /**< (queue_size_ == 1) ? 2 : queue_size_ (power of 2, >= 2) */
   const uint32_t physical_mask_;  /**< physical_slots_ - 1 */
   const size_t payload_words_;    /**< ceil(item_size_ / sizeof(size_t)) */
   const size_t seq_offset_;       /**< byte offset of per-slot uint32_t seq array in buffer_ */
+  std::atomic_uint32_t generation_{0}; /**< object generation count */
   const uint16_t item_size_;      /**< cached object size */
   const uint16_t queue_size_;     /**< logical maximum number of elements in the queue */
   const uint8_t instance_;        /**< orb multi instance identifier */
+  std::atomic<bool> has_published_{false}; /**< true once at least one publish completed */
 
   DeviceNode(const struct orb_metadata &meta, uint8_t instance);
   ~DeviceNode();
