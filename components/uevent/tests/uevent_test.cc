@@ -846,3 +846,119 @@ TEST(UeventTest, LoopbreakFromMultipleThreadsConcurrently) {
   uevent_source_destroy(&src);
   uevent_destroy(&base);
 }
+
+// ---- Reuse source after previous base destroyed while source was in ready queue ----
+
+TEST(UeventTest, ReuseSourceAfterBaseDestroyedWhileReady) {
+  struct Ctx {
+    std::atomic<bool> ready{false};
+  };
+  Ctx ctx;
+
+  auto ready_fn = [](void *p) -> bool {
+    return static_cast<Ctx *>(p)->ready.load();
+  };
+
+  uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
+  ASSERT_EQ(uevent_source_create(&src, ready_fn, nullptr, nullptr, nullptr, &ctx), 0);
+
+  uevent_t base_a = UEVENT_INITIALIZER;
+  ASSERT_EQ(uevent_create(&base_a), 0);
+  ASSERT_EQ(uevent_add(&base_a, &src, 0), 0);
+
+  // Queue src in base_a's ready_queue_ (sets in_ready_queue_ = true), then destroy base_a.
+  ctx.ready = true;
+  uevent_source_notify(&src);
+  uevent_destroy(&base_a);
+  EXPECT_FALSE(uevent_source_is_bound(&src));
+
+  // Re-attach src to base_b; in_ready_queue_ must have been reset so notifications work.
+  ctx.ready = false;
+  uevent_t base_b = UEVENT_INITIALIZER;
+  ASSERT_EQ(uevent_create(&base_b), 0);
+  ASSERT_EQ(uevent_add(&base_b, &src, 0), 0);
+
+  uevent_source_t ready[1] = {UEVENT_SOURCE_INITIALIZER};
+  EXPECT_EQ(uevent_loop(&base_b, ready, 1, 0), 0);
+
+  ctx.ready = true;
+  uevent_source_notify(&src);
+  ASSERT_EQ(uevent_loop(&base_b, ready, 1, 100), 1);
+  EXPECT_EQ(ready[0]._handle, src._handle);
+
+  ASSERT_EQ(uevent_remove(&base_b, &src), 0);
+  uevent_source_destroy(&src);
+  uevent_destroy(&base_b);
+}
+
+// ---- Adding an already-ready source wakes a blocked loop ----
+
+TEST(UeventTest, AddAlreadyReadySourceWakesBlockedLoop) {
+  struct Ctx {
+    std::atomic<bool> ready{true};
+  };
+  Ctx ctx;
+
+  auto ready_fn = [](void *p) -> bool {
+    return static_cast<Ctx *>(p)->ready.load();
+  };
+
+  uevent_t base = UEVENT_INITIALIZER;
+  ASSERT_EQ(uevent_create(&base), 0);
+
+  uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
+  ASSERT_EQ(uevent_source_create(&src, ready_fn, nullptr, nullptr, nullptr, &ctx), 0);
+
+  std::thread adder([&]() {
+    std::this_thread::sleep_for(std::chrono::milliseconds(30));
+    // Add without calling uevent_source_notify; already-ready state must wake Wait().
+    uevent_add(&base, &src, 0);
+  });
+
+  uevent_source_t ready[1] = {UEVENT_SOURCE_INITIALIZER};
+  ASSERT_EQ(uevent_loop(&base, ready, 1, 500), 1);
+  EXPECT_EQ(ready[0]._handle, src._handle);
+
+  adder.join();
+  ASSERT_EQ(uevent_remove(&base, &src), 0);
+  uevent_source_destroy(&src);
+  uevent_destroy(&base);
+}
+
+// ---- Per-event timeout followed by notify does not leave stale queue entries ----
+
+TEST(UeventTest, PerEventTimeoutThenNotifyCleanlyDelivers) {
+  struct Ctx {
+    std::atomic<bool> ready{false};
+  };
+  Ctx ctx;
+
+  auto ready_fn = [](void *p) -> bool {
+    return static_cast<Ctx *>(p)->ready.load();
+  };
+
+  uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
+  ASSERT_EQ(uevent_source_create(&src, ready_fn, nullptr, nullptr, nullptr, &ctx), 0);
+
+  uevent_t base = UEVENT_INITIALIZER;
+  ASSERT_EQ(uevent_create(&base), 0);
+  ASSERT_EQ(uevent_add(&base, &src, 30), 0);
+
+  uevent_source_t ready[1] = {UEVENT_SOURCE_INITIALIZER};
+  ASSERT_EQ(uevent_loop(&base, ready, 1, 500), 1);
+  EXPECT_EQ(ready[0]._handle, src._handle);
+
+  // Subsequent notifications after timeout expiration must work cleanly.
+  for (int i = 0; i < 5; ++i) {
+    ctx.ready = true;
+    uevent_source_notify(&src);
+    ASSERT_EQ(uevent_loop(&base, ready, 1, 100), 1);
+    EXPECT_EQ(ready[0]._handle, src._handle);
+    ctx.ready = false;
+    EXPECT_EQ(uevent_loop(&base, ready, 1, 0), 0);
+  }
+
+  ASSERT_EQ(uevent_remove(&base, &src), 0);
+  uevent_source_destroy(&src);
+  uevent_destroy(&base);
+}

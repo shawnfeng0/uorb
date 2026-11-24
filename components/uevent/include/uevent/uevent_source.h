@@ -68,8 +68,12 @@ class EventSource {
     return wakeup_.load(std::memory_order_acquire) == poll;
   }
 
-  bool in_ready_queue() const { return in_ready_queue_; }
-  void set_in_ready_queue(bool v) { in_ready_queue_ = v; }
+  bool in_ready_queue() const {
+    return in_ready_queue_.load(std::memory_order_relaxed);
+  }
+  void set_in_ready_queue(bool v) {
+    in_ready_queue_.store(v, std::memory_order_release);
+  }
 
   virtual bool is_ready() const = 0;
 
@@ -78,13 +82,20 @@ class EventSource {
   void notify_waiters();
 
  private:
+  friend class EventPoll;
+
   pthread_mutex_t notify_mu_
 #ifdef PTHREAD_MUTEX_INITIALIZER
       = PTHREAD_MUTEX_INITIALIZER
 #endif
   ;  // serializes notify_waiters() vs ClearWakeup()
   std::atomic<EventPoll *> wakeup_{nullptr};
-  bool in_ready_queue_{false};
+  std::atomic<bool> in_ready_queue_{false};
+
+  // Intrusive doubly-linked list links owned by EventPoll (guarded by EventPoll::mu_).
+  EventSource *poll_prev_{nullptr};
+  EventSource *poll_next_{nullptr};
+  bool in_poll_list_{false};
 };
 
 }  // namespace uevent
