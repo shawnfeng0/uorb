@@ -18,6 +18,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Add topic durability policy (`ORB_DURABILITY_DURABLE` / `ORB_DURABILITY_VOLATILE`) in `orb_metadata`, `ORB_DEFINE`, and the `.msg` code generator (`ORB_DURABILITY` constant).
 - Add C++ convenience helpers `uorb::publish<Topic>()` / `uorb::copy<Topic>()` and `Subscription::SetCallback()` / `ClearCallback()`.
 - Add built-in software-triggered manual event source API (`uevent_manual_source_create/trigger/reset`).
+- Add thread-safe `uorb::AsyncDispatcher` (`<uorb_uevent/async_dispatcher.h>`) running topic callbacks on a dedicated POSIX worker thread with O(1) stack depth, zero STL containers, and safe cross-thread/self `Unsubscribe()`.
 
 ### Changed
 
@@ -38,6 +39,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Make `DeviceNode` counters (`subscriber_count_`, `publisher_count_`, `initial_generation()`, `FillStatus()`) lock-free using wait-free atomics; add Dekker fast-path in `Publish()` to skip `callback_lock_` when no callbacks are registered.
 - Make `DeviceNode::Copy()` 100% lock-free using per-slot 4-byte `std::atomic<uint32_t>` SeqLock tags (`physical_slots = (queue_size == 1) ? 2 : queue_size`, single allocation, zero extra slots for `queue_size >= 2`) and relaxed atomic word copies (TSan/UBSan clean, wait-free against single-core RTOS preemption, no `sched_yield()` required).
 - Group `DeviceNode` member fields to isolate writer-only `data_lock_` from the lock-free `Copy()` reader block (`buffer_`, slot geometry, `generation_`) using cold callback/lifecycle fields as a zero-overhead separator.
+- Dispatch `DeviceNode` publish callbacks outside `callback_lock_` via an intrusive stack cursor with per-entry `active_calls` drain, self-unregister/self-destroy detachment, and a `kMaxSyncCallbackDepth` stack-overflow circuit breaker; document the two-layer notification architecture in `ARCHITECTURE.md`.
 - Switch `DeviceNode::receiver_list_` to a doubly-linked intrusive list for O(1) callback unregistration and invoke user callbacks directly without lambda indirection.
 - Replace `std::list` in `EventPoll` with a zero-allocation intrusive doubly-linked list, coalesce notifications via atomic `in_ready_queue_` fast-path, only signal condition variables when waiters are blocked, and lazily fetch clocks for timeouts.
 - Consolidate all unit and integration tests into a single `uorb_test` executable.

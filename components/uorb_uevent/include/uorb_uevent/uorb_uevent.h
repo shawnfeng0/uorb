@@ -15,6 +15,8 @@
 extern "C" {
 #endif
 
+#define UORB_UEVENT_API_DECLARED 1
+
 /**
  * Create an event source that wraps a uORB subscription.
  *
@@ -189,5 +191,7 @@ class EventLoop {
 };
 
 }  // namespace uorb
+
+#include <uorb_uevent/async_dispatcher.h>
 
 #endif  // __cplusplus

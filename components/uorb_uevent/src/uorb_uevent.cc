@@ -10,6 +10,10 @@
 #include <atomic>
 #include <new>
 
+namespace uorb {
+constexpr AsyncDispatcher::Token AsyncDispatcher::kInvalidToken;
+}  // namespace uorb
+
 namespace {
 
 // Direct EventSource implementation for a uORB subscription:

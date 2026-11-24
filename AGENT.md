@@ -72,8 +72,11 @@ depend on private `uevent_base/` headers.
 ### DeviceNode (uorb core)
 
 ```
-DeviceMaster::lock_  →  data_lock_     (node lookup)
-callback_lock_       →  data_lock_     (callbacks calling Copy)
+DeviceMaster::lock_  →  data_lock_        (node lookup)
+DeviceNode::Publish:
+  1. data_lock_      →  (write slot, release)
+  2. callback_lock_  →  (advance stack cursor, increment active_calls, release)
+  3. user callback   →  (NO DeviceNode locks held!)
 ```
 
 - `data_lock_` only serializes concurrent writers in `Publish()`. `Copy()` is
@@ -81,13 +84,26 @@ callback_lock_       →  data_lock_     (callbacks calling Copy)
   SeqLock tags (`physical_slots = (queue_size == 1) ? 2 : queue_size`, single
   allocation with `std::atomic<size_t>` payload words), so readers never block
   writers or each other.
-- `data_lock_` and `callback_lock_` are **NEVER held simultaneously** in
-  `Publish()`. Publish writes data under `data_lock_`, releases it, then
-  invokes callbacks under `callback_lock_`.
-- Callbacks executing under `callback_lock_` may safely call `Copy()` (lock-free).
-- **Do NOT** call `Publish()` on the same topic from a callback — that
-  would acquire `data_lock_` then `callback_lock_`, creating a lock-order
-  violation.
+- `data_lock_` and `callback_lock_` are **NEVER held simultaneously**, and
+  `callback_lock_` is **NEVER held while invoking `entry.on_publish()`**.
+  Therefore callbacks may safely call `Copy()`, `Publish()` (even on the same
+  topic, bounded by `kMaxSyncCallbackDepth = 16`), `ClearCallback()`,
+  `orb_subscriber_destroy()`, or acquire application mutexes without
+  lock-order deadlocks.
+- Cross-thread `UnregisterCallback()` blocks on `callback_cv_` until other
+  threads' in-flight invocations of that entry finish; self-unregistration
+  detaches the current thread's `ActiveCallFrame`s to avoid self-deadlock and
+  use-after-free.
+- For business callbacks (which may chain publishes or perform heavier work),
+  prefer `uorb::EventLoop` or `uorb::AsyncDispatcher` so publisher threads only
+  perform O(1) wakeup signals.
+
+### AsyncDispatcher (uorb_uevent)
+
+```
+AsyncDispatcher::mu_  →  DeviceNode::callback_lock_ / EventPoll::mu_  (Subscribe)
+WorkerLoop: EventPoll::mu_ (released) → AsyncDispatcher::mu_ (released) → user callback (NO locks held)
+```
 
 ### EventPoll (uevent)
 

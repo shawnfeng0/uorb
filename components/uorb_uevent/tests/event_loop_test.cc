@@ -12,6 +12,7 @@
 #include <uorb/topics/orb_test.h>
 #include <uorb/topics/orb_test_large.h>
 #include <uorb/topics/orb_test_medium.h>
+#include <uorb/topics/orb_test_volatile.h>
 
 #include <atomic>
 #include <cerrno>
@@ -459,6 +460,174 @@ TEST(EventLoopTest, SubscribeAcceptsMoveOnlyCallback) {
 
   ASSERT_EQ(loop.RunOnce(100), 1);
   EXPECT_EQ(observed, 42);
+}
+
+// ---------------------------------------------------------------------------
+// AsyncDispatcher tests
+// ---------------------------------------------------------------------------
+
+TEST(AsyncDispatcherTest, StartStopRestartAndOffPublisherThreadDelivery) {
+  uorb::AsyncDispatcher dispatcher;
+  ASSERT_TRUE(dispatcher);
+  EXPECT_FALSE(dispatcher.IsRunning());
+
+  std::atomic<int> received_val{0};
+  std::atomic<bool> on_different_thread{false};
+  const std::thread::id main_tid = std::this_thread::get_id();
+
+  const auto tok = dispatcher.Subscribe<uorb::msg::orb_test_volatile>(
+      [&](const orb_test_volatile_s &msg) {
+        on_different_thread.store(std::this_thread::get_id() != main_tid,
+                                  std::memory_order_release);
+        received_val.store(msg.val, std::memory_order_release);
+      });
+  ASSERT_NE(tok, uorb::AsyncDispatcher::kInvalidToken);
+
+  ASSERT_TRUE(dispatcher.Start());
+  EXPECT_TRUE(dispatcher.IsRunning());
+  // Start() is idempotent.
+  EXPECT_TRUE(dispatcher.Start());
+
+  orb_test_volatile_s sent{};
+  sent.val = 123;
+  ASSERT_EQ(uorb::publish<uorb::msg::orb_test_volatile>(sent), ORB_OK);
+
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+  while (received_val.load(std::memory_order_acquire) != 123 &&
+         std::chrono::steady_clock::now() < deadline) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  EXPECT_EQ(received_val.load(), 123);
+  EXPECT_TRUE(on_different_thread.load());
+
+  // Stop and restart cleanly.
+  dispatcher.Stop();
+  EXPECT_FALSE(dispatcher.IsRunning());
+  dispatcher.Stop();  // idempotent
+
+  ASSERT_TRUE(dispatcher.Start());
+  EXPECT_TRUE(dispatcher.IsRunning());
+
+  sent.val = 456;
+  ASSERT_EQ(uorb::publish<uorb::msg::orb_test_volatile>(sent), ORB_OK);
+  const auto deadline2 = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+  while (received_val.load(std::memory_order_acquire) != 456 &&
+         std::chrono::steady_clock::now() < deadline2) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  EXPECT_EQ(received_val.load(), 456);
+  EXPECT_TRUE(dispatcher.Unsubscribe(tok));
+  EXPECT_FALSE(dispatcher.Unsubscribe(tok));  // second unsubscribe returns false
+}
+
+// Re-publishing the same topic 100 times in a chain runs iteratively on the
+// dispatcher worker thread with O(1) stack depth and zero deadlocks.
+TEST(AsyncDispatcherTest, LongPublishChainRunsIterativelyWithoutDeadlock) {
+  uorb::AsyncDispatcher dispatcher;
+  ASSERT_TRUE(dispatcher);
+  ASSERT_TRUE(dispatcher.Start());
+
+  constexpr int kTarget = 100;
+  std::atomic<int> count{0};
+  const auto tok = dispatcher.Subscribe<uorb::msg::orb_test_volatile>(
+      [&](const orb_test_volatile_s &msg) {
+        const int n = count.fetch_add(1, std::memory_order_acq_rel) + 1;
+        if (n < kTarget) {
+          orb_test_volatile_s next = msg;
+          next.val += 1;
+          EXPECT_EQ(uorb::publish<uorb::msg::orb_test_volatile>(next), ORB_OK);
+        }
+      });
+  ASSERT_NE(tok, uorb::AsyncDispatcher::kInvalidToken);
+
+  orb_test_volatile_s start_msg{};
+  start_msg.val = 1;
+  ASSERT_EQ(uorb::publish<uorb::msg::orb_test_volatile>(start_msg), ORB_OK);
+
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+  while (count.load(std::memory_order_acquire) < kTarget &&
+         std::chrono::steady_clock::now() < deadline) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  EXPECT_EQ(count.load(), kTarget);
+}
+
+// Cross-thread Unsubscribe() must wait for an in-flight callback to finish before
+// returning, and self-Unsubscribe() + dynamic Subscribe() inside a callback must
+// work without deadlocking.
+TEST(AsyncDispatcherTest, CrossThreadDrainAndSelfUnsubscribeInsideCallback) {
+  uorb::AsyncDispatcher dispatcher;
+  ASSERT_TRUE(dispatcher);
+  ASSERT_TRUE(dispatcher.Start());
+
+  // 1) Cross-thread drain on Unsubscribe()
+  std::atomic<bool> entered{false};
+  std::atomic<bool> finished{false};
+  int *captured_state = new int(77);
+
+  const auto slow_tok = dispatcher.Subscribe<uorb::msg::orb_test_volatile>(
+      [&](const orb_test_volatile_s &) {
+        entered.store(true, std::memory_order_release);
+        std::this_thread::sleep_for(std::chrono::milliseconds(30));
+        EXPECT_EQ(*captured_state, 77);
+        finished.store(true, std::memory_order_release);
+      });
+  ASSERT_NE(slow_tok, uorb::AsyncDispatcher::kInvalidToken);
+
+  orb_test_volatile_s m{};
+  m.val = 1;
+  ASSERT_EQ(uorb::publish<uorb::msg::orb_test_volatile>(m), ORB_OK);
+
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+  while (!entered.load(std::memory_order_acquire) &&
+         std::chrono::steady_clock::now() < deadline) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  ASSERT_TRUE(entered.load());
+  ASSERT_TRUE(dispatcher.Unsubscribe(slow_tok));
+  EXPECT_TRUE(finished.load());
+  delete captured_state;
+
+  // 2) Self-Unsubscribe + dynamic Subscribe from inside a callback
+  std::atomic<uorb::AsyncDispatcher::Token> self_tok{uorb::AsyncDispatcher::kInvalidToken};
+  std::atomic<int> first_calls{0};
+  std::atomic<int> second_calls{0};
+
+  const auto tok = dispatcher.Subscribe<uorb::msg::orb_test_volatile>(
+      [&](const orb_test_volatile_s &) {
+        first_calls.fetch_add(1, std::memory_order_acq_rel);
+        const auto t = self_tok.load(std::memory_order_acquire);
+        EXPECT_TRUE(dispatcher.Unsubscribe(t));
+        const auto next_tok = dispatcher.Subscribe<uorb::msg::orb_test_volatile>(
+            [&](const orb_test_volatile_s &) {
+              second_calls.fetch_add(1, std::memory_order_acq_rel);
+            });
+        EXPECT_NE(next_tok, uorb::AsyncDispatcher::kInvalidToken);
+      });
+  ASSERT_NE(tok, uorb::AsyncDispatcher::kInvalidToken);
+  self_tok.store(tok, std::memory_order_release);
+
+  m.val = 2;
+  ASSERT_EQ(uorb::publish<uorb::msg::orb_test_volatile>(m), ORB_OK);
+  const auto deadline2 = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+  while (first_calls.load(std::memory_order_acquire) < 1 &&
+         std::chrono::steady_clock::now() < deadline2) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  EXPECT_EQ(first_calls.load(), 1);
+
+  // Give the worker a moment to complete deferred cleanup of first subscription,
+  // then publish again: only the dynamically subscribed callback should fire.
+  std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  m.val = 3;
+  ASSERT_EQ(uorb::publish<uorb::msg::orb_test_volatile>(m), ORB_OK);
+  const auto deadline3 = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+  while (second_calls.load(std::memory_order_acquire) < 1 &&
+         std::chrono::steady_clock::now() < deadline3) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  EXPECT_EQ(first_calls.load(), 1);
+  EXPECT_GE(second_calls.load(), 1);
 }
 
 }  // namespace uORBTest
