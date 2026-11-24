@@ -6,11 +6,10 @@
 #include <uevent/uevent_source.h>
 
 #include <errno.h>
-#include <algorithm>
 #include <atomic>
-#include <unordered_map>
-#include <unordered_set>
-#include <vector>
+#include <cstddef>
+#include <cstring>
+#include <new>
 
 #include "base/mutex.h"
 #include "base/condition_variable.h"
@@ -19,12 +18,19 @@ namespace uevent {
 
 class RingBuffer {
  public:
-  void Reserve(size_t capacity) {
-    if (capacity <= capacity_) return;
+  RingBuffer() = default;
+  ~RingBuffer() { delete[] buf_; }
+  RingBuffer(const RingBuffer &) = delete;
+  RingBuffer &operator=(const RingBuffer &) = delete;
+
+  bool Reserve(size_t capacity) {
+    if (capacity <= capacity_) return true;
     size_t new_cap = 16;
     while (new_cap < capacity) new_cap <<= 1;
 
-    std::vector<EventSource *> new_buf(new_cap, nullptr);
+    auto **new_buf = new (std::nothrow) EventSource *[new_cap]();
+    if (!new_buf) return false;
+
     size_t count = size();
     if (capacity_ > 0) {
       size_t mask = capacity_ - 1;
@@ -32,21 +38,24 @@ class RingBuffer {
         new_buf[i] = buf_[(head_ + i) & mask];
       }
     }
-    buf_ = std::move(new_buf);
+    delete[] buf_;
+    buf_ = new_buf;
     head_ = 0;
     tail_ = count;
     capacity_ = new_cap;
+    return true;
   }
 
   bool empty() const { return head_ == tail_; }
   size_t size() const { return tail_ - head_; }
 
-  void push(EventSource *s) {
+  bool push(EventSource *s) {
     if (tail_ - head_ >= capacity_) {
-      Reserve(capacity_ == 0 ? 16 : capacity_ * 2);
+      if (!Reserve(capacity_ == 0 ? 16 : capacity_ * 2)) return false;
     }
     buf_[tail_ & (capacity_ - 1)] = s;
     ++tail_;
+    return true;
   }
 
   EventSource *pop() {
@@ -70,14 +79,14 @@ class RingBuffer {
 
   void clear() {
     if (capacity_ > 0) {
-      std::fill(buf_.begin(), buf_.end(), nullptr);
+      std::memset(buf_, 0, capacity_ * sizeof(EventSource *));
     }
     head_ = 0;
     tail_ = 0;
   }
 
  private:
-  std::vector<EventSource *> buf_;
+  EventSource **buf_{nullptr};
   size_t head_{0};
   size_t tail_{0};
   size_t capacity_{0};
@@ -88,21 +97,21 @@ class EventPoll {
   EventPoll() = default;
 
   ~EventPoll() {
-    std::vector<EventSource *> to_cleanup;
-    {
-      base::LockGuard<base::Mutex> lk(mu_);
-      to_cleanup.reserve(source_count_);
-      while (sources_head_) {
-        EventSource *s = sources_head_;
+    for (;;) {
+      EventSource *s = nullptr;
+      {
+        base::LockGuard<base::Mutex> lk(mu_);
+        if (!sources_head_) {
+          ready_queue_.clear();
+          ready_count_ = 0;
+          deadline_count_ = 0;
+          timeout_fired_count_ = 0;
+          break;
+        }
+        s = sources_head_;
         UnlinkSource(s);
-        to_cleanup.push_back(s);
+        ClearTimeoutStateLocked(s);
       }
-      ready_queue_.clear();
-      ready_count_ = 0;
-      deadlines_.clear();
-      timeout_fired_.clear();
-    }
-    for (auto *s : to_cleanup) {
       s->RemoveWakeup();
       // Safe after RemoveWakeup(): no notify_waiters() for this poll is in flight.
       s->set_in_ready_queue(false);
@@ -129,28 +138,41 @@ class EventPoll {
     if (!source.SetWakeup(this)) return false;
 
     bool needs_notify = false;
+    bool reserved = false;
     {
       base::LockGuard<base::Mutex> lk(mu_);
-      source.set_user_data(data);
-      LinkSource(&source);
-      ready_queue_.Reserve(source_count_);
-      if (source.is_ready() && !source.in_ready_queue()) {
-        source.set_in_ready_queue(true);
-        ready_queue_.push(&source);
-        ++ready_count_;
-        if (waiters_ > 0 && (!signaled_ || waiters_ > 1)) {
-          signaled_ = true;
-          needs_notify = true;
+      reserved = ready_queue_.Reserve(source_count_ + 1);
+      if (reserved) {
+        source.set_user_data(data);
+        LinkSource(&source);
+        if (source.is_ready() && !source.in_ready_queue()) {
+          source.set_in_ready_queue(true);
+          ready_queue_.push(&source);
+          ++ready_count_;
+          if (waiters_ > 0 && (!signaled_ || waiters_ > 1)) {
+            signaled_ = true;
+            needs_notify = true;
+          }
+        }
+        if (timeout_ms > 0) {
+          source.deadline_ = cv_.timespec_add_ms(cv_.get_now(), timeout_ms);
+          if (!source.has_deadline_) {
+            source.has_deadline_ = true;
+            ++deadline_count_;
+          }
+          deadlines_changed_ = true;
+          if (waiters_ > 0 && (!signaled_ || waiters_ > 1)) {
+            signaled_ = true;
+            needs_notify = true;
+          }
         }
       }
-      if (timeout_ms > 0) {
-        deadlines_[&source] = cv_.timespec_add_ms(cv_.get_now(), timeout_ms);
-        deadlines_changed_ = true;
-        if (waiters_ > 0 && (!signaled_ || waiters_ > 1)) {
-          signaled_ = true;
-          needs_notify = true;
-        }
-      }
+    }
+    if (!reserved) {
+      source.RemoveWakeup();
+      source.set_in_ready_queue(false);
+      errno = ENOMEM;
+      return false;
     }
     if (needs_notify) {
       cv_.notify_one();
@@ -171,8 +193,7 @@ class EventPoll {
         ready_queue_.remove(&source);
         if (ready_count_ > 0) --ready_count_;
       }
-      if (!deadlines_.empty()) deadlines_.erase(&source);
-      if (!timeout_fired_.empty()) timeout_fired_.erase(&source);
+      ClearTimeoutStateLocked(&source);
     }
     source.ClearWakeup();
     {
@@ -204,31 +225,36 @@ class EventPoll {
 
     for (;;) {
       // Expire per-event deadlines (avoid clock_gettime when none exist).
-      if (!deadlines_.empty()) {
+      if (deadline_count_ > 0) {
         struct timespec now = cv_.get_now();
-        for (auto it = deadlines_.begin(); it != deadlines_.end();) {
-          if (cv_.timespec_ge(now, it->second)) {
-            timeout_fired_.insert(it->first);
-            it = deadlines_.erase(it);
-          } else {
-            ++it;
+        for (EventSource *s = sources_head_; s != nullptr && deadline_count_ > 0; s = s->poll_next_) {
+          if (s->has_deadline_ && cv_.timespec_ge(now, s->deadline_)) {
+            s->has_deadline_ = false;
+            --deadline_count_;
+            if (!s->timeout_fired_) {
+              s->timeout_fired_ = true;
+              ++timeout_fired_count_;
+            }
           }
         }
       }
 
       // Collect ready sources.
       int count = 0;
-      if (!timeout_fired_.empty()) {
-        for (auto it = timeout_fired_.begin();
-             it != timeout_fired_.end() && count < max_ready;) {
-          auto *s = *it;
-          ready[count++] = s;
-          if (s->in_ready_queue()) {
-            s->set_in_ready_queue(false);
-            ready_queue_.remove(s);
-            if (ready_count_ > 0) --ready_count_;
+      if (timeout_fired_count_ > 0) {
+        for (EventSource *s = sources_head_;
+             s != nullptr && count < max_ready && timeout_fired_count_ > 0;
+             s = s->poll_next_) {
+          if (s->timeout_fired_) {
+            s->timeout_fired_ = false;
+            --timeout_fired_count_;
+            ready[count++] = s;
+            if (s->in_ready_queue()) {
+              s->set_in_ready_queue(false);
+              ready_queue_.remove(s);
+              if (ready_count_ > 0) --ready_count_;
+            }
           }
-          it = timeout_fired_.erase(it);
         }
       }
 
@@ -253,9 +279,10 @@ class EventPoll {
             if (count < max_ready) {
               ready[count++] = s;
             } else if (!s->in_ready_queue()) {
-              s->set_in_ready_queue(true);
-              ready_queue_.push(s);
-              ++ready_count_;
+              if (ready_queue_.push(s)) {
+                s->set_in_ready_queue(true);
+                ++ready_count_;
+              }
             }
           }
         }
@@ -289,17 +316,18 @@ class EventPoll {
       // Compute earliest wake time: min(loop deadline, earliest per-event deadline).
       bool has_wake_time = has_loop_deadline;
       struct timespec wake_time = has_loop_deadline ? loop_deadline : timespec{};
-      if (!deadlines_.empty()) {
-        for (const auto &kv : deadlines_) {
-          if (!has_wake_time || cv_.timespec_ge(wake_time, kv.second)) {
-            wake_time = kv.second;
+      if (deadline_count_ > 0) {
+        for (EventSource *s = sources_head_; s != nullptr; s = s->poll_next_) {
+          if (s->has_deadline_ &&
+              (!has_wake_time || cv_.timespec_ge(wake_time, s->deadline_))) {
+            wake_time = s->deadline_;
             has_wake_time = true;
           }
         }
       }
 
       auto wake_pred = [this] {
-        return ready_count_ > 0 || !timeout_fired_.empty() || deadlines_changed_ || stop_;
+        return ready_count_ > 0 || timeout_fired_count_ > 0 || deadlines_changed_ || stop_;
       };
 
       deadlines_changed_ = false;
@@ -350,12 +378,13 @@ class EventPoll {
     {
       base::LockGuard<base::Mutex> lk(mu_);
       if (!source->in_ready_queue()) {
-        source->set_in_ready_queue(true);
-        ready_queue_.push(source);
-        ++ready_count_;
-        if (waiters_ > 0 && (!signaled_ || waiters_ > 1)) {
-          signaled_ = true;
-          needs_notify = true;
+        if (ready_queue_.push(source)) {
+          source->set_in_ready_queue(true);
+          ++ready_count_;
+          if (waiters_ > 0 && (!signaled_ || waiters_ > 1)) {
+            signaled_ = true;
+            needs_notify = true;
+          }
         }
       }
     }
@@ -397,6 +426,17 @@ class EventPoll {
     --source_count_;
   }
 
+  void ClearTimeoutStateLocked(EventSource *s) {
+    if (s->has_deadline_) {
+      s->has_deadline_ = false;
+      if (deadline_count_ > 0) --deadline_count_;
+    }
+    if (s->timeout_fired_) {
+      s->timeout_fired_ = false;
+      if (timeout_fired_count_ > 0) --timeout_fired_count_;
+    }
+  }
+
   base::Mutex mu_;
   base::ConditionVariable cv_;
   EventSource *sources_head_{nullptr};
@@ -404,11 +444,11 @@ class EventPoll {
   size_t source_count_{0};
   RingBuffer ready_queue_;
   size_t ready_count_{0};
+  size_t deadline_count_{0};
+  size_t timeout_fired_count_{0};
   size_t waiters_{0};
   bool signaled_{false};
   bool deadlines_changed_{false};
-  std::unordered_map<EventSource *, struct timespec> deadlines_;
-  std::unordered_set<EventSource *> timeout_fired_;
   std::atomic<bool> stop_{false};
 };
 

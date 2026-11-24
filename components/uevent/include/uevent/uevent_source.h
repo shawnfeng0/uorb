@@ -5,6 +5,7 @@
 #include <atomic>
 #include <cerrno>
 #include <pthread.h>
+#include <time.h>
 
 namespace uevent {
 
@@ -102,6 +103,11 @@ class EventSource {
   EventSource *poll_prev_{nullptr};
   EventSource *poll_next_{nullptr};
   bool in_poll_list_{false};
+
+  // Per-event timeout state owned by EventPoll (guarded by EventPoll::mu_).
+  struct timespec deadline_{};
+  bool has_deadline_{false};
+  bool timeout_fired_{false};
 };
 
 }  // namespace uevent

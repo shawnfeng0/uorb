@@ -6,7 +6,6 @@
 #include <uevent/uevent.h>
 
 #include <new>
-#include <vector>
 
 #include "event_poll.h"
 
@@ -93,16 +92,21 @@ int uevent_loop(uevent_t *ev, uevent_source_t *ready, int max_ready, int timeout
   constexpr int kStackCap = 64;
   uevent::EventSource *stack_buf[kStackCap];
   uevent::EventSource **buf = stack_buf;
-  std::vector<uevent::EventSource *> heap_buf;
+  uevent::EventSource **heap_buf = nullptr;
   if (max_ready > kStackCap) {
-    heap_buf.resize(static_cast<size_t>(max_ready));
-    buf = heap_buf.data();
+    heap_buf = new (std::nothrow) uevent::EventSource *[static_cast<size_t>(max_ready)];
+    if (!heap_buf) {
+      errno = ENOMEM;
+      return -1;
+    }
+    buf = heap_buf;
   }
   const int n = poll->Wait(buf, max_ready, timeout_ms);
   for (int i = 0; i < n; ++i) {
     ready[i]._handle = buf[i];
     ready[i].data = buf[i]->user_data();
   }
+  delete[] heap_buf;
   return n;
 }
 
@@ -138,7 +142,7 @@ int uevent_source_create(uevent_source_t *src,
 
 void uevent_source_destroy(uevent_source_t *src) {
   if (!src || !src->_handle) return;
-  delete reinterpret_cast<CEventSource *>(src->_handle);
+  delete reinterpret_cast<uevent::EventSource *>(src->_handle);
   src->_handle = nullptr;
   src->data.u64 = 0;
 }

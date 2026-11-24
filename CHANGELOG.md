@@ -38,6 +38,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Switch `DeviceNode::receiver_list_` to a doubly-linked intrusive list for O(1) callback unregistration and invoke user callbacks directly without lambda indirection.
 - Replace `std::list` in `EventPoll` with a zero-allocation intrusive doubly-linked list, coalesce notifications via atomic `in_ready_queue_` fast-path, only signal condition variables when waiters are blocked, and lazily fetch clocks for timeouts.
 - Consolidate all unit and integration tests into a single `uorb_test` executable.
+- Remove all STL containers (`std::unordered_map`, `std::unordered_set`, `std::vector`) from `uevent` using intrusive per-event timeout fields and `nothrow` ring buffer storage, enabling `-fno-exceptions -fno-rtti` builds for `uorb`, `uevent`, and `uorb_uevent`.
+- Implement `uorb_uevent` bridge directly as a single-allocation `UorbEventSource` subclass to cut per-source allocations in half and remove C callback indirection.
 
 ### Fixed
 

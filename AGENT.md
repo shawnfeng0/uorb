@@ -197,8 +197,7 @@ map them to `errno` values. Callers test with `err != ORB_OK` or
   `./build/tests/uorb_test`).
 - When adding tests that create uevent sources via
   `uorb_subscriber_create_source()`, always pair with
-  `uorb_subscriber_destroy_source()` to avoid leaking `CEventSource`
-  and `UorbEventBridge`.
+  `uorb_subscriber_destroy_source()` to avoid leaking `UorbEventSource`.
 
 ## 12. Common Pitfalls
 
