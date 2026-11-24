@@ -339,8 +339,7 @@ The project uses CMake for building. Key CMake targets:
 - `uorb` - Core pub/sub library
 - `uevent` - Event loop library
 - `uorb_uevent` - Bridge library
-- `uorb_unittest` - Unit tests
-- `uorb_test` - Integration tests
+- `uorb_test` - Unified unit and integration test suite
 - `uorb_bench` - Benchmarks
 
 ### Build Options

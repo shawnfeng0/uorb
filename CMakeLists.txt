@@ -63,18 +63,6 @@ if (UORB_BUILD_TESTS)
     include(cmake/googletest.cmake)
     enable_testing()
 
-    # For uorb internal unit test
-    add_executable(uorb_unittest src/base/condition_variable_test.cc)
-    target_link_libraries(uorb_unittest PRIVATE uorb GTest::gtest_main)
-    target_include_directories(uorb_unittest PRIVATE src)
-    add_test(uorb_unittest uorb_unittest)
-
-    # uorb pub/sub tests
+    # Unified test executable (uorb core, uevent, and uorb_uevent bridge tests)
     add_subdirectory(tests)
-
-    # uevent library tests (independent of uORB)
-    add_subdirectory(components/uevent/tests)
-
-    # uorb_uevent bridge tests
-    add_subdirectory(components/uorb_uevent/tests)
 endif ()

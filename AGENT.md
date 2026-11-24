@@ -114,7 +114,7 @@ so the EventPoll can be safely freed. `ClearWakeup()` is called from
 `RemoveWakeup()` which is called from `~EventPoll()` and `Remove()`.
 
 `Remove()` does a two-phase cleanup: remove from lists under `mu_`,
-call `ClearWakeup()` outside `mu_`, then re-check `ready_set_` under
+call `ClearWakeup()` outside `mu_`, then re-check `ready_queue_` under
 `mu_` (to clean entries from a racing `NotifyReady`).
 
 ## 7. Callback API
@@ -149,10 +149,9 @@ orb_err orb_subscriber_set_callback(orb_subscriber_t *sub,
 Publish(data)
   → write to ring buffer under data_lock_
   → release data_lock_
-  → for each CallbackEntry:
-      entry.on_publish(data, entry.ctx)  under callback_lock_
-        → ReceiverLocal lambda: publish_cb(msg, publish_cb_ctx)
-          → User callback(msg, ctx)
+  → if callback_count_ > 0 (Dekker seq_cst fast-path):
+      for each CallbackEntry under callback_lock_:
+        entry.on_publish(data, entry.ctx)   // direct call to user callback
 ```
 
 ## 8. DeviceNode Lifecycle
@@ -192,8 +191,10 @@ map them to `errno` values. Callers test with `err != ORB_OK` or
     -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address" ...`
   - macOS `leaks` tool: `leaks --atExit -- ./test_binary`
   - ThreadSanitizer (TSan): same pattern with `-fsanitize=thread`
-- Tests live in: `tests/` (uorb core), `components/uevent/tests/`,
-  `components/uorb_uevent/tests/`.
+- Tests live in `src/base/condition_variable_test.cc`, `tests/` (uorb core),
+  `components/uevent/tests/`, and `components/uorb_uevent/tests/`, and are built
+  into a single unified test executable `uorb_test` (run via `ctest` or
+  `./build/tests/uorb_test`).
 - When adding tests that create uevent sources via
   `uorb_subscriber_create_source()`, always pair with
   `uorb_subscriber_destroy_source()` to avoid leaking `CEventSource`
