@@ -59,7 +59,7 @@ static void CmdListener(uorb::listener::Fd &fd,
     return;
   }
 
-  orb_subscriber_t sub{ORB_SUBSCRIBER_INITIALIZER};
+  orb_subscriber_t sub = ORB_SUBSCRIBER_INITIALIZER;
   if (orb_subscriber_create(&sub, meta) != ORB_OK) {
     fd.write("Failed to create subscription\n");
     return;

@@ -15,8 +15,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Expand test coverage with edge-case and stress tests across all components.
 - Add epoll-style `uevent_data_t` user payload on `uevent_source_t` and upgrade `uorb::EventLoop` to O(1) direct pointer dispatch without `std::function` or hash map lookup.
 - Add `orb_strerror()` and return `ORB_ERR_NO_ENTRY` when copying from an unpublished topic or querying a non-existent topic instance.
-- Add topic durability policy (`ORB_DURABILITY_DURABLE` / `ORB_DURABILITY_VOLATILE`) in `orb_metadata` and `ORB_DEFINE`.
+- Add topic durability policy (`ORB_DURABILITY_DURABLE` / `ORB_DURABILITY_VOLATILE`) in `orb_metadata`, `ORB_DEFINE`, and the `.msg` code generator (`ORB_DURABILITY` constant).
 - Add C++ convenience helpers `uorb::publish<Topic>()` / `uorb::copy<Topic>()` and `Subscription::SetCallback()` / `ClearCallback()`.
+- Add built-in software-triggered manual event source API (`uevent_manual_source_create/trigger/reset`).
 
 ### Changed
 
@@ -40,6 +41,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Consolidate all unit and integration tests into a single `uorb_test` executable.
 - Remove all STL containers (`std::unordered_map`, `std::unordered_set`, `std::vector`) from `uevent` using intrusive per-event timeout fields and `nothrow` ring buffer storage, enabling `-fno-exceptions -fno-rtti` builds for `uorb`, `uevent`, and `uorb_uevent`.
 - Implement `uorb_uevent` bridge directly as a single-allocation `UorbEventSource` subclass to cut per-source allocations in half and remove C callback indirection.
+- Rename `components/uevent/src/base/` to `uevent_base/` to eliminate include-path collisions with `src/base/`, and clean up remaining compiler and duplicate-library linker warnings.
 
 ### Fixed
 
