@@ -53,6 +53,67 @@ class AsyncDispatcher {
   using Token = uint64_t;
   static constexpr Token kInvalidToken = 0;
 
+  /// Move-only RAII subscription guard that automatically unsubscribes on destruction.
+  /// Must not outlive the AsyncDispatcher that created it.
+  class ScopedSubscription {
+   public:
+    ScopedSubscription() noexcept = default;
+    ScopedSubscription(AsyncDispatcher *dispatcher, Token token) noexcept
+        : dispatcher_(token != kInvalidToken ? dispatcher : nullptr), token_(token) {}
+
+    ScopedSubscription(const ScopedSubscription &) = delete;
+    ScopedSubscription &operator=(const ScopedSubscription &) = delete;
+
+    ScopedSubscription(ScopedSubscription &&other) noexcept
+        : dispatcher_(other.dispatcher_), token_(other.token_) {
+      other.dispatcher_ = nullptr;
+      other.token_ = kInvalidToken;
+    }
+
+    ScopedSubscription &operator=(ScopedSubscription &&other) noexcept {
+      if (this != &other) {
+        Reset();
+        dispatcher_ = other.dispatcher_;
+        token_ = other.token_;
+        other.dispatcher_ = nullptr;
+        other.token_ = kInvalidToken;
+      }
+      return *this;
+    }
+
+    ~ScopedSubscription() { Reset(); }
+
+    explicit operator bool() const noexcept {
+      return dispatcher_ != nullptr && token_ != kInvalidToken;
+    }
+
+    Token token() const noexcept { return token_; }
+
+    /// Unsubscribe immediately (no-op if empty). Blocks until any in-flight
+    /// callback finishes when called from a thread other than the worker thread.
+    void Reset() {
+      if (dispatcher_ && token_ != kInvalidToken) {
+        AsyncDispatcher *d = dispatcher_;
+        const Token t = token_;
+        dispatcher_ = nullptr;
+        token_ = kInvalidToken;
+        d->Unsubscribe(t);
+      }
+    }
+
+    /// Detach ownership without unsubscribing and return the underlying Token.
+    Token Release() noexcept {
+      const Token t = token_;
+      dispatcher_ = nullptr;
+      token_ = kInvalidToken;
+      return t;
+    }
+
+   private:
+    AsyncDispatcher *dispatcher_{nullptr};
+    Token token_{kInvalidToken};
+  };
+
   AsyncDispatcher() {
     pthread_mutex_init(&mu_, nullptr);
     pthread_cond_init(&done_cv_, nullptr);
@@ -228,6 +289,13 @@ class AsyncDispatcher {
     }
     pthread_mutex_unlock(&mu_);
     return token;
+  }
+
+  /// Convenience wrapper around Subscribe() returning a move-only RAII ScopedSubscription.
+  template <const orb_metadata &meta, typename Callback>
+  ScopedSubscription SubscribeScoped(Callback &&cb, unsigned instance = 0) {
+    const Token tok = Subscribe<meta>(std::forward<Callback>(cb), instance);
+    return ScopedSubscription(this, tok);
   }
 
   /// Unsubscribe a previously registered callback by token.

@@ -716,4 +716,83 @@ TEST(AsyncDispatcherTest, SelfStopInsideCallbackThenRestartAndConcurrentStartSto
   EXPECT_TRUE(dispatcher.Unsubscribe(tok));
 }
 
+TEST(AsyncDispatcherTest, ScopedSubscriptionAutoUnsubscribesMoveAndRelease) {
+  uorb::AsyncDispatcher dispatcher;
+  ASSERT_TRUE(dispatcher);
+  ASSERT_TRUE(dispatcher.Start());
+
+  std::atomic<int> calls{0};
+  std::atomic<bool> in_cb{false};
+  std::atomic<bool> cb_done{false};
+
+  {
+    auto guard = dispatcher.SubscribeScoped<uorb::msg::orb_test_volatile>(
+        [&](const orb_test_volatile_s &) {
+          in_cb.store(true, std::memory_order_release);
+          std::this_thread::sleep_for(std::chrono::milliseconds(20));
+          calls.fetch_add(1, std::memory_order_acq_rel);
+          cb_done.store(true, std::memory_order_release);
+        });
+    ASSERT_TRUE(guard);
+    const auto tok = guard.token();
+    EXPECT_NE(tok, uorb::AsyncDispatcher::kInvalidToken);
+
+    // Move construction & move assignment transfer ownership cleanly.
+    uorb::AsyncDispatcher::ScopedSubscription moved(std::move(guard));
+    EXPECT_FALSE(guard);
+    EXPECT_TRUE(moved);
+    EXPECT_EQ(moved.token(), tok);
+
+    uorb::AsyncDispatcher::ScopedSubscription assigned;
+    EXPECT_FALSE(assigned);
+    assigned = std::move(moved);
+    EXPECT_FALSE(moved);
+    EXPECT_TRUE(assigned);
+
+    orb_test_volatile_s m{};
+    m.val = 1;
+    ASSERT_EQ(uorb::publish<uorb::msg::orb_test_volatile>(m), ORB_OK);
+
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    while (!in_cb.load(std::memory_order_acquire) &&
+           std::chrono::steady_clock::now() < deadline) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    ASSERT_TRUE(in_cb.load());
+    // Leaving scope destroys `assigned`, which must drain the in-flight callback.
+  }
+
+  EXPECT_TRUE(cb_done.load(std::memory_order_acquire));
+  EXPECT_EQ(calls.load(std::memory_order_acquire), 1);
+
+  // Subsequent publishes must not trigger the unsubscribed callback.
+  orb_test_volatile_s m2{};
+  m2.val = 2;
+  ASSERT_EQ(uorb::publish<uorb::msg::orb_test_volatile>(m2), ORB_OK);
+  std::this_thread::sleep_for(std::chrono::milliseconds(15));
+  EXPECT_EQ(calls.load(std::memory_order_acquire), 1);
+
+  // Release() detaches without unsubscribing.
+  std::atomic<int> released_calls{0};
+  uorb::AsyncDispatcher::Token raw_tok = uorb::AsyncDispatcher::kInvalidToken;
+  {
+    auto guard2 = dispatcher.SubscribeScoped<uorb::msg::orb_test_volatile>(
+        [&](const orb_test_volatile_s &) {
+          released_calls.fetch_add(1, std::memory_order_acq_rel);
+        });
+    ASSERT_TRUE(guard2);
+    raw_tok = guard2.Release();
+    EXPECT_FALSE(guard2);
+  }
+  ASSERT_EQ(uorb::publish<uorb::msg::orb_test_volatile>(m2), ORB_OK);
+  const auto deadline2 = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+  while (released_calls.load(std::memory_order_acquire) < 1 &&
+         std::chrono::steady_clock::now() < deadline2) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  EXPECT_EQ(released_calls.load(), 1);
+  EXPECT_TRUE(dispatcher.Unsubscribe(raw_tok));
+  dispatcher.Stop();
+}
+
 }  // namespace uORBTest
