@@ -630,4 +630,90 @@ TEST(AsyncDispatcherTest, CrossThreadDrainAndSelfUnsubscribeInsideCallback) {
   EXPECT_GE(second_calls.load(), 1);
 }
 
+// Self-Stop() inside a callback followed directly by Start() must reclaim the
+// exited worker thread and restart cleanly; concurrent Start()/Stop() calls
+// must serialize without spawning duplicate workers or corrupting state.
+TEST(AsyncDispatcherTest, SelfStopInsideCallbackThenRestartAndConcurrentStartStop) {
+  uorb::AsyncDispatcher dispatcher;
+  ASSERT_TRUE(dispatcher);
+  ASSERT_TRUE(dispatcher.Start());
+
+  std::atomic<int> received{0};
+  std::atomic<bool> stop_on_next{true};
+  const auto tok = dispatcher.Subscribe<uorb::msg::orb_test_volatile>(
+      [&](const orb_test_volatile_s &msg) {
+        received.store(msg.val, std::memory_order_release);
+        if (stop_on_next.exchange(false, std::memory_order_acq_rel)) {
+          dispatcher.Stop();
+        }
+      });
+  ASSERT_NE(tok, uorb::AsyncDispatcher::kInvalidToken);
+
+  orb_test_volatile_s m{};
+  m.val = 11;
+  ASSERT_EQ(uorb::publish<uorb::msg::orb_test_volatile>(m), ORB_OK);
+
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+  while (dispatcher.IsRunning() && std::chrono::steady_clock::now() < deadline) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  EXPECT_EQ(received.load(std::memory_order_acquire), 11);
+  EXPECT_FALSE(dispatcher.IsRunning());
+
+  // Directly call Start() without an intermediate external Stop(): must join
+  // the exited worker and spawn a fresh one.
+  ASSERT_TRUE(dispatcher.Start());
+  EXPECT_TRUE(dispatcher.IsRunning());
+
+  m.val = 22;
+  ASSERT_EQ(uorb::publish<uorb::msg::orb_test_volatile>(m), ORB_OK);
+  const auto deadline2 = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+  while (received.load(std::memory_order_acquire) != 22 &&
+         std::chrono::steady_clock::now() < deadline2) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  EXPECT_EQ(received.load(std::memory_order_acquire), 22);
+
+  // Concurrent Start()/Stop() stress across multiple threads.
+  std::thread t1([&]() {
+    for (int i = 0; i < 20; ++i) {
+      dispatcher.Start();
+      std::this_thread::yield();
+    }
+  });
+  std::thread t2([&]() {
+    for (int i = 0; i < 20; ++i) {
+      dispatcher.Stop();
+      std::this_thread::yield();
+    }
+  });
+  std::thread t3([&]() {
+    for (int i = 0; i < 20; ++i) {
+      orb_test_volatile_s msg{};
+      msg.val = 100 + i;
+      uorb::publish<uorb::msg::orb_test_volatile>(msg);
+      std::this_thread::yield();
+    }
+  });
+  t1.join();
+  t2.join();
+  t3.join();
+
+  // Leave in a known running state and verify delivery still works.
+  ASSERT_TRUE(dispatcher.Start());
+  EXPECT_TRUE(dispatcher.IsRunning());
+  m.val = 999;
+  ASSERT_EQ(uorb::publish<uorb::msg::orb_test_volatile>(m), ORB_OK);
+  const auto deadline3 = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+  while (received.load(std::memory_order_acquire) != 999 &&
+         std::chrono::steady_clock::now() < deadline3) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  EXPECT_EQ(received.load(std::memory_order_acquire), 999);
+
+  dispatcher.Stop();
+  EXPECT_FALSE(dispatcher.IsRunning());
+  EXPECT_TRUE(dispatcher.Unsubscribe(tok));
+}
+
 }  // namespace uORBTest

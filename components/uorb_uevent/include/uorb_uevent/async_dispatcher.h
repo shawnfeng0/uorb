@@ -98,13 +98,29 @@ class AsyncDispatcher {
   explicit operator bool() const { return base_._handle != nullptr; }
 
   /// Start the background worker thread. Idempotent (returns true if already started).
+  /// Thread-safe: serializes with concurrent Stop() calls and reclaims a worker
+  /// that previously exited via self-Stop() before spawning a new thread.
   bool Start() {
     if (!base_._handle) return false;
 
     pthread_mutex_lock(&mu_);
-    if (started_) {
+    while (state_ == WorkerState::kStopping) {
+      pthread_cond_wait(&done_cv_, &mu_);
+    }
+    if (state_ == WorkerState::kRunning) {
       pthread_mutex_unlock(&mu_);
       return true;
+    }
+    if (state_ == WorkerState::kExitedPendingJoin) {
+      const pthread_t old_tid = worker_tid_;
+      state_ = WorkerState::kStopping;
+      pthread_mutex_unlock(&mu_);
+
+      pthread_join(old_tid, nullptr);
+
+      pthread_mutex_lock(&mu_);
+      state_ = WorkerState::kStopped;
+      pthread_cond_broadcast(&done_cv_);
     }
 
     stop_requested_.store(false, std::memory_order_release);
@@ -112,23 +128,30 @@ class AsyncDispatcher {
       pthread_mutex_unlock(&mu_);
       return false;
     }
-    started_ = true;
-    worker_valid_ = true;
+    state_ = WorkerState::kRunning;
     running_.store(true, std::memory_order_release);
     pthread_mutex_unlock(&mu_);
     return true;
   }
 
-  /// Stop the background worker thread and join it. Safe to call multiple times
-  /// or when not started. Must not be called from inside a dispatched callback
-  /// to wait for completion (self-call requests stop asynchronously without joining).
+  /// Stop the background worker thread and join it. Safe to call multiple times,
+  /// concurrently from multiple threads, or when not started. When called from
+  /// inside a dispatched callback, requests stop asynchronously without joining.
   void Stop() {
     pthread_t tid{};
     bool should_join = false;
 
     pthread_mutex_lock(&mu_);
-    if (started_) {
-      if (worker_valid_ && pthread_equal(pthread_self(), worker_tid_)) {
+    for (;;) {
+      if (state_ == WorkerState::kStopped) {
+        pthread_mutex_unlock(&mu_);
+        return;
+      }
+      if (state_ == WorkerState::kStopping) {
+        pthread_cond_wait(&done_cv_, &mu_);
+        continue;
+      }
+      if (state_ == WorkerState::kRunning && pthread_equal(pthread_self(), worker_tid_)) {
         stop_requested_.store(true, std::memory_order_release);
         pthread_mutex_unlock(&mu_);
         if (base_._handle) uevent_loopbreak(&base_);
@@ -136,15 +159,21 @@ class AsyncDispatcher {
       }
       tid = worker_tid_;
       stop_requested_.store(true, std::memory_order_release);
-      started_ = false;
+      state_ = WorkerState::kStopping;
       should_join = true;
+      break;
     }
     pthread_mutex_unlock(&mu_);
 
     if (should_join) {
       if (base_._handle) uevent_loopbreak(&base_);
       pthread_join(tid, nullptr);
+
+      pthread_mutex_lock(&mu_);
+      state_ = WorkerState::kStopped;
       running_.store(false, std::memory_order_release);
+      pthread_cond_broadcast(&done_cv_);
+      pthread_mutex_unlock(&mu_);
     }
   }
 
@@ -219,7 +248,7 @@ class AsyncDispatcher {
       return false;
     }
     if (entry->in_callback) {
-      if (worker_valid_ && pthread_equal(pthread_self(), worker_tid_)) {
+      if (state_ != WorkerState::kStopped && pthread_equal(pthread_self(), worker_tid_)) {
         entry->pending_destroy = true;
         defer_destroy = true;
       } else {
@@ -277,7 +306,7 @@ class AsyncDispatcher {
   }
 
   void WorkerLoop() {
-    // Synchronize with Start() so worker_tid_ and worker_valid_ are visible.
+    // Synchronize with Start() so worker_tid_ and state_ are visible.
     pthread_mutex_lock(&mu_);
     pthread_mutex_unlock(&mu_);
 
@@ -331,9 +360,11 @@ class AsyncDispatcher {
     }
 
     pthread_mutex_lock(&mu_);
-    worker_valid_ = false;
-    pthread_mutex_unlock(&mu_);
+    if (state_ == WorkerState::kRunning) {
+      state_ = WorkerState::kExitedPendingJoin;
+    }
     running_.store(false, std::memory_order_release);
+    pthread_mutex_unlock(&mu_);
   }
 
   void LinkEntryLocked(EntryBase *entry) {
@@ -373,14 +404,20 @@ class AsyncDispatcher {
     delete entry;
   }
 
+  enum class WorkerState : uint8_t {
+    kStopped,
+    kRunning,
+    kExitedPendingJoin,
+    kStopping,
+  };
+
   uevent_t base_ = UEVENT_INITIALIZER;
   pthread_mutex_t mu_{};
   pthread_cond_t done_cv_{};
   pthread_t worker_tid_{};
   EntryBase *entries_head_{nullptr};
   Token next_token_{0};
-  bool started_{false};
-  bool worker_valid_{false};
+  WorkerState state_{WorkerState::kStopped};
   std::atomic<bool> stop_requested_{false};
   std::atomic<bool> running_{false};
 };
