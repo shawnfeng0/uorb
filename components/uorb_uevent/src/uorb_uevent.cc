@@ -27,16 +27,18 @@ class UorbEventSource final : public uevent::EventSource {
     return orb_subscriber_check_update(const_cast<orb_subscriber_t *>(&sub_));
   }
 
-  bool SetWakeup(uevent::EventPoll *poll) override {
-    if (!EventSource::SetWakeup(poll)) return false;
+  uevent_err SetWakeup(uevent::EventPoll *poll) override {
+    const uevent_err err = EventSource::SetWakeup(poll);
+    if (err != UEVENT_OK) return err;
     orb_callback_ctx ctx{};
     ctx.ptr = this;
-    if (orb_subscriber_set_callback(&sub_, &OnPublish, ctx) != ORB_OK) {
+    const orb_err cb_err = orb_subscriber_set_callback(&sub_, &OnPublish, ctx);
+    if (cb_err != ORB_OK) {
       ClearWakeup();
-      return false;
+      return (cb_err == ORB_ERR_BUSY) ? UEVENT_ERR_BUSY : UEVENT_ERR_INVALID;
     }
     registered_.store(true, std::memory_order_release);
-    return true;
+    return UEVENT_OK;
   }
 
   void OnRemoved() override {
@@ -56,21 +58,19 @@ class UorbEventSource final : public uevent::EventSource {
 
 }  // anonymous namespace
 
-int uorb_subscriber_create_source(uevent_source_t *src, orb_subscriber_t *sub) {
+uevent_err uorb_subscriber_create_source(uevent_source_t *src, orb_subscriber_t *sub) {
   if (!src || !sub) {
-    errno = EINVAL;
-    return -1;
+    return UEVENT_ERR_INVALID;
   }
 
   auto *source = new (std::nothrow) UorbEventSource(*sub);
   if (!source) {
-    errno = ENOMEM;
-    return -1;
+    return UEVENT_ERR_NO_MEM;
   }
 
   src->_handle = source;
   src->data.u64 = 0;
-  return 0;
+  return UEVENT_OK;
 }
 
 void uorb_subscriber_destroy_source(uevent_source_t *src) {

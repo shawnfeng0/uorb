@@ -86,10 +86,9 @@ TEST(UeventTest, LoopbreakIsNonSticky) {
 // ---- uevent_source_create / uevent_source_destroy ----
 
 TEST(UeventTest, SourceCreateWithNullReadyFnFails) {
-  errno = 0;
   uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
-  EXPECT_EQ(uevent_source_create(&src, nullptr, nullptr, nullptr, nullptr, nullptr), -1);
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(uevent_source_create(&src, nullptr, nullptr, nullptr, nullptr, nullptr),
+            UEVENT_ERR_INVALID);
 }
 
 TEST(UeventTest, SourceCreateDestroy) {
@@ -136,44 +135,39 @@ TEST(UeventTest, SourceIsBoundTrueAfterAdd) {
 TEST(UeventTest, AddNullBaseFails) {
   auto ready_fn = [](void *) -> bool { return false; };
   uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
-  ASSERT_EQ(uevent_source_create(&src, ready_fn, nullptr, nullptr, nullptr, nullptr), 0);
-  EXPECT_EQ(uevent_add(nullptr, &src, 0), -1);
-  EXPECT_EQ(errno, EINVAL);
+  ASSERT_EQ(uevent_source_create(&src, ready_fn, nullptr, nullptr, nullptr, nullptr), UEVENT_OK);
+  EXPECT_EQ(uevent_add(nullptr, &src, 0), UEVENT_ERR_INVALID);
   uevent_source_destroy(&src);
 }
 
 TEST(UeventTest, AddNullSourceFails) {
   uevent_t base = UEVENT_INITIALIZER;
-  ASSERT_EQ(uevent_create(&base), 0);
-  EXPECT_EQ(uevent_add(&base, nullptr, 0), -1);
-  EXPECT_EQ(errno, EINVAL);
+  ASSERT_EQ(uevent_create(&base), UEVENT_OK);
+  EXPECT_EQ(uevent_add(&base, nullptr, 0), UEVENT_ERR_INVALID);
   uevent_destroy(&base);
 }
 
 TEST(UeventTest, RemoveNullBaseFails) {
   auto ready_fn = [](void *) -> bool { return false; };
   uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
-  ASSERT_EQ(uevent_source_create(&src, ready_fn, nullptr, nullptr, nullptr, nullptr), 0);
-  EXPECT_EQ(uevent_remove(nullptr, &src), -1);
-  EXPECT_EQ(errno, EINVAL);
+  ASSERT_EQ(uevent_source_create(&src, ready_fn, nullptr, nullptr, nullptr, nullptr), UEVENT_OK);
+  EXPECT_EQ(uevent_remove(nullptr, &src), UEVENT_ERR_INVALID);
   uevent_source_destroy(&src);
 }
 
 TEST(UeventTest, AddSameSourceToTwoBasesFails) {
   auto ready_fn = [](void *) -> bool { return false; };
   uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
-  ASSERT_EQ(uevent_source_create(&src, ready_fn, nullptr, nullptr, nullptr, nullptr), 0);
+  ASSERT_EQ(uevent_source_create(&src, ready_fn, nullptr, nullptr, nullptr, nullptr), UEVENT_OK);
 
   uevent_t base_a = UEVENT_INITIALIZER;
   uevent_t base_b = UEVENT_INITIALIZER;
-  ASSERT_EQ(uevent_create(&base_a), 0);
-  ASSERT_EQ(uevent_create(&base_b), 0);
+  ASSERT_EQ(uevent_create(&base_a), UEVENT_OK);
+  ASSERT_EQ(uevent_create(&base_b), UEVENT_OK);
 
-  ASSERT_EQ(uevent_add(&base_a, &src, 0), 0);
+  ASSERT_EQ(uevent_add(&base_a, &src, 0), UEVENT_OK);
 
-  errno = 0;
-  EXPECT_EQ(uevent_add(&base_b, &src, 0), -1);
-  EXPECT_EQ(errno, EBUSY);
+  EXPECT_EQ(uevent_add(&base_b, &src, 0), UEVENT_ERR_BUSY);
 
   ASSERT_EQ(uevent_remove(&base_a, &src), 0);
   // Now can add to base_b
@@ -193,7 +187,7 @@ TEST(UeventTest, RemoveUnboundSourceFails) {
   uevent_t base = UEVENT_INITIALIZER;
   ASSERT_EQ(uevent_create(&base), 0);
 
-  EXPECT_EQ(uevent_remove(&base, &src), -1);
+  EXPECT_EQ(uevent_remove(&base, &src), UEVENT_ERR_INVALID);
 
   uevent_source_destroy(&src);
   uevent_destroy(&base);
@@ -204,15 +198,15 @@ TEST(UeventTest, RemoveUnboundSourceFails) {
 TEST(UeventTest, AddSameSourceTwiceIsIdempotent) {
   auto ready_fn = [](void *) -> bool { return false; };
   uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
-  ASSERT_EQ(uevent_source_create(&src, ready_fn, nullptr, nullptr, nullptr, nullptr), 0);
+  ASSERT_EQ(uevent_source_create(&src, ready_fn, nullptr, nullptr, nullptr, nullptr), UEVENT_OK);
 
   uevent_t base = UEVENT_INITIALIZER;
-  ASSERT_EQ(uevent_create(&base), 0);
+  ASSERT_EQ(uevent_create(&base), UEVENT_OK);
 
-  ASSERT_EQ(uevent_add(&base, &src, 0), 0);
-  ASSERT_EQ(uevent_add(&base, &src, 0), 0);  // idempotent
-  ASSERT_EQ(uevent_remove(&base, &src), 0);
-  EXPECT_EQ(uevent_remove(&base, &src), -1);  // already removed
+  ASSERT_EQ(uevent_add(&base, &src, 0), UEVENT_OK);
+  ASSERT_EQ(uevent_add(&base, &src, 0), UEVENT_OK);  // idempotent
+  ASSERT_EQ(uevent_remove(&base, &src), UEVENT_OK);
+  EXPECT_EQ(uevent_remove(&base, &src), UEVENT_ERR_INVALID);  // already removed
 
   uevent_source_destroy(&src);
   uevent_destroy(&base);
@@ -302,24 +296,21 @@ TEST(UeventTest, LoopBlocksUntilNotified) {
 
 TEST(UeventTest, LoopNullBaseFails) {
   uevent_source_t ready[1] = {UEVENT_SOURCE_INITIALIZER};
-  EXPECT_EQ(uevent_loop(nullptr, ready, 1, 0), -1);
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(uevent_loop(nullptr, ready, 1, 0), UEVENT_ERR_INVALID);
 }
 
 TEST(UeventTest, LoopNullReadyFails) {
   uevent_t base = UEVENT_INITIALIZER;
-  ASSERT_EQ(uevent_create(&base), 0);
-  EXPECT_EQ(uevent_loop(&base, nullptr, 1, 0), -1);
-  EXPECT_EQ(errno, EINVAL);
+  ASSERT_EQ(uevent_create(&base), UEVENT_OK);
+  EXPECT_EQ(uevent_loop(&base, nullptr, 1, 0), UEVENT_ERR_INVALID);
   uevent_destroy(&base);
 }
 
 TEST(UeventTest, LoopZeroMaxReadyFails) {
   uevent_t base = UEVENT_INITIALIZER;
-  ASSERT_EQ(uevent_create(&base), 0);
+  ASSERT_EQ(uevent_create(&base), UEVENT_OK);
   uevent_source_t ready[1] = {UEVENT_SOURCE_INITIALIZER};
-  EXPECT_EQ(uevent_loop(&base, ready, 0, 0), -1);
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(uevent_loop(&base, ready, 0, 0), UEVENT_ERR_INVALID);
   uevent_destroy(&base);
 }
 
@@ -645,7 +636,7 @@ TEST(UeventTest, RegisterFnReturningFalseFailsAdd) {
   uevent_t base = UEVENT_INITIALIZER;
   ASSERT_EQ(uevent_create(&base), 0);
 
-  EXPECT_EQ(uevent_add(&base, &src, 0), -1);
+  EXPECT_EQ(uevent_add(&base, &src, 0), UEVENT_ERR_INVALID);
   // unregister should NOT be called when register fails
   EXPECT_FALSE(ctx.unregistered.load());
 
@@ -1060,30 +1051,17 @@ TEST(UeventTest, ManualSourceTriggerResetAndCrossThreadWakeup) {
 }
 
 TEST(UeventTest, ManualSourceRejectsInvalidAndNonManualHandles) {
-  errno = 0;
-  EXPECT_EQ(uevent_manual_source_create(nullptr), -1);
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(uevent_manual_source_create(nullptr), UEVENT_ERR_INVALID);
+  EXPECT_EQ(uevent_manual_source_trigger(nullptr), UEVENT_ERR_INVALID);
+  EXPECT_EQ(uevent_manual_source_reset(nullptr), UEVENT_ERR_INVALID);
 
-  errno = 0;
-  EXPECT_EQ(uevent_manual_source_trigger(nullptr), -1);
-  EXPECT_EQ(errno, EINVAL);
-
-  errno = 0;
-  EXPECT_EQ(uevent_manual_source_reset(nullptr), -1);
-  EXPECT_EQ(errno, EINVAL);
-
-  // Passing a regular callback-backed source must safely fail with EINVAL.
+  // Passing a regular callback-backed source must safely fail with UEVENT_ERR_INVALID.
   auto ready_fn = [](void *) -> bool { return false; };
   uevent_source_t custom = UEVENT_SOURCE_INITIALIZER;
-  ASSERT_EQ(uevent_source_create(&custom, ready_fn, nullptr, nullptr, nullptr, nullptr), 0);
+  ASSERT_EQ(uevent_source_create(&custom, ready_fn, nullptr, nullptr, nullptr, nullptr), UEVENT_OK);
 
-  errno = 0;
-  EXPECT_EQ(uevent_manual_source_trigger(&custom), -1);
-  EXPECT_EQ(errno, EINVAL);
-
-  errno = 0;
-  EXPECT_EQ(uevent_manual_source_reset(&custom), -1);
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(uevent_manual_source_trigger(&custom), UEVENT_ERR_INVALID);
+  EXPECT_EQ(uevent_manual_source_reset(&custom), UEVENT_ERR_INVALID);
 
   uevent_source_destroy(&custom);
 }
@@ -1133,14 +1111,10 @@ TEST(UeventTest, ConcurrentRemoveDestroyWhileLoopReturnsUserData) {
 
 TEST(UeventTest, TimerSourceOneShotAndPeriodic) {
   // Invalid arguments rejected.
-  errno = 0;
-  EXPECT_EQ(uevent_timer_source_create(nullptr, 10, false), -1);
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(uevent_timer_source_create(nullptr, 10, false), UEVENT_ERR_INVALID);
 
   uevent_source_t invalid_timer = UEVENT_SOURCE_INITIALIZER;
-  errno = 0;
-  EXPECT_EQ(uevent_timer_source_create(&invalid_timer, 0, true), -1);
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(uevent_timer_source_create(&invalid_timer, 0, true), UEVENT_ERR_INVALID);
 
   uevent_t base = UEVENT_INITIALIZER;
   ASSERT_EQ(uevent_create(&base), 0);

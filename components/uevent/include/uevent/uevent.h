@@ -6,13 +6,32 @@
 
 #pragma once
 
-#include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/**
+ * Error codes for uevent operations.
+ *
+ * All error codes are negative so int-returning APIs like uevent_loop() can
+ * return >= 0 for ready counts and negative uevent_err values on error or
+ * cancellation without relying on thread-global errno.
+ */
+typedef enum {
+  UEVENT_OK = 0,
+  UEVENT_ERR_CANCELED = -1, /**< uevent_loop() interrupted by uevent_loopbreak() */
+  UEVENT_ERR_INVALID = -2,  /**< Invalid argument */
+  UEVENT_ERR_NO_MEM = -3,   /**< Out of memory */
+  UEVENT_ERR_BUSY = -4,     /**< Resource already bound to another event base */
+} uevent_err;
+
+/**
+ * Convert a uevent_err code to a human-readable string (never NULL).
+ */
+const char *uevent_strerror(uevent_err err);
 
 /**
  * Event base handle (the event loop itself).
@@ -78,9 +97,9 @@ typedef void (*uevent_ctx_destroy_fn)(void *ctx);
 /**
  * Create an event base.
  * @param ev event base handle to initialize
- * @return 0 on success, -1 on error
+ * @return UEVENT_OK on success, negative uevent_err on error
  */
-int uevent_create(uevent_t *ev);
+uevent_err uevent_create(uevent_t *ev);
 
 /**
  * Destroy an event base and free all resources.
@@ -96,24 +115,25 @@ void uevent_destroy(uevent_t *ev);
 /**
  * Wait for event sources to become ready.
  *
- * @param ev        event base handle
- * @param ready     output array of ready event source handles
- * @param max_ready max number of output handles (must be > 0)
+ * @param ev         event base handle
+ * @param ready      output array of ready event source handles
+ * @param max_ready  max number of output handles (must be > 0)
  * @param timeout_ms timeout in ms (0: return immediately, <0: block)
- * @return number of ready sources (>= 0), or -1 on error/loopbreak
+ * @return number of ready sources (>= 0), UEVENT_ERR_CANCELED on loopbreak,
+ *         or negative uevent_err on error
  */
 int uevent_loop(uevent_t *ev, uevent_source_t *ready, int max_ready, int timeout_ms);
 
 /**
  * Break the current uevent_loop() call (non-sticky).
  *
- * Thread-safe. Causes the blocked uevent_loop() to return -1.
+ * Thread-safe. Causes the blocked uevent_loop() to return UEVENT_ERR_CANCELED.
  * Subsequent loop calls behave normally.
  *
  * @param ev event base handle
- * @return 0 on success, -1 if ev is NULL
+ * @return UEVENT_OK on success, UEVENT_ERR_INVALID if ev is NULL
  */
-int uevent_loopbreak(uevent_t *ev);
+uevent_err uevent_loopbreak(uevent_t *ev);
 
 /**
  * Create a custom event source.
@@ -124,14 +144,14 @@ int uevent_loopbreak(uevent_t *ev);
  * @param unregister_fn callback called on uevent_remove (may be NULL)
  * @param ctx_destroy_fn callback called when source is destroyed (may be NULL)
  * @param ctx           user context pointer passed to all callbacks
- * @return 0 on success, -1 on error
+ * @return UEVENT_OK on success, negative uevent_err on error
  */
-int uevent_source_create(uevent_source_t *src,
-                         uevent_ready_fn ready_fn,
-                         uevent_register_fn register_fn,
-                         uevent_unregister_fn unregister_fn,
-                         uevent_ctx_destroy_fn ctx_destroy_fn,
-                         void *ctx);
+uevent_err uevent_source_create(uevent_source_t *src,
+                                uevent_ready_fn ready_fn,
+                                uevent_register_fn register_fn,
+                                uevent_unregister_fn unregister_fn,
+                                uevent_ctx_destroy_fn ctx_destroy_fn,
+                                void *ctx);
 
 /**
  * Destroy an event source.
@@ -157,20 +177,20 @@ void uevent_source_notify(uevent_source_t *src);
 /**
  * Add an event source to the event base.
  *
- * @param ev        event base handle
- * @param src       event source handle
+ * @param ev         event base handle
+ * @param src        event source handle
  * @param timeout_ms per-event timeout in ms (0 = no timeout, >0 = fire after N ms)
- * @return 0 on success, -1 on error (errno = EBUSY if already bound)
+ * @return UEVENT_OK on success, UEVENT_ERR_BUSY if already bound, or negative uevent_err
  */
-int uevent_add(uevent_t *ev, uevent_source_t *src, int timeout_ms);
+uevent_err uevent_add(uevent_t *ev, uevent_source_t *src, int timeout_ms);
 
 /**
  * Remove an event source from the event base.
  * @param ev  event base handle
  * @param src event source handle
- * @return 0 on success, -1 on error
+ * @return UEVENT_OK on success, negative uevent_err on error
  */
-int uevent_remove(uevent_t *ev, uevent_source_t *src);
+uevent_err uevent_remove(uevent_t *ev, uevent_source_t *src);
 
 /**
  * Check if an event source is currently bound to an event base.
@@ -187,27 +207,27 @@ bool uevent_source_is_bound(uevent_source_t *src);
  * and destroy via uevent_source_destroy().
  *
  * @param src event source handle to initialize
- * @return 0 on success, -1 on error
+ * @return UEVENT_OK on success, negative uevent_err on error
  */
-int uevent_manual_source_create(uevent_source_t *src);
+uevent_err uevent_manual_source_create(uevent_source_t *src);
 
 /**
  * Trigger a manual event source (marks ready and wakes any waiting loop).
  * Thread-safe.
  *
  * @param src manual event source handle
- * @return 0 on success, -1 if src is invalid or not a manual source (errno = EINVAL)
+ * @return UEVENT_OK on success, UEVENT_ERR_INVALID if src is invalid or not a manual source
  */
-int uevent_manual_source_trigger(uevent_source_t *src);
+uevent_err uevent_manual_source_trigger(uevent_source_t *src);
 
 /**
  * Reset a manual event source to the not-ready state.
  * Thread-safe.
  *
  * @param src manual event source handle
- * @return 0 on success, -1 if src is invalid or not a manual source (errno = EINVAL)
+ * @return UEVENT_OK on success, UEVENT_ERR_INVALID if src is invalid or not a manual source
  */
-int uevent_manual_source_reset(uevent_source_t *src);
+uevent_err uevent_manual_source_reset(uevent_source_t *src);
 
 /**
  * Create a built-in monotonic timer event source (zero extra threads or OS timerfd).
@@ -220,9 +240,9 @@ int uevent_manual_source_reset(uevent_source_t *src);
  * @param src       event source handle to initialize
  * @param period_ms timer interval in milliseconds (must be > 0)
  * @param periodic  true for repeating timer, false for one-shot timer
- * @return 0 on success, -1 on error (errno = EINVAL or ENOMEM)
+ * @return UEVENT_OK on success, negative uevent_err on error
  */
-int uevent_timer_source_create(uevent_source_t *src, uint32_t period_ms, bool periodic);
+uevent_err uevent_timer_source_create(uevent_source_t *src, uint32_t period_ms, bool periodic);
 
 #ifdef __cplusplus
 }

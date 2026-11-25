@@ -31,7 +31,7 @@
 
 #ifndef UORB_UEVENT_API_DECLARED
 extern "C" {
-int uorb_subscriber_create_source(uevent_source_t *src, orb_subscriber_t *sub);
+uevent_err uorb_subscriber_create_source(uevent_source_t *src, orb_subscriber_t *sub);
 void uorb_subscriber_destroy_source(uevent_source_t *src);
 }
 #endif

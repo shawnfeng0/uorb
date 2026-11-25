@@ -248,9 +248,7 @@ TEST(EventLoopTest, SubscriptionCannotBindToMultipleEventPolls) {
 
   ASSERT_EQ(uevent_add(&base_a, &source, 0), 0);
 
-  errno = 0;
-  EXPECT_EQ(uevent_add(&base_b, &source, 0), -1);
-  EXPECT_EQ(errno, EBUSY);
+  EXPECT_EQ(uevent_add(&base_b, &source, 0), UEVENT_ERR_BUSY);
 
   EXPECT_EQ(uevent_remove(&base_a, &source), 0);
   EXPECT_EQ(uevent_add(&base_b, &source, 0), 0);

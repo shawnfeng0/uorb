@@ -31,14 +31,15 @@ class CEventSource final : public uevent::EventSource {
 
   bool is_ready() const override { return ready_fn_(ctx_); }
 
-  bool SetWakeup(uevent::EventPoll *poll) override {
-    if (!EventSource::SetWakeup(poll)) return false;
+  uevent_err SetWakeup(uevent::EventPoll *poll) override {
+    const uevent_err err = EventSource::SetWakeup(poll);
+    if (err != UEVENT_OK) return err;
     if (register_fn_ && !register_fn_(ctx_)) {
       ClearWakeup();
-      return false;
+      return UEVENT_ERR_INVALID;
     }
     registered_ = true;
-    return true;
+    return UEVENT_OK;
   }
 
   void OnRemoved() override {
@@ -97,20 +98,35 @@ class TimerEventSource final : public uevent::EventSource {
 
 // ---- C API implementation ----
 
-int uevent_create(uevent_t *ev) {
+const char *uevent_strerror(uevent_err err) {
+  switch (err) {
+    case UEVENT_OK:
+      return "OK";
+    case UEVENT_ERR_CANCELED:
+      return "Canceled";
+    case UEVENT_ERR_INVALID:
+      return "Invalid argument";
+    case UEVENT_ERR_NO_MEM:
+      return "Out of memory";
+    case UEVENT_ERR_BUSY:
+      return "Resource busy";
+    default:
+      return "Unknown error";
+  }
+}
+
+uevent_err uevent_create(uevent_t *ev) {
   static_assert(sizeof(uevent_t) == sizeof(void *),
                 "uevent_t must have same layout as void* for handle wrapper safety");
   if (!ev) {
-    errno = EINVAL;
-    return -1;
+    return UEVENT_ERR_INVALID;
   }
   auto *poll = new (std::nothrow) uevent::EventPoll();
   if (!poll) {
-    errno = ENOMEM;
-    return -1;
+    return UEVENT_ERR_NO_MEM;
   }
   ev->_handle = poll;
-  return 0;
+  return UEVENT_OK;
 }
 
 void uevent_destroy(uevent_t *ev) {
@@ -122,41 +138,37 @@ void uevent_destroy(uevent_t *ev) {
 
 int uevent_loop(uevent_t *ev, uevent_source_t *ready, int max_ready, int timeout_ms) {
   if (!ev || !ev->_handle || !ready || max_ready <= 0) {
-    errno = EINVAL;
-    return -1;
+    return UEVENT_ERR_INVALID;
   }
   auto *poll = reinterpret_cast<uevent::EventPoll *>(ev->_handle);
   return poll->WaitSources(ready, max_ready, timeout_ms);
 }
 
-int uevent_loopbreak(uevent_t *ev) {
+uevent_err uevent_loopbreak(uevent_t *ev) {
   if (!ev || !ev->_handle) {
-    errno = EINVAL;
-    return -1;
+    return UEVENT_ERR_INVALID;
   }
   auto *poll = reinterpret_cast<uevent::EventPoll *>(ev->_handle);
   poll->Stop();
-  return 0;
+  return UEVENT_OK;
 }
 
-int uevent_source_create(uevent_source_t *src,
-                         uevent_ready_fn ready_fn,
-                         uevent_register_fn register_fn,
-                         uevent_unregister_fn unregister_fn,
-                         uevent_ctx_destroy_fn ctx_destroy_fn,
-                         void *ctx) {
+uevent_err uevent_source_create(uevent_source_t *src,
+                                uevent_ready_fn ready_fn,
+                                uevent_register_fn register_fn,
+                                uevent_unregister_fn unregister_fn,
+                                uevent_ctx_destroy_fn ctx_destroy_fn,
+                                void *ctx) {
   if (!src || !ready_fn) {
-    errno = EINVAL;
-    return -1;
+    return UEVENT_ERR_INVALID;
   }
   auto *source = new (std::nothrow) CEventSource(ready_fn, register_fn, unregister_fn, ctx_destroy_fn, ctx);
   if (!source) {
-    errno = ENOMEM;
-    return -1;
+    return UEVENT_ERR_NO_MEM;
   }
   src->_handle = source;
   src->data.u64 = 0;
-  return 0;
+  return UEVENT_OK;
 }
 
 void uevent_source_destroy(uevent_source_t *src) {
@@ -171,24 +183,22 @@ void uevent_source_notify(uevent_source_t *src) {
   reinterpret_cast<uevent::EventSource *>(src->_handle)->notify_waiters();
 }
 
-int uevent_add(uevent_t *ev, uevent_source_t *src, int timeout_ms) {
+uevent_err uevent_add(uevent_t *ev, uevent_source_t *src, int timeout_ms) {
   if (!ev || !ev->_handle || !src || !src->_handle) {
-    errno = EINVAL;
-    return -1;
+    return UEVENT_ERR_INVALID;
   }
   auto *poll = reinterpret_cast<uevent::EventPoll *>(ev->_handle);
   auto *es = reinterpret_cast<uevent::EventSource *>(src->_handle);
-  return poll->Add(*es, timeout_ms, src->data) ? 0 : -1;
+  return poll->Add(*es, timeout_ms, src->data);
 }
 
-int uevent_remove(uevent_t *ev, uevent_source_t *src) {
+uevent_err uevent_remove(uevent_t *ev, uevent_source_t *src) {
   if (!ev || !ev->_handle || !src || !src->_handle) {
-    errno = EINVAL;
-    return -1;
+    return UEVENT_ERR_INVALID;
   }
   auto *poll = reinterpret_cast<uevent::EventPoll *>(ev->_handle);
   auto *es = reinterpret_cast<uevent::EventSource *>(src->_handle);
-  return poll->Remove(*es) ? 0 : -1;
+  return poll->Remove(*es);
 }
 
 bool uevent_source_is_bound(uevent_source_t *src) {
@@ -196,56 +206,48 @@ bool uevent_source_is_bound(uevent_source_t *src) {
   return reinterpret_cast<uevent::EventSource *>(src->_handle)->HasWakeup();
 }
 
-int uevent_manual_source_create(uevent_source_t *src) {
+uevent_err uevent_manual_source_create(uevent_source_t *src) {
   if (!src) {
-    errno = EINVAL;
-    return -1;
+    return UEVENT_ERR_INVALID;
   }
   auto *source = new (std::nothrow) ManualEventSource();
   if (!source) {
-    errno = ENOMEM;
-    return -1;
+    return UEVENT_ERR_NO_MEM;
   }
   src->_handle = source;
   src->data.u64 = 0;
-  return 0;
+  return UEVENT_OK;
 }
 
-int uevent_manual_source_trigger(uevent_source_t *src) {
+uevent_err uevent_manual_source_trigger(uevent_source_t *src) {
   if (!src || !src->_handle) {
-    errno = EINVAL;
-    return -1;
+    return UEVENT_ERR_INVALID;
   }
   if (!reinterpret_cast<uevent::EventSource *>(src->_handle)->Trigger()) {
-    errno = EINVAL;
-    return -1;
+    return UEVENT_ERR_INVALID;
   }
-  return 0;
+  return UEVENT_OK;
 }
 
-int uevent_manual_source_reset(uevent_source_t *src) {
+uevent_err uevent_manual_source_reset(uevent_source_t *src) {
   if (!src || !src->_handle) {
-    errno = EINVAL;
-    return -1;
+    return UEVENT_ERR_INVALID;
   }
   if (!reinterpret_cast<uevent::EventSource *>(src->_handle)->Reset()) {
-    errno = EINVAL;
-    return -1;
+    return UEVENT_ERR_INVALID;
   }
-  return 0;
+  return UEVENT_OK;
 }
 
-int uevent_timer_source_create(uevent_source_t *src, uint32_t period_ms, bool periodic) {
+uevent_err uevent_timer_source_create(uevent_source_t *src, uint32_t period_ms, bool periodic) {
   if (!src || period_ms == 0) {
-    errno = EINVAL;
-    return -1;
+    return UEVENT_ERR_INVALID;
   }
   auto *source = new (std::nothrow) TimerEventSource(period_ms, periodic);
   if (!source) {
-    errno = ENOMEM;
-    return -1;
+    return UEVENT_ERR_NO_MEM;
   }
   src->_handle = source;
   src->data.u64 = 0;
-  return 0;
+  return UEVENT_OK;
 }

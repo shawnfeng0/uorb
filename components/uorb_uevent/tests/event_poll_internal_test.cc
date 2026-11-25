@@ -45,13 +45,13 @@ TEST(EventPollInternalTest, WaitZeroReturnsZeroWhenNoReadyData) {
   uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
   ASSERT_EQ(uorb_subscriber_create_source(&src, &sub), 0);
   uevent::EventSource *es = reinterpret_cast<uevent::EventSource *>(src._handle);
-  ASSERT_TRUE(poll.Add(*es));
+  ASSERT_EQ(poll.Add(*es), UEVENT_OK);
   drain_initial(poll, es, &sub);
 
   uevent::EventSource *ready[1] = {nullptr};
   EXPECT_EQ(poll.Wait(ready, 1, 0), 0);
 
-  ASSERT_TRUE(poll.Remove(*es));
+  ASSERT_EQ(poll.Remove(*es), UEVENT_OK);
   uorb_subscriber_destroy_source(&src);
   EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
 }
@@ -70,7 +70,7 @@ TEST(EventPollInternalTest, WaitZeroReturnsReadyReceiverWhenDataArrives) {
   uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
   ASSERT_EQ(uorb_subscriber_create_source(&src, &sub), 0);
   uevent::EventSource *es = reinterpret_cast<uevent::EventSource *>(src._handle);
-  ASSERT_TRUE(poll.Add(*es));
+  ASSERT_EQ(poll.Add(*es), UEVENT_OK);
   drain_initial(poll, es, &sub);
 
   orb_test_s msg{};
@@ -85,7 +85,7 @@ TEST(EventPollInternalTest, WaitZeroReturnsReadyReceiverWhenDataArrives) {
   EXPECT_EQ(orb_subscriber_copy(&sub, &msg), ORB_OK);
   EXPECT_EQ(msg.val, 321);
 
-  ASSERT_TRUE(poll.Remove(*es));
+  ASSERT_EQ(poll.Remove(*es), UEVENT_OK);
   uorb_subscriber_destroy_source(&src);
   EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
   EXPECT_EQ(orb_publisher_destroy(&pub), ORB_OK);
@@ -111,8 +111,8 @@ TEST(EventPollInternalTest, WaitReturnsMultipleReadyReceivers) {
   ASSERT_EQ(uorb_subscriber_create_source(&src2, &second_sub), 0);
   uevent::EventSource *es1 = reinterpret_cast<uevent::EventSource *>(src1._handle);
   uevent::EventSource *es2 = reinterpret_cast<uevent::EventSource *>(src2._handle);
-  ASSERT_TRUE(poll.Add(*es1));
-  ASSERT_TRUE(poll.Add(*es2));
+  ASSERT_EQ(poll.Add(*es1), UEVENT_OK);
+  ASSERT_EQ(poll.Add(*es2), UEVENT_OK);
 
   { uevent::EventSource *r[2] = {nullptr}; poll.Wait(r, 2, 0); }
 
@@ -126,8 +126,8 @@ TEST(EventPollInternalTest, WaitReturnsMultipleReadyReceivers) {
   EXPECT_TRUE((ready[0] == es1 && ready[1] == es2) ||
               (ready[0] == es2 && ready[1] == es1));
 
-  ASSERT_TRUE(poll.Remove(*es1));
-  ASSERT_TRUE(poll.Remove(*es2));
+  ASSERT_EQ(poll.Remove(*es1), UEVENT_OK);
+  ASSERT_EQ(poll.Remove(*es2), UEVENT_OK);
   uorb_subscriber_destroy_source(&src1);
   uorb_subscriber_destroy_source(&src2);
   EXPECT_EQ(orb_subscriber_destroy(&first_sub), ORB_OK);
@@ -155,8 +155,8 @@ TEST(EventPollInternalTest, WaitTruncatesReadyOutputToCapacity) {
   ASSERT_EQ(uorb_subscriber_create_source(&src2, &second_sub), 0);
   uevent::EventSource *es1 = reinterpret_cast<uevent::EventSource *>(src1._handle);
   uevent::EventSource *es2 = reinterpret_cast<uevent::EventSource *>(src2._handle);
-  ASSERT_TRUE(poll.Add(*es1));
-  ASSERT_TRUE(poll.Add(*es2));
+  ASSERT_EQ(poll.Add(*es1), UEVENT_OK);
+  ASSERT_EQ(poll.Add(*es2), UEVENT_OK);
 
   { uevent::EventSource *r[2] = {nullptr}; poll.Wait(r, 2, 0); }
 
@@ -174,8 +174,8 @@ TEST(EventPollInternalTest, WaitTruncatesReadyOutputToCapacity) {
   EXPECT_NE(remaining_ready[0], ready[0]);
   EXPECT_EQ(orb_subscriber_copy(remaining_ready[0] == es1 ? &first_sub : &second_sub, &msg), ORB_OK);
 
-  ASSERT_TRUE(poll.Remove(*es1));
-  ASSERT_TRUE(poll.Remove(*es2));
+  ASSERT_EQ(poll.Remove(*es1), UEVENT_OK);
+  ASSERT_EQ(poll.Remove(*es2), UEVENT_OK);
   uorb_subscriber_destroy_source(&src1);
   uorb_subscriber_destroy_source(&src2);
   EXPECT_EQ(orb_subscriber_destroy(&first_sub), ORB_OK);
@@ -193,7 +193,7 @@ TEST(EventPollInternalTest, WaitAfterStopReturnsMinusOneOnce) {
   uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
   ASSERT_EQ(uorb_subscriber_create_source(&src, &sub), 0);
   uevent::EventSource *es = reinterpret_cast<uevent::EventSource *>(src._handle);
-  ASSERT_TRUE(poll.Add(*es));
+  ASSERT_EQ(poll.Add(*es), UEVENT_OK);
   drain_initial(poll, es, &sub);
 
   poll.Stop();
@@ -202,7 +202,7 @@ TEST(EventPollInternalTest, WaitAfterStopReturnsMinusOneOnce) {
   EXPECT_EQ(poll.Wait(ready, 1, 0), -1);
   EXPECT_EQ(poll.Wait(ready, 1, 0), 0);
 
-  ASSERT_TRUE(poll.Remove(*es));
+  ASSERT_EQ(poll.Remove(*es), UEVENT_OK);
   uorb_subscriber_destroy_source(&src);
   EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
 }
@@ -217,7 +217,7 @@ TEST(EventPollInternalTest, WaitInterruptedByStopReturnsMinusOne) {
   uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
   ASSERT_EQ(uorb_subscriber_create_source(&src, &sub), 0);
   uevent::EventSource *es = reinterpret_cast<uevent::EventSource *>(src._handle);
-  ASSERT_TRUE(poll.Add(*es));
+  ASSERT_EQ(poll.Add(*es), UEVENT_OK);
   drain_initial(poll, es, &sub);
 
   std::atomic<int> wait_result{0};
@@ -232,7 +232,7 @@ TEST(EventPollInternalTest, WaitInterruptedByStopReturnsMinusOne) {
   waiter.join();
   EXPECT_EQ(wait_result.load(), -1);
 
-  ASSERT_TRUE(poll.Remove(*es));
+  ASSERT_EQ(poll.Remove(*es), UEVENT_OK);
   uorb_subscriber_destroy_source(&src);
   EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
 }
@@ -247,10 +247,10 @@ TEST(EventPollInternalTest, AddPollableIsIdempotentForSamePoll) {
   uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
   ASSERT_EQ(uorb_subscriber_create_source(&src, &sub), 0);
   uevent::EventSource *es = reinterpret_cast<uevent::EventSource *>(src._handle);
-  EXPECT_TRUE(poll.Add(*es));
-  EXPECT_TRUE(poll.Add(*es));
-  EXPECT_TRUE(poll.Remove(*es));
-  EXPECT_FALSE(poll.Remove(*es));
+  EXPECT_EQ(poll.Add(*es), UEVENT_OK);
+  EXPECT_EQ(poll.Add(*es), UEVENT_OK);
+  EXPECT_EQ(poll.Remove(*es), UEVENT_OK);
+  EXPECT_EQ(poll.Remove(*es), UEVENT_ERR_INVALID);
   uorb_subscriber_destroy_source(&src);
   EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
 }
@@ -267,10 +267,9 @@ TEST(EventPollInternalTest, RemovePollableRejectsReceiverBoundToAnotherPoll) {
   ASSERT_EQ(uorb_subscriber_create_source(&src, &sub), 0);
   uevent::EventSource *es = reinterpret_cast<uevent::EventSource *>(src._handle);
 
-  ASSERT_TRUE(owner_poll.Add(*es));
-  EXPECT_FALSE(other_poll.Remove(*es));
-  EXPECT_EQ(errno, EBUSY);
-  ASSERT_TRUE(owner_poll.Remove(*es));
+  ASSERT_EQ(owner_poll.Add(*es), UEVENT_OK);
+  EXPECT_EQ(other_poll.Remove(*es), UEVENT_ERR_BUSY);
+  ASSERT_EQ(owner_poll.Remove(*es), UEVENT_OK);
   uorb_subscriber_destroy_source(&src);
   EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
 }
@@ -285,9 +284,9 @@ TEST(EventPollInternalTest, DestroySubscriptionAfterUnbinding) {
   uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
   ASSERT_EQ(uorb_subscriber_create_source(&src, &sub), 0);
   uevent::EventSource *es = reinterpret_cast<uevent::EventSource *>(src._handle);
-  ASSERT_TRUE(poll.Add(*es));
+  ASSERT_EQ(poll.Add(*es), UEVENT_OK);
 
-  ASSERT_TRUE(poll.Remove(*es));
+  ASSERT_EQ(poll.Remove(*es), UEVENT_OK);
   uorb_subscriber_destroy_source(&src);
   EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
   EXPECT_EQ(sub._handle, nullptr);
@@ -298,18 +297,14 @@ TEST(EventPollInternalTest, WaitRejectsZeroMaxReady) {
   uevent::EventPoll poll;
   uevent::EventSource *ready[1] = {nullptr};
 
-  errno = 0;
-  EXPECT_EQ(poll.Wait(ready, 0, 0), -1);
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(poll.Wait(ready, 0, 0), UEVENT_ERR_INVALID);
 }
 
 // ---- WaitRejectsNullReadyArray ----
 TEST(EventPollInternalTest, WaitRejectsNullReadyArray) {
   uevent::EventPoll poll;
 
-  errno = 0;
-  EXPECT_EQ(poll.Wait(nullptr, 1, 0), -1);
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(poll.Wait(nullptr, 1, 0), UEVENT_ERR_INVALID);
 }
 
 // ---- WaitRejectsNegativeMaxReady ----
@@ -317,9 +312,7 @@ TEST(EventPollInternalTest, WaitRejectsNegativeMaxReady) {
   uevent::EventPoll poll;
   uevent::EventSource *ready[1] = {nullptr};
 
-  errno = 0;
-  EXPECT_EQ(poll.Wait(ready, -1, 0), -1);
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(poll.Wait(ready, -1, 0), UEVENT_ERR_INVALID);
 }
 
 // ---- AddRemovePressureWithActivePublisher ----
@@ -352,13 +345,13 @@ TEST(EventPollInternalTest, AddRemovePressureWithActivePublisher) {
   orb_test_s msg{};
 
   for (int i = 0; i < 200; ++i) {
-    ASSERT_TRUE(poll.Add(*es));
+    ASSERT_EQ(poll.Add(*es), UEVENT_OK);
     const int n = poll.Wait(ready, 1, 20);
     ASSERT_GE(n, 0);
     if (n > 0 && ready[0] == es) {
       ASSERT_EQ(orb_subscriber_copy(&sub, &msg), ORB_OK);
     }
-    ASSERT_TRUE(poll.Remove(*es));
+    ASSERT_EQ(poll.Remove(*es), UEVENT_OK);
   }
 
   running = false;
@@ -379,11 +372,11 @@ TEST(EventPollInternalTest, PerEventTimeoutFiresWithoutData) {
   uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
   ASSERT_EQ(uorb_subscriber_create_source(&src, &sub), 0);
   uevent::EventSource *es = reinterpret_cast<uevent::EventSource *>(src._handle);
-  ASSERT_TRUE(poll.Add(*es));
+  ASSERT_EQ(poll.Add(*es), UEVENT_OK);
   drain_initial(poll, es, &sub);
 
-  ASSERT_TRUE(poll.Remove(*es));
-  ASSERT_TRUE(poll.Add(*es, 50));
+  ASSERT_EQ(poll.Remove(*es), UEVENT_OK);
+  ASSERT_EQ(poll.Add(*es, 50), UEVENT_OK);
 
   uevent::EventSource *ready[1] = {nullptr};
   auto t0 = std::chrono::steady_clock::now();
@@ -399,7 +392,7 @@ TEST(EventPollInternalTest, PerEventTimeoutFiresWithoutData) {
 
   EXPECT_EQ(poll.Wait(ready, 1, 0), 0);
 
-  ASSERT_TRUE(poll.Remove(*es));
+  ASSERT_EQ(poll.Remove(*es), UEVENT_OK);
   uorb_subscriber_destroy_source(&src);
   EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
 }
@@ -414,13 +407,13 @@ TEST(EventPollInternalTest, PerEventTimeoutZeroMeansNoTimeout) {
   uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
   ASSERT_EQ(uorb_subscriber_create_source(&src, &sub), 0);
   uevent::EventSource *es = reinterpret_cast<uevent::EventSource *>(src._handle);
-  ASSERT_TRUE(poll.Add(*es, 0));
+  ASSERT_EQ(poll.Add(*es, 0), UEVENT_OK);
   drain_initial(poll, es, &sub);
 
   uevent::EventSource *ready[1] = {nullptr};
   EXPECT_EQ(poll.Wait(ready, 1, 0), 0);
 
-  ASSERT_TRUE(poll.Remove(*es));
+  ASSERT_EQ(poll.Remove(*es), UEVENT_OK);
   uorb_subscriber_destroy_source(&src);
   EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
 }
@@ -441,7 +434,7 @@ TEST(EventPollInternalTest, CustomEventSourceFromC) {
   ASSERT_NE(src._handle, nullptr);
 
   uevent::EventPoll poll;
-  ASSERT_TRUE(poll.Add(*reinterpret_cast<uevent::EventSource *>(src._handle)));
+  ASSERT_EQ(poll.Add(*reinterpret_cast<uevent::EventSource *>(src._handle)), UEVENT_OK);
 
   uevent::EventSource *ready[1] = {nullptr};
   EXPECT_EQ(poll.Wait(ready, 1, 0), 0);
@@ -455,7 +448,7 @@ TEST(EventPollInternalTest, CustomEventSourceFromC) {
   ctx.has_data = false;
   EXPECT_EQ(poll.Wait(ready, 1, 0), 0);
 
-  EXPECT_TRUE(poll.Remove(*reinterpret_cast<uevent::EventSource *>(src._handle)));
+  EXPECT_EQ(poll.Remove(*reinterpret_cast<uevent::EventSource *>(src._handle)), UEVENT_OK);
   uevent_source_destroy(&src);
 }
 
@@ -484,7 +477,7 @@ TEST(EventPollInternalTest, AddSourceAlreadyReady) {
 
   // Add should detect the source is already ready and place it in ready_set_.
   uevent::EventPoll poll;
-  ASSERT_TRUE(poll.Add(*es));
+  ASSERT_EQ(poll.Add(*es), UEVENT_OK);
   EXPECT_TRUE(es->is_ready());
 
   // Wait should return 1 immediately.
@@ -492,7 +485,7 @@ TEST(EventPollInternalTest, AddSourceAlreadyReady) {
   EXPECT_EQ(poll.Wait(ready, 1, 0), 1);
   EXPECT_EQ(ready[0], es);
 
-  ASSERT_TRUE(poll.Remove(*es));
+  ASSERT_EQ(poll.Remove(*es), UEVENT_OK);
   uorb_subscriber_destroy_source(&src);
   EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
   EXPECT_EQ(orb_publisher_destroy(&pub), ORB_OK);
@@ -525,9 +518,9 @@ TEST(EventPollInternalTest, WaitStarvationOneAlwaysReady) {
   uevent::EventSource *es3 = reinterpret_cast<uevent::EventSource *>(src3._handle);
 
   uevent::EventPoll poll;
-  ASSERT_TRUE(poll.Add(*es1));
-  ASSERT_TRUE(poll.Add(*es2));
-  ASSERT_TRUE(poll.Add(*es3));
+  ASSERT_EQ(poll.Add(*es1), UEVENT_OK);
+  ASSERT_EQ(poll.Add(*es2), UEVENT_OK);
+  ASSERT_EQ(poll.Add(*es3), UEVENT_OK);
 
   // Drain all initial data.
   orb_test_s tmp{};
@@ -556,9 +549,9 @@ TEST(EventPollInternalTest, WaitStarvationOneAlwaysReady) {
   // Second Wait should return 0 (all consumed).
   EXPECT_EQ(poll.Wait(ready, 3, 0), 0);
 
-  ASSERT_TRUE(poll.Remove(*es1));
-  ASSERT_TRUE(poll.Remove(*es2));
-  ASSERT_TRUE(poll.Remove(*es3));
+  ASSERT_EQ(poll.Remove(*es1), UEVENT_OK);
+  ASSERT_EQ(poll.Remove(*es2), UEVENT_OK);
+  ASSERT_EQ(poll.Remove(*es3), UEVENT_OK);
   uorb_subscriber_destroy_source(&src1);
   uorb_subscriber_destroy_source(&src2);
   uorb_subscriber_destroy_source(&src3);
@@ -588,7 +581,7 @@ TEST(EventPollInternalTest, ManySourcesAllReady) {
 
   uevent::EventPoll poll;
   for (int i = 0; i < kN; ++i) {
-    ASSERT_TRUE(poll.Add(*sources[i]));
+    ASSERT_EQ(poll.Add(*sources[i]), UEVENT_OK);
   }
 
   // Drain initial data on all subscriptions.
@@ -616,7 +609,7 @@ TEST(EventPollInternalTest, ManySourcesAllReady) {
   EXPECT_EQ(poll.Wait(ready, 30, 0), 0);
 
   for (int i = 0; i < kN; ++i) {
-    ASSERT_TRUE(poll.Remove(*sources[i]));
+    ASSERT_EQ(poll.Remove(*sources[i]), UEVENT_OK);
   }
   for (int i = 0; i < kN; ++i) {
     uorb_subscriber_destroy_source(&srcs[i]);
@@ -635,7 +628,7 @@ TEST(EventPollInternalTest, RemoveWhileWaitBlocked) {
   uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
   ASSERT_EQ(uorb_subscriber_create_source(&src, &sub), 0);
   uevent::EventSource *es = reinterpret_cast<uevent::EventSource *>(src._handle);
-  ASSERT_TRUE(poll.Add(*es));
+  ASSERT_EQ(poll.Add(*es), UEVENT_OK);
   drain_initial(poll, es, &sub);
 
   std::atomic<int> wait_result{99};
@@ -645,7 +638,7 @@ TEST(EventPollInternalTest, RemoveWhileWaitBlocked) {
   });
 
   std::this_thread::sleep_for(std::chrono::milliseconds(30));
-  ASSERT_TRUE(poll.Remove(*es));
+  ASSERT_EQ(poll.Remove(*es), UEVENT_OK);
   // Remove does not notify the condition variable; call Stop to wake
   // the blocked Wait thread.
   poll.Stop();
@@ -667,7 +660,7 @@ TEST(EventPollInternalTest, StopCalledTwice) {
   uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
   ASSERT_EQ(uorb_subscriber_create_source(&src, &sub), 0);
   uevent::EventSource *es = reinterpret_cast<uevent::EventSource *>(src._handle);
-  ASSERT_TRUE(poll.Add(*es));
+  ASSERT_EQ(poll.Add(*es), UEVENT_OK);
   drain_initial(poll, es, &sub);
 
   // Calling Stop twice should be safe.
@@ -681,7 +674,7 @@ TEST(EventPollInternalTest, StopCalledTwice) {
   // Second Wait: stop_ is now false, no ready data -> returns 0.
   EXPECT_EQ(poll.Wait(ready, 1, 0), 0);
 
-  ASSERT_TRUE(poll.Remove(*es));
+  ASSERT_EQ(poll.Remove(*es), UEVENT_OK);
   uorb_subscriber_destroy_source(&src);
   EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
 }
@@ -700,12 +693,12 @@ TEST(EventPollInternalTest, PerEventTimeoutWithConcurrentNotify) {
   uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
   ASSERT_EQ(uorb_subscriber_create_source(&src, &sub), 0);
   uevent::EventSource *es = reinterpret_cast<uevent::EventSource *>(src._handle);
-  ASSERT_TRUE(poll.Add(*es));
+  ASSERT_EQ(poll.Add(*es), UEVENT_OK);
   drain_initial(poll, es, &sub);
 
-  ASSERT_TRUE(poll.Remove(*es));
+  ASSERT_EQ(poll.Remove(*es), UEVENT_OK);
   // Re-add with a 50 ms per-event timeout.
-  ASSERT_TRUE(poll.Add(*es, 50));
+  ASSERT_EQ(poll.Add(*es, 50), UEVENT_OK);
 
   auto t0 = std::chrono::steady_clock::now();
 
@@ -730,7 +723,7 @@ TEST(EventPollInternalTest, PerEventTimeoutWithConcurrentNotify) {
   // Should return well before the 50 ms per-event timeout fires.
   EXPECT_LT(elapsed_ms, 40);
 
-  ASSERT_TRUE(poll.Remove(*es));
+  ASSERT_EQ(poll.Remove(*es), UEVENT_OK);
   uorb_subscriber_destroy_source(&src);
   EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
   EXPECT_EQ(orb_publisher_destroy(&pub), ORB_OK);

@@ -28,7 +28,7 @@ extern "C" {
  * @param sub uORB subscription handle
  * @return 0 on success, -1 on error
  */
-int uorb_subscriber_create_source(uevent_source_t *src, orb_subscriber_t *sub);
+uevent_err uorb_subscriber_create_source(uevent_source_t *src, orb_subscriber_t *sub);
 
 /**
  * Destroy an event source created by uorb_subscriber_create_source().

@@ -30,11 +30,9 @@ TEST(UorbUeventTest, CreateDestroySource) {
 }
 
 TEST(UorbUeventTest, CreateSourceFromNullSubscriptionFails) {
-  errno = 0;
   uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
-  EXPECT_EQ(uorb_subscriber_create_source(&src, nullptr), -1);
+  EXPECT_EQ(uorb_subscriber_create_source(&src, nullptr), UEVENT_ERR_INVALID);
   EXPECT_EQ(src._handle, nullptr);
-  EXPECT_EQ(errno, EINVAL);
 }
 
 TEST(UorbUeventTest, DestroyNullSource) {
@@ -624,9 +622,9 @@ TEST(UorbUeventTest, SetCallbackThenCreateSource) {
   // orb_subscriber_set_callback on the (already-bound) subscriber handle,
   // which returns ORB_ERR_BUSY.
   uevent_t base = UEVENT_INITIALIZER;
-  ASSERT_EQ(uevent_create(&base), 0);
+  ASSERT_EQ(uevent_create(&base), UEVENT_OK);
   ASSERT_NE(base._handle, nullptr);
-  EXPECT_EQ(uevent_add(&base, &src, 0), -1);
+  EXPECT_EQ(uevent_add(&base, &src, 0), UEVENT_ERR_BUSY);
 
   // Source was never added, so just destroy it directly.
   uorb_subscriber_destroy_source(&src);
@@ -653,7 +651,7 @@ TEST(UorbUeventTest, CreateSourceWithUninitializedSubscriber) {
 
   // uevent_add must fail: bridge_register calls orb_subscriber_set_callback
   // which returns ORB_ERR_INVALID for a NULL handle.
-  EXPECT_EQ(uevent_add(&base, &src, 0), -1);
+  EXPECT_EQ(uevent_add(&base, &src, 0), UEVENT_ERR_INVALID);
 
   // Source was never added, so just destroy it directly.
   uorb_subscriber_destroy_source(&src);

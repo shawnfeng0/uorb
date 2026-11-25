@@ -176,42 +176,26 @@ TEST_F(UnitTest, uevent_poll_rejects_invalid_arguments) {
   uorb_subscriber_create_source(&src, &subscription);
   uevent_source_t ready[1] = {UEVENT_SOURCE_INITIALIZER};
 
-  errno = 0;
-  EXPECT_EQ(uevent_add(nullptr, &src, 0), -1);
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(uevent_add(nullptr, &src, 0), UEVENT_ERR_INVALID);
 
-  errno = 0;
   uevent_t fake_base = {reinterpret_cast<void *>(0x1)};
-  EXPECT_EQ(uevent_add(&fake_base, nullptr, 0), -1);
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(uevent_add(&fake_base, nullptr, 0), UEVENT_ERR_INVALID);
 
-  errno = 0;
-  EXPECT_EQ(uevent_remove(nullptr, &src), -1);
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(uevent_remove(nullptr, &src), UEVENT_ERR_INVALID);
 
-  errno = 0;
-  EXPECT_EQ(uevent_remove(&fake_base, nullptr), -1);
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(uevent_remove(&fake_base, nullptr), UEVENT_ERR_INVALID);
 
-  errno = 0;
-  EXPECT_EQ(uevent_loop(nullptr, ready, 1, 0), -1);
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(uevent_loop(nullptr, ready, 1, 0), UEVENT_ERR_INVALID);
 
   uevent_t base = UEVENT_INITIALIZER;
   uevent_create(&base);
   ASSERT_NE(base._handle, nullptr);
 
-  errno = 0;
-  EXPECT_EQ(uevent_loop(&base, nullptr, 1, 0), -1);
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(uevent_loop(&base, nullptr, 1, 0), UEVENT_ERR_INVALID);
 
-  errno = 0;
-  EXPECT_EQ(uevent_loop(&base, ready, 0, 0), -1);
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(uevent_loop(&base, ready, 0, 0), UEVENT_ERR_INVALID);
 
-  errno = 0;
-  EXPECT_EQ(uevent_loopbreak(nullptr), -1);
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(uevent_loopbreak(nullptr), UEVENT_ERR_INVALID);
 
   uevent_destroy(&base);
   uorb_subscriber_destroy_source(&src);

@@ -5,7 +5,6 @@
 
 #include <uevent/uevent_source.h>
 
-#include <errno.h>
 #include <atomic>
 #include <cstddef>
 #include <cstring>
@@ -121,21 +120,21 @@ class EventPoll {
   EventPoll(const EventPoll &) = delete;
   EventPoll &operator=(const EventPoll &) = delete;
 
-  bool Add(EventSource &source, int timeout_ms = 0) {
+  uevent_err Add(EventSource &source, int timeout_ms = 0) {
     return Add(source, timeout_ms, source.user_data());
   }
 
-  bool Add(EventSource &source, int timeout_ms, uevent_data_t data) {
+  uevent_err Add(EventSource &source, int timeout_ms, uevent_data_t data) {
     if (source.HasWakeup(this)) {
       base::LockGuard<base::Mutex> lk(mu_);
       source.set_user_data(data);
-      return true;
+      return UEVENT_OK;
     }
     if (source.HasWakeup()) {
-      errno = EBUSY;
-      return false;
+      return UEVENT_ERR_BUSY;
     }
-    if (!source.SetWakeup(this)) return false;
+    const uevent_err wakeup_err = source.SetWakeup(this);
+    if (wakeup_err != UEVENT_OK) return wakeup_err;
 
     bool needs_notify = false;
     bool reserved = false;
@@ -173,19 +172,17 @@ class EventPoll {
     if (!reserved) {
       source.RemoveWakeup();
       source.set_in_ready_queue(false);
-      errno = ENOMEM;
-      return false;
+      return UEVENT_ERR_NO_MEM;
     }
     if (needs_notify) {
       cv_.notify_one();
     }
-    return true;
+    return UEVENT_OK;
   }
 
-  bool Remove(EventSource &source) {
+  uevent_err Remove(EventSource &source) {
     if (!source.HasWakeup(this)) {
-      errno = source.HasWakeup() ? EBUSY : EINVAL;
-      return false;
+      return source.HasWakeup() ? UEVENT_ERR_BUSY : UEVENT_ERR_INVALID;
     }
     {
       base::LockGuard<base::Mutex> lk(mu_);
@@ -207,13 +204,12 @@ class EventPoll {
       }
     }
     source.OnRemoved();
-    return true;
+    return UEVENT_OK;
   }
 
   int Wait(EventSource *ready[], int max_ready, const int timeout_ms) {
     if (!ready || max_ready <= 0) {
-      errno = EINVAL;
-      return -1;
+      return UEVENT_ERR_INVALID;
     }
     return WaitImpl(max_ready, timeout_ms, [ready](int idx, EventSource *s) {
       ready[idx] = s;
@@ -225,8 +221,7 @@ class EventPoll {
   // immediately after Wait() releases mu_.
   int WaitSources(uevent_source_t *ready, int max_ready, const int timeout_ms) {
     if (!ready || max_ready <= 0) {
-      errno = EINVAL;
-      return -1;
+      return UEVENT_ERR_INVALID;
     }
     return WaitImpl(max_ready, timeout_ms, [ready](int idx, EventSource *s) {
       ready[idx]._handle = s;
@@ -275,7 +270,7 @@ class EventPoll {
     base::UniqueLock<base::Mutex> lk(mu_);
     if (stop_) {
       stop_ = false;
-      return -1;
+      return UEVENT_ERR_CANCELED;
     }
 
     bool has_loop_deadline = false;

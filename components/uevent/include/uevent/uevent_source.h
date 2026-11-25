@@ -3,7 +3,6 @@
 #include <uevent/uevent.h>
 
 #include <atomic>
-#include <cerrno>
 #include <pthread.h>
 #include <time.h>
 
@@ -33,18 +32,16 @@ class EventSource {
   EventSource &operator=(const EventSource &) = delete;
   EventSource &operator=(EventSource &&) = delete;
 
-  virtual bool SetWakeup(EventPoll *poll) {
+  virtual uevent_err SetWakeup(EventPoll *poll) {
     if (!poll) {
-      errno = EINVAL;
-      return false;
+      return UEVENT_ERR_INVALID;
     }
     auto *expected = static_cast<EventPoll *>(nullptr);
     if (!wakeup_.compare_exchange_strong(expected, poll, std::memory_order_acq_rel)) {
-      if (expected == poll) return true;
-      errno = EBUSY;
-      return false;
+      if (expected == poll) return UEVENT_OK;
+      return UEVENT_ERR_BUSY;
     }
-    return true;
+    return UEVENT_OK;
   }
 
   virtual bool RemoveWakeup() {
