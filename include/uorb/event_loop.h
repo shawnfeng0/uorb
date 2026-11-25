@@ -20,6 +20,13 @@
 
 namespace uorb {
 
+/// Per-subscription queue consumption policy shared by EventLoop and AsyncDispatcher.
+enum class ConsumePolicy : uint8_t {
+  kSingle,      ///< Default: copy at most 1 sample per wakeup (fair across topics)
+  kLatestOnly,  ///< Drain backlog and invoke callback once with the newest sample
+  kDrainAll,    ///< Drain queued samples (bounded per turn) and invoke callback for each
+};
+
 /**
  * EventLoop: C++ wrapper around the generic event loop C API.
  * Provides type-safe callback dispatch for uORB subscriptions and timers
@@ -33,6 +40,7 @@ namespace uorb {
 class EventLoop {
  public:
   using Token = uint64_t;
+  using ConsumePolicy = uorb::ConsumePolicy;
   static constexpr Token kInvalidToken = 0;
 
   EventLoop() { uevent_create(&base_); }
@@ -55,7 +63,8 @@ class EventLoop {
   explicit operator bool() const { return base_._handle != nullptr; }
 
   template <const orb_metadata &meta, typename Callback>
-  Token Subscribe(Callback &&cb, unsigned instance = 0) {
+  Token Subscribe(Callback &&cb, unsigned instance = 0,
+                  ConsumePolicy policy = ConsumePolicy::kSingle) {
     if (!base_._handle) return kInvalidToken;
 
     orb_sub_t sub = ORB_SUB_INITIALIZER;
@@ -69,8 +78,8 @@ class EventLoop {
 
     using MsgType = typename msg::TypeMap<meta>::type;
     using Callable = typename std::decay<Callback>::type;
-    auto *entry =
-        new (std::nothrow) TypedEntry<MsgType, Callable>(sub, source, std::forward<Callback>(cb));
+    auto *entry = new (std::nothrow)
+        TypedEntry<MsgType, Callable>(sub, source, policy, std::forward<Callback>(cb));
     if (!entry) {
       orb_sub_destroy(&sub);
       return kInvalidToken;
@@ -82,11 +91,12 @@ class EventLoop {
   /// Member-function overload for Subscribe().
   template <const orb_metadata &meta, typename C, typename R>
   Token Subscribe(R (C::*method)(const typename msg::TypeMap<meta>::type &),
-                  C *obj, unsigned instance = 0) {
+                  C *obj, unsigned instance = 0,
+                  ConsumePolicy policy = ConsumePolicy::kSingle) {
     if (!obj) return kInvalidToken;
     return Subscribe<meta>(
         [obj, method](const typename msg::TypeMap<meta>::type &m) { (obj->*method)(m); },
-        instance);
+        instance, policy);
   }
 
   /// Register a monotonic timer callback dispatched inside Run()/RunOnce().
@@ -140,7 +150,7 @@ class EventLoop {
       EntryBase *entry = FindEntry(ready[i].data.u64);
       if (!entry) continue;
       entry->in_callback = true;
-      entry->Dispatch();
+      entry->Dispatch(quit_requested_);
       entry->in_callback = false;
       if (entry->pending_destroy) {
         DestroyEntry(entry);
@@ -177,15 +187,19 @@ class EventLoop {
   }
 
  private:
+  static constexpr uint32_t kMaxDrainIterations = 64u;
+
   struct EntryBase {
-    EntryBase(orb_sub_t s, uevent_source_t src) : sub(s), source(src) {}
+    EntryBase(orb_sub_t s, uevent_source_t src, ConsumePolicy p)
+        : sub(s), source(src), policy(p) {}
     virtual ~EntryBase() = default;
-    virtual void Dispatch() = 0;
+    virtual void Dispatch(const std::atomic<bool> &quit_requested) = 0;
 
     orb_sub_t sub;
     uevent_source_t source;
     Token token{kInvalidToken};
     EntryBase *next{nullptr};
+    ConsumePolicy policy{ConsumePolicy::kSingle};
     bool in_callback{false};
     bool pending_destroy{false};
   };
@@ -193,14 +207,47 @@ class EventLoop {
   template <typename MsgType, typename Callable>
   struct TypedEntry final : EntryBase {
     template <typename G>
-    TypedEntry(orb_sub_t s, uevent_source_t src, G &&g)
-        : EntryBase(s, src), cb(std::forward<G>(g)) {}
+    TypedEntry(orb_sub_t s, uevent_source_t src, ConsumePolicy p, G &&g)
+        : EntryBase(s, src, p), cb(std::forward<G>(g)) {}
 
-    void Dispatch() override {
-      if (orb_sub_check_update(sub)) {
-        MsgType msg;
-        if (orb_sub_copy(sub, &msg) == ORB_OK) {
-          cb(msg);
+    void Dispatch(const std::atomic<bool> &quit_requested) override {
+      switch (policy) {
+        case ConsumePolicy::kSingle: {
+          if (orb_sub_check_update(sub)) {
+            MsgType msg;
+            if (orb_sub_copy(sub, &msg) == ORB_OK) {
+              cb(msg);
+            }
+          }
+          break;
+        }
+        case ConsumePolicy::kLatestOnly: {
+          MsgType msg;
+          bool has_msg = false;
+          for (uint32_t i = 0; i < kMaxDrainIterations && orb_sub_check_update(sub); ++i) {
+            if (orb_sub_copy(sub, &msg) == ORB_OK) {
+              has_msg = true;
+            } else {
+              break;
+            }
+          }
+          if (has_msg) {
+            cb(msg);
+          }
+          break;
+        }
+        case ConsumePolicy::kDrainAll: {
+          for (uint32_t i = 0; i < kMaxDrainIterations && orb_sub_check_update(sub); ++i) {
+            MsgType msg;
+            if (orb_sub_copy(sub, &msg) != ORB_OK) {
+              break;
+            }
+            cb(msg);
+            if (quit_requested.load(std::memory_order_acquire) || pending_destroy) {
+              break;
+            }
+          }
+          break;
         }
       }
     }
@@ -212,9 +259,10 @@ class EventLoop {
   struct TimerEntry final : EntryBase {
     template <typename G>
     TimerEntry(uevent_source_t src, G &&g)
-        : EntryBase(ORB_SUB_INITIALIZER, src), cb(std::forward<G>(g)) {}
+        : EntryBase(ORB_SUB_INITIALIZER, src, ConsumePolicy::kSingle),
+          cb(std::forward<G>(g)) {}
 
-    void Dispatch() override { cb(); }
+    void Dispatch(const std::atomic<bool> &) override { cb(); }
 
     Callable cb;
   };

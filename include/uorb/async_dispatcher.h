@@ -19,6 +19,7 @@
 
 #include <pthread.h>
 #include <uevent/uevent.h>
+#include <uorb/event_loop.h>
 #include <uorb/uorb.h>
 
 #include <atomic>
@@ -54,12 +55,8 @@ class AsyncDispatcher {
     int sched_priority{0};      ///< Priority used when sched_policy >= 0
   };
 
-  /// Per-subscription queue consumption policy when the worker wakes up.
-  enum class ConsumePolicy : uint8_t {
-    kSingle,      ///< Default: copy at most 1 sample per wakeup (fair across topics)
-    kLatestOnly,  ///< Drain backlog and invoke callback once with the newest sample
-    kDrainAll,    ///< Drain queued samples (bounded per turn) and invoke callback for each
-  };
+  /// Per-subscription queue consumption policy (alias for uorb::ConsumePolicy).
+  using ConsumePolicy = uorb::ConsumePolicy;
 
   /// Move-only RAII subscription guard that automatically unsubscribes on destruction.
   /// Must not outlive the AsyncDispatcher that created it.

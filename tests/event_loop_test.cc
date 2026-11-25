@@ -1060,4 +1060,67 @@ TEST(AsyncDispatcherTest, MemberFunctionBindingForTopicsAndTimers) {
   dispatcher.Stop();
 }
 
+TEST(EventLoopTest, ConsumePoliciesSingleLatestOnlyAndDrainAll) {
+  static_assert(std::is_same<uorb::EventLoop::ConsumePolicy, uorb::ConsumePolicy>::value,
+                "EventLoop::ConsumePolicy must alias uorb::ConsumePolicy");
+  static_assert(std::is_same<uorb::AsyncDispatcher::ConsumePolicy, uorb::ConsumePolicy>::value,
+                "AsyncDispatcher::ConsumePolicy must alias uorb::ConsumePolicy");
+
+  uorb::EventLoop loop;
+  ASSERT_TRUE(loop);
+
+  std::vector<int> single_vals;
+  std::vector<int> latest_vals;
+  std::vector<int> drain_vals;
+  uorb::EventLoop::Token self_unsub_tok = uorb::EventLoop::kInvalidToken;
+  int self_unsub_calls = 0;
+
+  ASSERT_NE(loop.Subscribe<uorb::msg::orb_test_volatile>(
+                [&](const orb_test_volatile_s &m) { single_vals.push_back(m.val); }, 0,
+                uorb::ConsumePolicy::kSingle),
+            uorb::EventLoop::kInvalidToken);
+  ASSERT_NE(loop.Subscribe<uorb::msg::orb_test_volatile>(
+                [&](const orb_test_volatile_s &m) { latest_vals.push_back(m.val); }, 0,
+                uorb::ConsumePolicy::kLatestOnly),
+            uorb::EventLoop::kInvalidToken);
+  ASSERT_NE(loop.Subscribe<uorb::msg::orb_test_volatile>(
+                [&](const orb_test_volatile_s &m) { drain_vals.push_back(m.val); }, 0,
+                uorb::ConsumePolicy::kDrainAll),
+            uorb::EventLoop::kInvalidToken);
+  self_unsub_tok = loop.Subscribe<uorb::msg::orb_test_volatile>(
+      [&](const orb_test_volatile_s &) {
+        ++self_unsub_calls;
+        loop.Unsubscribe(self_unsub_tok);
+      },
+      0, uorb::ConsumePolicy::kDrainAll);
+  ASSERT_NE(self_unsub_tok, uorb::EventLoop::kInvalidToken);
+
+  // Publish 4 samples into the depth-4 volatile queue before calling RunOnce().
+  for (int i = 1; i <= 4; ++i) {
+    orb_test_volatile_s m{};
+    m.val = i;
+    ASSERT_EQ(uorb::publish<uorb::msg::orb_test_volatile>(m), ORB_OK);
+  }
+
+  ASSERT_EQ(loop.RunOnce(100), 4);
+
+  // kSingle consumes 1 sample per RunOnce turn.
+  ASSERT_EQ(single_vals.size(), 1u);
+  EXPECT_EQ(single_vals[0], 1);
+
+  // kLatestOnly collapses backlog and invokes once with the newest sample (4).
+  ASSERT_EQ(latest_vals.size(), 1u);
+  EXPECT_EQ(latest_vals[0], 4);
+
+  // kDrainAll delivers all 4 queued samples in order in one turn.
+  ASSERT_EQ(drain_vals.size(), 4u);
+  EXPECT_EQ(drain_vals[0], 1);
+  EXPECT_EQ(drain_vals[1], 2);
+  EXPECT_EQ(drain_vals[2], 3);
+  EXPECT_EQ(drain_vals[3], 4);
+
+  // Self-unsubscribing inside kDrainAll stops draining immediately after 1 call.
+  EXPECT_EQ(self_unsub_calls, 1);
+}
+
 }  // namespace uORBTest
