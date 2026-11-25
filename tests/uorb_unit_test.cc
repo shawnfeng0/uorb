@@ -1856,6 +1856,12 @@ TEST_F(UnitTest, topic_enumeration_and_last_publish_time_us) {
       &ctx);
   EXPECT_EQ(early, 1u);
 
+  // Compile-time FNV-1a o_name_hash populated by ORB_DEFINE.
+  static_assert(uorb::topic_hash("orb_test") != 0u, "FNV-1a hash should be non-zero");
+  EXPECT_EQ(ORB_ID(orb_test)->o_name_hash, uorb::topic_hash("orb_test"));
+  EXPECT_EQ(ORB_ID(orb_test_medium)->o_name_hash, uorb::topic_hash("orb_test_medium"));
+  EXPECT_NE(ORB_ID(orb_test)->o_name_hash, ORB_ID(orb_test_medium)->o_name_hash);
+
   EXPECT_EQ(orb_subscriber_destroy(&sub_a), ORB_OK);
   EXPECT_EQ(orb_publisher_destroy(&pub_a), ORB_OK);
   EXPECT_EQ(orb_publisher_destroy(&pub_b), ORB_OK);

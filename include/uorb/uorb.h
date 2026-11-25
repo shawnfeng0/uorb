@@ -68,6 +68,7 @@ struct orb_metadata {
   const char *o_fields;             /**< semicolon separated list of fields (with type) */
   uint16_t o_queue_size;            /**< maximum number of queued samples */
   uint8_t o_durability;             /**< orb_durability_t (default: ORB_DURABILITY_DURABLE) */
+  uint32_t o_name_hash;             /**< compile-time FNV-1a 32-bit hash of o_name */
 #ifdef __cplusplus
   mutable std::atomic<void *> instances[ORB_MULTI_MAX_INSTANCES]{};
 #else
@@ -92,6 +93,10 @@ struct orb_status {
 
 #ifdef __cplusplus
 namespace uorb {
+/// Compile-time FNV-1a 32-bit hash of a NUL-terminated topic name.
+constexpr uint32_t topic_hash(const char *str, uint32_t h = 2166136261u) {
+  return *str ? topic_hash(str + 1, (h ^ static_cast<uint8_t>(*str)) * 16777619u) : h;
+}
 namespace msg {
 template <const orb_metadata &>
 struct TypeMap;
@@ -170,7 +175,8 @@ struct TypeMap;
 #define ORB_DEFINE_6(_name, _struct, _size_no_padding, _fields, _queue_size, _durability)                                    \
   ORB_CHECK_TOPIC_TYPE(_struct);                                                                                             \
   const struct orb_metadata uorb::msg::_name = {                                                                             \
-      #_name, sizeof(_struct), _size_no_padding, _fields, _queue_size, static_cast<uint8_t>(_durability), {}};               \
+      #_name, sizeof(_struct), _size_no_padding, _fields, _queue_size, static_cast<uint8_t>(_durability),                    \
+      uorb::topic_hash(#_name), {}};                                                                                         \
   const struct orb_metadata *__orb_##_name = &uorb::msg::_name;                                                              \
   struct hack
 #define ORB_DEFINE_SELECT(_1, _2, _3, _4, _5, _6, NAME, ...) NAME
