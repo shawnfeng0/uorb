@@ -928,39 +928,6 @@ TEST_F(UnitTest, publish_auto_creates_publication_on_first_use) {
   EXPECT_EQ(orb_publisher_destroy(&pub), ORB_OK);
 }
 
-TEST_F(UnitTest, check_and_copy_returns_true_when_updated) {
-  orb_publisher_t pub = ORB_PUBLISHER_INITIALIZER;
-  EXPECT_EQ(orb_publisher_create(&pub, ORB_ID(orb_test)), ORB_OK);
-  ASSERT_NE(pub._handle, nullptr);
-
-  orb_subscriber_t sub = ORB_SUBSCRIBER_INITIALIZER;
-  EXPECT_EQ(orb_subscriber_create(&sub, ORB_ID(orb_test)), ORB_OK);
-  ASSERT_NE(sub._handle, nullptr);
-
-  // Drain any initial data from previous tests
-  orb_test_s drain{};
-  orb_subscriber_check_and_copy(&sub, &drain);
-
-  // Now no update
-  EXPECT_EQ(orb_subscriber_check_and_copy(&sub, &drain), ORB_OK);
-
-  // Publish data
-  orb_test_s data{};
-  data.val = 123;
-  ASSERT_EQ(orb_publisher_publish(&pub, &data), ORB_OK);
-
-  // Now should return OK and copy
-  orb_test_s received{};
-  EXPECT_EQ(orb_subscriber_check_and_copy(&sub, &received), ORB_OK);
-  EXPECT_EQ(received.val, 123);
-
-  // After copy, should still return OK (but no new data)
-  EXPECT_EQ(orb_subscriber_check_and_copy(&sub, &drain), ORB_OK);
-
-  EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
-  EXPECT_EQ(orb_publisher_destroy(&pub), ORB_OK);
-}
-
 TEST_F(UnitTest, subscription_interval_boundary_conditions) {
   // Test with interval = 0 (should always update)
   uorb::SubscriptionInterval<uorb::msg::orb_test> sub0(0, 0);
@@ -1107,7 +1074,9 @@ TEST_F(UnitTest, publication_multi_wrapper_publishes_and_reports_instance) {
 
   // Drain the initial publish so the next publish is a fresh update.
   orb_test_medium_s recv{};
-  orb_subscriber_check_and_copy(&sub_data, &recv);
+  if (orb_subscriber_check_update(&sub_data)) {
+    ASSERT_EQ(orb_subscriber_copy(&sub_data, &recv), ORB_OK);
+  }
 
   pub_data.data().val = 4242;
   ASSERT_EQ(pub_data.Publish(), ORB_OK);
@@ -1130,7 +1099,9 @@ TEST_F(UnitTest, publication_multi_wrapper_publishes_and_reports_instance) {
   ASSERT_NE(sub_ext._handle, nullptr);
 
   // Drain the initial publish.
-  orb_subscriber_check_and_copy(&sub_ext, &recv);
+  if (orb_subscriber_check_update(&sub_ext)) {
+    ASSERT_EQ(orb_subscriber_copy(&sub_ext, &recv), ORB_OK);
+  }
 
   ext.val = 9999;
   ASSERT_EQ(pub_ext.Publish(ext), ORB_OK);

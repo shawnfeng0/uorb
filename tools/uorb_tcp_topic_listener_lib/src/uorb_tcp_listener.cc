@@ -79,7 +79,8 @@ static void CmdListener(uorb::listener::Fd &fd,
   do {
     uevent_source_t ready[1] = {UEVENT_SOURCE_INITIALIZER};
     if (uevent_loop(&poll, ready, 1, timeout_ms) > 0) {
-      if (orb_subscriber_check_and_copy(&sub, data.data()) == ORB_OK) {
+      if (orb_subscriber_check_update(&sub) &&
+          orb_subscriber_copy(&sub, data.data()) == ORB_OK) {
         if (orb_elapsed_time_us(last_write_timestamp) > 100 * 1000) {
           last_write_timestamp = orb_absolute_time_us();
           fd.write(data_printer.Convert2String(data.data(), data.size()));

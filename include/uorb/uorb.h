@@ -193,7 +193,7 @@ extern "C" {
  *   orb_publisher_publish_auto().
  * - Subscription: orb_subscriber_create(),
  *   orb_subscriber_create_multi(), orb_subscriber_destroy(), orb_subscriber_copy(),
- *   orb_subscriber_copy_once(), orb_subscriber_check_update(), orb_subscriber_check_and_copy().
+ *   orb_subscriber_copy_once(), orb_subscriber_check_update().
  * - Publish callback: orb_subscriber_set_callback(),
  *   orb_subscriber_clear_callback().
  * - Introspection: orb_exists(), orb_group_count(),
@@ -476,20 +476,6 @@ orb_err orb_subscriber_set_callback(orb_subscriber_t *sub, orb_subscriber_callba
  * @return ORB_OK on success, error code otherwise
  */
 orb_err orb_subscriber_clear_callback(orb_subscriber_t *sub);
-
-/**
- * If the message is updated, copy the message.
- * See orb_subscriber_check_update() and orb_subscriber_copy().
- */
-static inline orb_err orb_subscriber_check_and_copy(orb_subscriber_t *sub, void *buffer) {
-  if (!sub || !sub->_handle || !buffer) {
-    return ORB_ERR_INVALID;
-  }
-  if (!orb_subscriber_check_update(sub)) {
-    return ORB_OK;
-  }
-  return orb_subscriber_copy(sub, buffer);
-}
 
 /**
  * Check if a topic has already been created and published (advertised)
