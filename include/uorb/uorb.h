@@ -202,8 +202,7 @@ extern "C" {
  * - Metadata: ORB_ID(), ORB_DECLARE(), ORB_DEFINE(), orb_metadata.
  * - Publication: orb_pub_create(), orb_pub_create_multi(),
  *   orb_pub_destroy(), orb_pub_publish(), orb_pub_publish_once(),
- *   orb_pub_publish_auto(), orb_pub_loan(), orb_pub_publish_loaned(),
- *   orb_pub_discard_loan().
+ *   orb_pub_loan(), orb_pub_publish_loaned(), orb_pub_discard_loan().
  * - Subscription: orb_sub_create(),
  *   orb_sub_create_multi(), orb_sub_destroy(), orb_sub_copy(),
  *   orb_sub_copy_once(), orb_sub_check_update(),
@@ -341,29 +340,6 @@ void orb_pub_discard_loan(orb_pub_t pub, void *loaned_msg);
  * @return @see orb_pub_publish()
  */
 orb_err orb_pub_publish_once(const struct orb_metadata *meta, const void *data);
-
-/**
- * Advertise as the publisher of a topic.
- *
- * This performs the initial advertisement of a topic; it creates the topic
- * node if required and publishes the initial data.
- *
- * @see orb_pub_create_multi() for meaning of the individual parameters
- */
-static inline orb_err orb_pub_publish_auto(const struct orb_metadata *meta, orb_pub_t *pub, const void *data,
-                                    unsigned int *instance) {
-  if (!meta || !pub || !data) {
-    return ORB_ERR_INVALID;
-  }
-
-  if (!pub->_handle) {
-    orb_err err = orb_pub_create_multi(pub, meta, instance);
-    if (err != ORB_OK) {
-      return err;
-    }
-  }
-  return orb_pub_publish(*pub, data);
-}
 
 /**
  * Create a subscription handle for topic instance 0.

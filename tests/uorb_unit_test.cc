@@ -884,32 +884,6 @@ TEST_F(UnitTest, concurrent_publish_copy_with_multiple_handles) {
   }
 }
 
-TEST_F(UnitTest, publish_auto_creates_publication_on_first_use) {
-  // orb_pub_publish_auto should create a publication handle on first use
-  orb_pub_t pub = ORB_PUB_INITIALIZER;
-  orb_test_s data{};
-  data.val = 42;
-  unsigned int instance = 0;
-  ASSERT_EQ(orb_pub_publish_auto(ORB_ID(orb_test), &pub, &data, &instance), ORB_OK);
-  ASSERT_NE(pub._handle, nullptr);
-
-  // Subsequent calls should reuse the same publication
-  data.val = 43;
-  ASSERT_EQ(orb_pub_publish_auto(ORB_ID(orb_test), &pub, &data, &instance), ORB_OK);
-
-  // Verify data was published
-  orb_sub_t sub = ORB_SUB_INITIALIZER;
-  EXPECT_EQ(orb_sub_create(&sub, ORB_ID(orb_test)), ORB_OK);
-  ASSERT_NE(sub._handle, nullptr);
-  EXPECT_TRUE(orb_sub_check_update(sub));
-  orb_test_s received{};
-  EXPECT_EQ(orb_sub_copy(sub, &received), ORB_OK);
-  EXPECT_EQ(received.val, 43);
-
-  orb_sub_destroy(&sub);
-  orb_pub_destroy(&pub);
-}
-
 TEST_F(UnitTest, subscription_interval_boundary_conditions) {
   // Test with interval = 0 (should always update)
   uorb::SubscriptionInterval<uorb::msg::orb_test> sub0(0, 0);
