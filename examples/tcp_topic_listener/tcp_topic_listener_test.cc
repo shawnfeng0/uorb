@@ -104,8 +104,8 @@ int main(int, char *[]) {
 
   example_string_s example{};
   example.timestamp = orb_absolute_time_us();
-  orb_publisher_publish_once(&uorb::msg::example_string, &example);
-  orb_subscriber_copy_once(&uorb::msg::example_string, &example);
+  orb_pub_publish_once(&uorb::msg::example_string, &example);
+  orb_sub_copy_once(&uorb::msg::example_string, &example);
 
   orb_tcp_listener_init(orb_get_topics, 10924);
 

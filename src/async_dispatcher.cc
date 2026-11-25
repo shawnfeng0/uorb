@@ -209,7 +209,7 @@ AsyncDispatcher::Token AsyncDispatcher::RegisterEntry(EntryBase *entry) {
     UnlinkEntryLocked(token);
     pthread_mutex_unlock(&mu_);
     if (entry->sub._handle) {
-      orb_subscriber_destroy(&entry->sub);
+      orb_sub_destroy(&entry->sub);
     } else {
       uevent_source_destroy(&entry->source);
     }
@@ -330,7 +330,7 @@ void AsyncDispatcher::DestroyEntry(EntryBase *entry) {
     uevent_remove(&base_, &entry->source);
   }
   if (entry->sub._handle) {
-    orb_subscriber_destroy(&entry->sub);
+    orb_sub_destroy(&entry->sub);
   } else {
     uevent_source_destroy(&entry->source);
   }

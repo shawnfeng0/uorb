@@ -14,7 +14,7 @@ uorb (pub/sub + EventLoop/AsyncDispatcher) — src/, include/uorb/
 ```
 
 - **uevent**: Generic event/wait primitive (poll sources, timers, wait for readiness). Zero dependency on uorb; zero threads. Can be used standalone.
-- **uorb**: Topic-based publish/subscribe built directly on `uevent::EventSource`. Spawns zero implicit threads and exposes **no raw synchronous callback hooks** (`ReceiverLocal` inherits `uevent::EventSource` directly and is exposed as a borrowed view via `orb_subscriber_event_source()`). C++ callback dispatch is provided via `uorb::EventLoop` (user-driven, zero threads) and `uorb::AsyncDispatcher` (explicit `Start()` worker thread).
+- **uorb**: Topic-based publish/subscribe built directly on `uevent::EventSource`. Spawns zero implicit threads and exposes **no raw synchronous callback hooks** (`ReceiverLocal` inherits `uevent::EventSource` directly and is exposed as a borrowed view via `orb_sub_event_source()`). C++ callback dispatch is provided via `uorb::EventLoop` (user-driven, zero threads) and `uorb::AsyncDispatcher` (explicit `Start()` worker thread).
 
 The C API surface lives in headers: `include/uorb/uorb.h` and `components/uevent/include/uevent/uevent.h`.
 
@@ -126,15 +126,15 @@ call `ClearWakeup()` outside `mu_`, then re-check `ready_queue_` under
 ## 7. Event Notification Model (No Raw Sync Callbacks)
 
 `uorb` intentionally exposes **no raw synchronous callback registration API**.
-Instead, every `orb_subscriber_t` (`ReceiverLocal`) directly inherits
+Instead, every `orb_sub_t` (`ReceiverLocal`) directly inherits
 `uevent::EventSource` and exposes a zero-allocation borrowed view:
 
 ```c
-uevent_source_t orb_subscriber_event_source(orb_subscriber_t sub);
+uevent_source_t orb_sub_event_source(orb_sub_t sub);
 ```
 
 - Callers add this source to a `uevent_t` loop via `uevent_add()` and remove it
-  via `uevent_remove()` before calling `orb_subscriber_destroy()`.
+  via `uevent_remove()` before calling `orb_sub_destroy()`.
 - `ReceiverLocal::is_owned_by_uevent()` returns `false`, so accidentally calling
   `uevent_source_destroy()` on a borrowed subscriber source is a safe no-op.
 - C++ callers use `uorb::EventLoop` (`<uorb/event_loop.h>`, user-driven thread)
@@ -166,14 +166,14 @@ Subscribers can subscribe before any publisher exists.
 All public C API handles use the struct-with-void-pointer pattern:
 
 ```c
-typedef struct { void* _handle; } orb_publisher_t;
-typedef struct { void* _handle; } orb_subscriber_t;
+typedef struct { void* _handle; } orb_pub_t;
+typedef struct { void* _handle; } orb_sub_t;
 typedef struct { void* _handle; } uevent_t;
 typedef struct { void* _handle; } uevent_source_t;
 ```
 
 This avoids ABI issues and allows C callers to stack-allocate handles.
-Initializers (`ORB_PUBLISHER_INITIALIZER`, etc.) zero-initialize the
+Initializers (`ORB_PUB_INITIALIZER`, etc.) zero-initialize the
 handle. Functions check `_handle != NULL` before use.
 
 ## 10. Error Codes
@@ -196,13 +196,13 @@ map them to `errno` values. Callers test with `err != ORB_OK` or
   (`uevent_test.cc`, `condition_variable_test.cc`), and are built into a single
   unified test executable `uorb_test` (run via `ctest` or `./build/tests/uorb_test`).
 - Always call `uevent_remove()` on a subscriber's borrowed event source before
-  calling `orb_subscriber_destroy()`.
+  calling `orb_sub_destroy()`.
 
 ## 12. Common Pitfalls
 
 1. **Forgetting to destroy handles**: Every `*_create` must be paired
    with `*_destroy`. For uevent sources, `uevent_remove()` must be
-   called before `uevent_source_destroy()` (or `orb_subscriber_destroy()` for
+   called before `uevent_source_destroy()` (or `orb_sub_destroy()` for
    borrowed subscriber sources).
 
 2. **Do not include private `uevent_base/` headers from public headers**:

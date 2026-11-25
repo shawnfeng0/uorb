@@ -24,26 +24,26 @@ class SubscriptionBase {
 
   explicit SubscriptionBase(uint8_t instance = 0) noexcept : instance_(instance) {}
 
-  ~SubscriptionBase() { if (handle_._handle) orb_subscriber_destroy(&handle_); }
+  ~SubscriptionBase() { if (handle_._handle) orb_sub_destroy(&handle_); }
 
   bool Subscribe() {
     if (handle_._handle) {
       return true;
     }
-    return orb_subscriber_create_multi(&handle_, &meta, instance_) == ORB_OK;
+    return orb_sub_create_multi(&handle_, &meta, instance_) == ORB_OK;
   }
 
-  orb_subscriber_t handle() {
-    return Subscribe() ? handle_ : orb_subscriber_t{nullptr};
+  orb_sub_t handle() {
+    return Subscribe() ? handle_ : orb_sub_t{nullptr};
   }
 
   /// Return a borrowed uevent_source_t view for waiting on this subscription via uevent.
   uevent_source_t event_source() {
-    return orb_subscriber_event_source(handle());
+    return orb_sub_event_source(handle());
   }
 
   /// Check if there is a new update.
-  bool Updated() { return Subscribe() && orb_subscriber_check_update(handle_); }
+  bool Updated() { return Subscribe() && orb_sub_check_update(handle_); }
 
   /// Update the struct if new data is available.
   /// Dispatches to Derived::Updated() and Derived::Copy() via CRTP.
@@ -54,12 +54,12 @@ class SubscriptionBase {
   bool Update(ValueType &dst) { return Update(&dst); }
 
   /// Copy the struct unconditionally.
-  bool Copy(ValueType *dst) { return Subscribe() && orb_subscriber_copy(handle_, dst) == ORB_OK; }
+  bool Copy(ValueType *dst) { return Subscribe() && orb_sub_copy(handle_, dst) == ORB_OK; }
   bool Copy(ValueType &dst) { return Copy(&dst); }
 
  protected:
   const uint8_t instance_{0};
-  orb_subscriber_t handle_ = ORB_SUBSCRIBER_INITIALIZER;
+  orb_sub_t handle_ = ORB_SUB_INITIALIZER;
 };
 
 }  // namespace detail

@@ -216,7 +216,7 @@ if (sub_example_string.Update()) {
 }
 ```
 
-Or use the `uevent` API with `sub.event_source()` (or `orb_subscriber_event_source()` in C), which provides zero-allocation event-driven dispatch (recommended):
+Or use the `uevent` API with `sub.event_source()` (or `orb_sub_event_source()` in C), which provides zero-allocation event-driven dispatch (recommended):
 
 ```c++
 #include <uevent/uevent.h>

@@ -58,8 +58,8 @@ static void CmdListener(uorb::listener::Fd &fd,
     return;
   }
 
-  orb_subscriber_t sub = ORB_SUBSCRIBER_INITIALIZER;
-  if (orb_subscriber_create(&sub, meta) != ORB_OK) {
+  orb_sub_t sub = ORB_SUB_INITIALIZER;
+  if (orb_sub_create(&sub, meta) != ORB_OK) {
     fd.write("Failed to create subscription\n");
     return;
   }
@@ -67,7 +67,7 @@ static void CmdListener(uorb::listener::Fd &fd,
 
   uevent_t poll = UEVENT_INITIALIZER;
   uevent_create(&poll);
-  uevent_source_t source = orb_subscriber_event_source(sub);
+  uevent_source_t source = orb_sub_event_source(sub);
   uevent_add(&poll, &source, 0);
 
   uorb::listener::DataPrinter data_printer(*meta);
@@ -77,8 +77,8 @@ static void CmdListener(uorb::listener::Fd &fd,
   do {
     uevent_source_t ready[1] = {UEVENT_SOURCE_INITIALIZER};
     if (uevent_loop(&poll, ready, 1, timeout_ms) > 0) {
-      if (orb_subscriber_check_update(sub) &&
-          orb_subscriber_copy(sub, data.data()) == ORB_OK) {
+      if (orb_sub_check_update(sub) &&
+          orb_sub_copy(sub, data.data()) == ORB_OK) {
         if (orb_elapsed_time_us(last_write_timestamp) > 100 * 1000) {
           last_write_timestamp = orb_absolute_time_us();
           fd.write(data_printer.Convert2String(data.data(), data.size()));
@@ -105,7 +105,7 @@ static void CmdListener(uorb::listener::Fd &fd,
 
   uevent_remove(&poll, &source);
   uevent_destroy(&poll);
-  orb_subscriber_destroy(&sub);
+  orb_sub_destroy(&sub);
 }
 
 static void CmdStatus(uorb::listener::Fd &fd,

@@ -22,7 +22,7 @@ using namespace uorb;
 
 // ReceiverLocal: internal struct representing a uORB subscription.
 // Inherits uevent::EventSource directly so any subscriber handle can be added
-// to a uevent loop via orb_subscriber_event_source() with zero extra allocation
+// to a uevent loop via orb_sub_event_source() with zero extra allocation
 // and zero synchronous user-callback hooks.
 struct ReceiverLocal final : public uevent::EventSource {
   DeviceNode &dev;
@@ -77,15 +77,15 @@ struct ReceiverLocal final : public uevent::EventSource {
 #define UORB_GIT_TAG "v0.0.0-0-unknown"
 #endif
 
-orb_err orb_publisher_create(orb_publisher_t *pub, const struct orb_metadata *meta) {
-  static_assert(sizeof(orb_publisher_t) == sizeof(void *),
-                "orb_publisher_t must have same layout as void*");
-  static_assert(sizeof(orb_subscriber_t) == sizeof(void *),
-                "orb_subscriber_t must have same layout as void*");
-  return orb_publisher_create_multi(pub, meta, nullptr);
+orb_err orb_pub_create(orb_pub_t *pub, const struct orb_metadata *meta) {
+  static_assert(sizeof(orb_pub_t) == sizeof(void *),
+                "orb_pub_t must have same layout as void*");
+  static_assert(sizeof(orb_sub_t) == sizeof(void *),
+                "orb_sub_t must have same layout as void*");
+  return orb_pub_create_multi(pub, meta, nullptr);
 }
 
-orb_err orb_publisher_create_multi(orb_publisher_t *pub, const struct orb_metadata *meta, unsigned int *instance) {
+orb_err orb_pub_create_multi(orb_pub_t *pub, const struct orb_metadata *meta, unsigned int *instance) {
   if (!pub || !meta) {
     return ORB_ERR_INVALID;
   }
@@ -101,7 +101,7 @@ orb_err orb_publisher_create_multi(orb_publisher_t *pub, const struct orb_metada
   return ORB_OK;
 }
 
-void orb_publisher_destroy(orb_publisher_t *pub) {
+void orb_pub_destroy(orb_pub_t *pub) {
   if (!pub || !pub->_handle) {
     return;
   }
@@ -112,7 +112,7 @@ void orb_publisher_destroy(orb_publisher_t *pub) {
   pub->_handle = nullptr;
 }
 
-orb_err orb_publisher_publish(orb_publisher_t pub, const void *data) {
+orb_err orb_pub_publish(orb_pub_t pub, const void *data) {
   if (!pub._handle || !data) {
     return ORB_ERR_INVALID;
   }
@@ -121,7 +121,7 @@ orb_err orb_publisher_publish(orb_publisher_t pub, const void *data) {
   return dev.Publish(data) ? ORB_OK : ORB_ERR_NO_MEM;
 }
 
-orb_err orb_publisher_loan(orb_publisher_t pub, void **out_msg) {
+orb_err orb_pub_loan(orb_pub_t pub, void **out_msg) {
   if (!pub._handle || !out_msg) {
     return ORB_ERR_INVALID;
   }
@@ -130,7 +130,7 @@ orb_err orb_publisher_loan(orb_publisher_t pub, void **out_msg) {
   return dev.Loan(out_msg);
 }
 
-orb_err orb_publisher_publish_loaned(orb_publisher_t pub, void *loaned_msg) {
+orb_err orb_pub_publish_loaned(orb_pub_t pub, void *loaned_msg) {
   if (!pub._handle || !loaned_msg) {
     return ORB_ERR_INVALID;
   }
@@ -139,7 +139,7 @@ orb_err orb_publisher_publish_loaned(orb_publisher_t pub, void *loaned_msg) {
   return dev.PublishLoaned(loaned_msg);
 }
 
-void orb_publisher_discard_loan(orb_publisher_t pub, void *loaned_msg) {
+void orb_pub_discard_loan(orb_pub_t pub, void *loaned_msg) {
   if (!pub._handle || !loaned_msg) {
     return;
   }
@@ -148,7 +148,7 @@ void orb_publisher_discard_loan(orb_publisher_t pub, void *loaned_msg) {
   dev.DiscardLoan(loaned_msg);
 }
 
-orb_err orb_publisher_publish_once(const struct orb_metadata *meta, const void *data) {
+orb_err orb_pub_publish_once(const struct orb_metadata *meta, const void *data) {
   if (!meta || !data) {
     return ORB_ERR_INVALID;
   }
@@ -164,11 +164,11 @@ orb_err orb_publisher_publish_once(const struct orb_metadata *meta, const void *
   return dev->Publish(data) ? ORB_OK : ORB_ERR_NO_MEM;
 }
 
-orb_err orb_subscriber_create(orb_subscriber_t *sub, const struct orb_metadata *meta) {
-  return orb_subscriber_create_multi(sub, meta, 0);
+orb_err orb_sub_create(orb_sub_t *sub, const struct orb_metadata *meta) {
+  return orb_sub_create_multi(sub, meta, 0);
 }
 
-orb_err orb_subscriber_create_multi(orb_subscriber_t *sub, const struct orb_metadata *meta, unsigned instance) {
+orb_err orb_sub_create_multi(orb_sub_t *sub, const struct orb_metadata *meta, unsigned instance) {
   if (!sub || !meta) {
     return ORB_ERR_INVALID;
   }
@@ -190,7 +190,7 @@ orb_err orb_subscriber_create_multi(orb_subscriber_t *sub, const struct orb_meta
   return ORB_OK;
 }
 
-void orb_subscriber_destroy(orb_subscriber_t *sub) {
+void orb_sub_destroy(orb_sub_t *sub) {
   if (!sub || !sub->_handle) {
     return;
   }
@@ -200,7 +200,7 @@ void orb_subscriber_destroy(orb_subscriber_t *sub) {
   sub->_handle = nullptr;
 }
 
-orb_err orb_subscriber_copy(orb_subscriber_t sub, void *buffer) {
+orb_err orb_sub_copy(orb_sub_t sub, void *buffer) {
   if (!sub._handle || !buffer) {
     return ORB_ERR_INVALID;
   }
@@ -210,7 +210,7 @@ orb_err orb_subscriber_copy(orb_subscriber_t sub, void *buffer) {
   return r.Copy(buffer) ? ORB_OK : ORB_ERR_NO_ENTRY;
 }
 
-orb_err orb_subscriber_copy_once(const struct orb_metadata *meta, void *buffer) {
+orb_err orb_sub_copy_once(const struct orb_metadata *meta, void *buffer) {
   if (!meta || !buffer) {
     return ORB_ERR_INVALID;
   }
@@ -231,7 +231,7 @@ orb_err orb_subscriber_copy_once(const struct orb_metadata *meta, void *buffer) 
   return dev->Copy(buffer, &last_generation_) ? ORB_OK : ORB_ERR_NO_ENTRY;
 }
 
-bool orb_subscriber_check_update(orb_subscriber_t sub) {
+bool orb_sub_check_update(orb_sub_t sub) {
   if (!sub._handle) {
     return false;
   }
@@ -241,7 +241,7 @@ bool orb_subscriber_check_update(orb_subscriber_t sub) {
   return r.updates_available() > 0;
 }
 
-uevent_source_t orb_subscriber_event_source(orb_subscriber_t sub) {
+uevent_source_t orb_sub_event_source(orb_sub_t sub) {
   uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
   if (!sub._handle) {
     return src;

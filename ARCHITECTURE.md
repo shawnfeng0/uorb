@@ -64,7 +64,7 @@ The publish/subscribe library built directly on `uevent::EventSource`. Spawns **
 - `src/async_dispatcher.cc` - Non-template `uorb::AsyncDispatcher` implementation
 
 **Headers:**
-- `include/uorb/uorb.h` - Public C API (including `orb_subscriber_event_source()`)
+- `include/uorb/uorb.h` - Public C API (including `orb_sub_event_source()`)
 - `include/uorb/publication.h` - C++ `Publication` / `PublicationData` / `LoanedMessage`
 - `include/uorb/publication_multi.h` - C++ `PublicationMulti` / `PublicationMultiData`
 - `include/uorb/subscription.h` - C++ `Subscription` / `SubscriptionData`
@@ -78,7 +78,7 @@ The publish/subscribe library built directly on `uevent::EventSource`. Spawns **
 **Key features:**
 - Lock-free `Copy()` (per-slot 4-byte atomic SeqLock) and mutex-serialized `Publish()`
 - Stack-free `Loan` API and pluggable RTOS allocator (`orb_set_allocator`, `orb_topic_preallocate`)
-- Zero-allocation `orb_subscriber_event_source(sub)` borrowed `uevent_source_t` view
+- Zero-allocation `orb_sub_event_source(sub)` borrowed `uevent_source_t` view
 - `EventLoop` (caller-driven, zero threads) and `AsyncDispatcher` (explicit background worker thread)
 
 ## Directory Structure

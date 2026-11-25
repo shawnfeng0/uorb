@@ -18,13 +18,13 @@ class LoanedMessage {
   using Type = typename msg::TypeMap<meta>::type;
 
   LoanedMessage() noexcept = default;
-  LoanedMessage(orb_publisher_t pub, Type *msg) noexcept : pub_(pub), msg_(msg) {}
+  LoanedMessage(orb_pub_t pub, Type *msg) noexcept : pub_(pub), msg_(msg) {}
 
   LoanedMessage(const LoanedMessage &) = delete;
   LoanedMessage &operator=(const LoanedMessage &) = delete;
 
   LoanedMessage(LoanedMessage &&other) noexcept : pub_(other.pub_), msg_(other.msg_) {
-    other.pub_ = ORB_PUBLISHER_INITIALIZER;
+    other.pub_ = ORB_PUB_INITIALIZER;
     other.msg_ = nullptr;
   }
 
@@ -33,7 +33,7 @@ class LoanedMessage {
       Discard();
       pub_ = other.pub_;
       msg_ = other.msg_;
-      other.pub_ = ORB_PUBLISHER_INITIALIZER;
+      other.pub_ = ORB_PUB_INITIALIZER;
       other.msg_ = nullptr;
     }
     return *this;
@@ -49,22 +49,22 @@ class LoanedMessage {
   orb_err Publish() {
     if (!msg_) return ORB_ERR_INVALID;
     Type *m = msg_;
-    orb_publisher_t p = pub_;
+    orb_pub_t p = pub_;
     msg_ = nullptr;
-    pub_ = ORB_PUBLISHER_INITIALIZER;
-    return orb_publisher_publish_loaned(p, m);
+    pub_ = ORB_PUB_INITIALIZER;
+    return orb_pub_publish_loaned(p, m);
   }
 
   void Discard() {
     if (msg_) {
-      orb_publisher_discard_loan(pub_, msg_);
+      orb_pub_discard_loan(pub_, msg_);
       msg_ = nullptr;
-      pub_ = ORB_PUBLISHER_INITIALIZER;
+      pub_ = ORB_PUB_INITIALIZER;
     }
   }
 
  private:
-  orb_publisher_t pub_ = ORB_PUBLISHER_INITIALIZER;
+  orb_pub_t pub_ = ORB_PUB_INITIALIZER;
   Type *msg_{nullptr};
 };
 
@@ -85,7 +85,7 @@ class Publication {
   Publication(Publication &&) = delete;
   Publication &operator=(const Publication &) = delete;
   Publication &operator=(Publication &&) = delete;
-  ~Publication() { if (handle_._handle) orb_publisher_destroy(&handle_); }
+  ~Publication() { if (handle_._handle) orb_pub_destroy(&handle_); }
 
   /**
    * Publish the struct
@@ -94,30 +94,30 @@ class Publication {
    */
   orb_err Publish(const Type &data) {
     if (!handle_._handle) {
-      orb_err err = orb_publisher_create(&handle_, &meta);
+      orb_err err = orb_pub_create(&handle_, &meta);
       if (err != ORB_OK) return err;
     }
 
-    return orb_publisher_publish(handle_, &data);
+    return orb_pub_publish(handle_, &data);
   }
 
   /// Borrow a topic-owned message buffer for stack-free in-place construction.
   /// Returns an empty LoanedMessage (operator bool() == false) on error / busy.
   LoanedMessage<meta> Loan() {
     if (!handle_._handle) {
-      if (orb_publisher_create(&handle_, &meta) != ORB_OK) {
+      if (orb_pub_create(&handle_, &meta) != ORB_OK) {
         return LoanedMessage<meta>{};
       }
     }
     void *raw = nullptr;
-    if (orb_publisher_loan(handle_, &raw) != ORB_OK) {
+    if (orb_pub_loan(handle_, &raw) != ORB_OK) {
       return LoanedMessage<meta>{};
     }
     return LoanedMessage<meta>(handle_, static_cast<Type *>(raw));
   }
 
  private:
-  orb_publisher_t handle_ = ORB_PUBLISHER_INITIALIZER;
+  orb_pub_t handle_ = ORB_PUB_INITIALIZER;
 };
 
 /**

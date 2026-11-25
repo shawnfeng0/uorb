@@ -156,14 +156,14 @@ class AsyncDispatcher {
                   ConsumePolicy policy = ConsumePolicy::kSingle) {
     if (!base_._handle) return kInvalidToken;
 
-    orb_subscriber_t sub = ORB_SUBSCRIBER_INITIALIZER;
-    if (orb_subscriber_create_multi(&sub, &meta, instance) != ORB_OK) {
+    orb_sub_t sub = ORB_SUB_INITIALIZER;
+    if (orb_sub_create_multi(&sub, &meta, instance) != ORB_OK) {
       return kInvalidToken;
     }
 
-    uevent_source_t source = orb_subscriber_event_source(sub);
+    uevent_source_t source = orb_sub_event_source(sub);
     if (!source._handle) {
-      orb_subscriber_destroy(&sub);
+      orb_sub_destroy(&sub);
       return kInvalidToken;
     }
 
@@ -172,7 +172,7 @@ class AsyncDispatcher {
     auto *entry = new (std::nothrow)
         TypedEntry<MsgType, Callable>(sub, source, policy, std::forward<Callback>(cb));
     if (!entry) {
-      orb_subscriber_destroy(&sub);
+      orb_sub_destroy(&sub);
       return kInvalidToken;
     }
 
@@ -261,12 +261,12 @@ class AsyncDispatcher {
   static constexpr uint32_t kMaxDrainIterations = 64u;
 
   struct EntryBase {
-    EntryBase(orb_subscriber_t s, uevent_source_t src, ConsumePolicy p)
+    EntryBase(orb_sub_t s, uevent_source_t src, ConsumePolicy p)
         : sub(s), source(src), policy(p) {}
     virtual ~EntryBase() = default;
     virtual void Dispatch(const std::atomic<bool> &stop_requested) = 0;
 
-    orb_subscriber_t sub;
+    orb_sub_t sub;
     uevent_source_t source;
     Token token{kInvalidToken};
     EntryBase *next{nullptr};
@@ -280,15 +280,15 @@ class AsyncDispatcher {
   template <typename MsgType, typename Callable>
   struct TypedEntry final : EntryBase {
     template <typename G>
-    TypedEntry(orb_subscriber_t s, uevent_source_t src, ConsumePolicy p, G &&g)
+    TypedEntry(orb_sub_t s, uevent_source_t src, ConsumePolicy p, G &&g)
         : EntryBase(s, src, p), cb(std::forward<G>(g)) {}
 
     void Dispatch(const std::atomic<bool> &stop_requested) override {
       switch (policy) {
         case ConsumePolicy::kSingle: {
-          if (orb_subscriber_check_update(sub)) {
+          if (orb_sub_check_update(sub)) {
             MsgType msg;
-            if (orb_subscriber_copy(sub, &msg) == ORB_OK) {
+            if (orb_sub_copy(sub, &msg) == ORB_OK) {
               cb(msg);
             }
           }
@@ -297,8 +297,8 @@ class AsyncDispatcher {
         case ConsumePolicy::kLatestOnly: {
           MsgType msg;
           bool has_msg = false;
-          for (uint32_t i = 0; i < kMaxDrainIterations && orb_subscriber_check_update(sub); ++i) {
-            if (orb_subscriber_copy(sub, &msg) == ORB_OK) {
+          for (uint32_t i = 0; i < kMaxDrainIterations && orb_sub_check_update(sub); ++i) {
+            if (orb_sub_copy(sub, &msg) == ORB_OK) {
               has_msg = true;
             } else {
               break;
@@ -310,9 +310,9 @@ class AsyncDispatcher {
           break;
         }
         case ConsumePolicy::kDrainAll: {
-          for (uint32_t i = 0; i < kMaxDrainIterations && orb_subscriber_check_update(sub); ++i) {
+          for (uint32_t i = 0; i < kMaxDrainIterations && orb_sub_check_update(sub); ++i) {
             MsgType msg;
-            if (orb_subscriber_copy(sub, &msg) != ORB_OK) {
+            if (orb_sub_copy(sub, &msg) != ORB_OK) {
               break;
             }
             cb(msg);
@@ -333,7 +333,7 @@ class AsyncDispatcher {
   struct TimerEntry final : EntryBase {
     template <typename G>
     TimerEntry(uevent_source_t src, G &&g)
-        : EntryBase(ORB_SUBSCRIBER_INITIALIZER, src, ConsumePolicy::kSingle),
+        : EntryBase(ORB_SUB_INITIALIZER, src, ConsumePolicy::kSingle),
           cb(std::forward<G>(g)) {}
 
     void Dispatch(const std::atomic<bool> &) override { cb(); }

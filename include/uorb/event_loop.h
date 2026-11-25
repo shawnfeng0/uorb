@@ -58,12 +58,12 @@ class EventLoop {
   Token Subscribe(Callback &&cb, unsigned instance = 0) {
     if (!base_._handle) return kInvalidToken;
 
-    orb_subscriber_t sub = ORB_SUBSCRIBER_INITIALIZER;
-    if (orb_subscriber_create_multi(&sub, &meta, instance) != ORB_OK) return kInvalidToken;
+    orb_sub_t sub = ORB_SUB_INITIALIZER;
+    if (orb_sub_create_multi(&sub, &meta, instance) != ORB_OK) return kInvalidToken;
 
-    uevent_source_t source = orb_subscriber_event_source(sub);
+    uevent_source_t source = orb_sub_event_source(sub);
     if (!source._handle) {
-      orb_subscriber_destroy(&sub);
+      orb_sub_destroy(&sub);
       return kInvalidToken;
     }
 
@@ -72,7 +72,7 @@ class EventLoop {
     auto *entry =
         new (std::nothrow) TypedEntry<MsgType, Callable>(sub, source, std::forward<Callback>(cb));
     if (!entry) {
-      orb_subscriber_destroy(&sub);
+      orb_sub_destroy(&sub);
       return kInvalidToken;
     }
 
@@ -178,11 +178,11 @@ class EventLoop {
 
  private:
   struct EntryBase {
-    EntryBase(orb_subscriber_t s, uevent_source_t src) : sub(s), source(src) {}
+    EntryBase(orb_sub_t s, uevent_source_t src) : sub(s), source(src) {}
     virtual ~EntryBase() = default;
     virtual void Dispatch() = 0;
 
-    orb_subscriber_t sub;
+    orb_sub_t sub;
     uevent_source_t source;
     Token token{kInvalidToken};
     EntryBase *next{nullptr};
@@ -193,13 +193,13 @@ class EventLoop {
   template <typename MsgType, typename Callable>
   struct TypedEntry final : EntryBase {
     template <typename G>
-    TypedEntry(orb_subscriber_t s, uevent_source_t src, G &&g)
+    TypedEntry(orb_sub_t s, uevent_source_t src, G &&g)
         : EntryBase(s, src), cb(std::forward<G>(g)) {}
 
     void Dispatch() override {
-      if (orb_subscriber_check_update(sub)) {
+      if (orb_sub_check_update(sub)) {
         MsgType msg;
-        if (orb_subscriber_copy(sub, &msg) == ORB_OK) {
+        if (orb_sub_copy(sub, &msg) == ORB_OK) {
           cb(msg);
         }
       }
@@ -212,7 +212,7 @@ class EventLoop {
   struct TimerEntry final : EntryBase {
     template <typename G>
     TimerEntry(uevent_source_t src, G &&g)
-        : EntryBase(ORB_SUBSCRIBER_INITIALIZER, src), cb(std::forward<G>(g)) {}
+        : EntryBase(ORB_SUB_INITIALIZER, src), cb(std::forward<G>(g)) {}
 
     void Dispatch() override { cb(); }
 
@@ -228,7 +228,7 @@ class EventLoop {
     entry->source.data.u64 = tok;
     if (uevent_add(&base_, &entry->source, 0) != 0) {
       if (entry->sub._handle) {
-        orb_subscriber_destroy(&entry->sub);
+        orb_sub_destroy(&entry->sub);
       } else {
         uevent_source_destroy(&entry->source);
       }
@@ -266,7 +266,7 @@ class EventLoop {
       uevent_remove(&base_, &entry->source);
     }
     if (entry->sub._handle) {
-      orb_subscriber_destroy(&entry->sub);
+      orb_sub_destroy(&entry->sub);
     } else {
       uevent_source_destroy(&entry->source);
     }

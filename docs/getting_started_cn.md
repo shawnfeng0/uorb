@@ -215,7 +215,7 @@ if (sub_example_string.Update()) {
 }
 ```
 
-或使用 `uevent` API 配合 `sub.event_source()`（C 接口为 `orb_subscriber_event_source()`），提供零额外分配的事件驱动调度（推荐此用法）：
+或使用 `uevent` API 配合 `sub.event_source()`（C 接口为 `orb_sub_event_source()`），提供零额外分配的事件驱动调度（推荐此用法）：
 
 ```c++
 #include <uevent/uevent.h>
