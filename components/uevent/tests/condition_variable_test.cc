@@ -1,7 +1,7 @@
 //
 // Created by shawnfeng on 23-5-13.
 //
-#include "condition_variable.h"
+#include "uevent_base/condition_variable.h"
 
 #include <gtest/gtest.h>
 
@@ -32,7 +32,7 @@ class ThreadBarrier {
   ThreadBarrier &operator=(const ThreadBarrier &) = delete;
 
   void wait() {
-    uorb::base::LockGuard<uorb::base::Mutex> lock(mutex_);
+    uevent::base::LockGuard<uevent::base::Mutex> lock(mutex_);
     if (--num_threads_ == 0) {
       cv_.notify_all();
     } else {
@@ -41,34 +41,24 @@ class ThreadBarrier {
   }
 
  private:
-  uorb::base::Mutex mutex_;
-  uorb::base::ConditionVariable cv_;
+  uevent::base::Mutex mutex_;
+  uevent::base::ConditionVariable cv_;
   int num_threads_;
 };
 
-namespace uorb {
-namespace base {
-class ConditionVariableTest : public ConditionVariable {
- public:
-  using ConditionVariable::get_now_time;
-  using ConditionVariable::timespec_get_after;
-};
-}  // namespace base
-}  // namespace uorb
-
 TEST(ConditionVariableTest, get_time) {
   for (int ms = 0; ms < 100000; ms++) {
-    using namespace uorb::base;
-    auto now = ConditionVariableTest::get_now_time();
+    using namespace uevent::base;
+    auto now = ConditionVariable::get_now();
     auto now_us = (uint64_t)now.tv_sec * 1000000 + now.tv_nsec / 1000;
-    auto after = ConditionVariableTest::timespec_get_after(now, ms);
+    auto after = ConditionVariable::timespec_add_ms(now, ms);
     auto after_us = (uint64_t)after.tv_sec * 1000000 + after.tv_nsec / 1000;
     EXPECT_EQ(after_us, now_us + ms * 1000);
   }
 }
 
 bool wait_for_case(int set_timeout_ms, int wait_timeout_ms, uint64_t *actual_waiting_time) {
-  using namespace uorb::base;
+  using namespace uevent::base;
   ConditionVariable condition_variable;
   Mutex mutex;
   ThreadBarrier barrier(2);
@@ -119,7 +109,7 @@ TEST(ConditionVariableTest, wait_for_timeout) {
 }
 
 TEST(ConditionVariableTest, wait_for_predicate_total_timeout_not_extended) {
-  using namespace uorb::base;
+  using namespace uevent::base;
 
   ConditionVariable cv;
   Mutex mutex;

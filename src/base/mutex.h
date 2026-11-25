@@ -61,43 +61,6 @@ class LockGuard {
   MutexType &mutex_;
 };
 
-/**
- * @brief A movable-free RAII lock supporting manual unlock/relock.
- */
-template <typename MutexType = Mutex>
-class UniqueLock {
- public:
-  explicit UniqueLock(MutexType &m) : mutex_(m), owns_(true) { mutex_.lock(); }
-  ~UniqueLock() {
-    if (owns_) {
-      mutex_.unlock();
-    }
-  }
-
-  UniqueLock(const UniqueLock &) = delete;
-  UniqueLock &operator=(const UniqueLock &) = delete;
-
-  void lock() {
-    if (!owns_) {
-      mutex_.lock();
-      owns_ = true;
-    }
-  }
-
-  void unlock() {
-    if (owns_) {
-      owns_ = false;
-      mutex_.unlock();
-    }
-  }
-
-  bool owns_lock() const noexcept { return owns_; }
-
- private:
-  MutexType &mutex_;
-  bool owns_;
-};
-
 }  // namespace base
 }  // namespace uorb
 

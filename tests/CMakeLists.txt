@@ -9,7 +9,7 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/msg)
 
 set(TEST_SOURCE
         uorb_unit_test.cc
-        ${CMAKE_CURRENT_SOURCE_DIR}/../src/base/condition_variable_test.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/../components/uevent/tests/condition_variable_test.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/../components/uevent/tests/uevent_test.cc
         uorb_event_source_test.cc
         event_loop_test.cc
