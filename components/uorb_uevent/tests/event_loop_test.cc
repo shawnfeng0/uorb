@@ -912,4 +912,59 @@ TEST(AsyncDispatcherTest, ThreadConfigAndConsumePolicies) {
   }
 }
 
+TEST(AsyncDispatcherTest, TimersPeriodicOneShotSelfUnsubscribeAndScoped) {
+  uorb::AsyncDispatcher dispatcher;
+  ASSERT_TRUE(dispatcher);
+  ASSERT_TRUE(dispatcher.Start());
+
+  // Invalid period rejected.
+  EXPECT_EQ(dispatcher.AddTimer(0, []() {}), uorb::AsyncDispatcher::kInvalidToken);
+
+  // One-shot timer fires once.
+  std::atomic<int> oneshot_calls{0};
+  auto oneshot_guard = dispatcher.AddTimerScoped(
+      15, [&]() { oneshot_calls.fetch_add(1, std::memory_order_acq_rel); }, false);
+  ASSERT_TRUE(oneshot_guard);
+
+  // Periodic timer that self-unsubscribes after 3 ticks.
+  std::atomic<int> periodic_calls{0};
+  std::atomic<uorb::AsyncDispatcher::Token> self_tok{uorb::AsyncDispatcher::kInvalidToken};
+  const auto tok = dispatcher.AddTimer(
+      15,
+      [&]() {
+        const int n = periodic_calls.fetch_add(1, std::memory_order_acq_rel) + 1;
+        if (n >= 3) {
+          dispatcher.Unsubscribe(self_tok.load(std::memory_order_acquire));
+        }
+      },
+      true);
+  ASSERT_NE(tok, uorb::AsyncDispatcher::kInvalidToken);
+  self_tok.store(tok, std::memory_order_release);
+
+  // Scoped periodic timer cancelled by scope exit.
+  std::atomic<int> scoped_calls{0};
+  {
+    auto scoped_timer = dispatcher.AddTimerScoped(
+        15, [&]() { scoped_calls.fetch_add(1, std::memory_order_acq_rel); }, true);
+    ASSERT_TRUE(scoped_timer);
+
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    while ((oneshot_calls.load(std::memory_order_acquire) < 1 ||
+            periodic_calls.load(std::memory_order_acquire) < 3 ||
+            scoped_calls.load(std::memory_order_acquire) < 2) &&
+           std::chrono::steady_clock::now() < deadline) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+  }
+
+  const int scoped_after_cancel = scoped_calls.load(std::memory_order_acquire);
+  std::this_thread::sleep_for(std::chrono::milliseconds(45));
+
+  EXPECT_EQ(oneshot_calls.load(), 1);
+  EXPECT_EQ(periodic_calls.load(), 3);
+  EXPECT_EQ(scoped_calls.load(), scoped_after_cancel);
+
+  dispatcher.Stop();
+}
+
 }  // namespace uORBTest

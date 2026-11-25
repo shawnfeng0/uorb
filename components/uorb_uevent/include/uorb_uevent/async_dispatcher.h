@@ -329,25 +329,7 @@ class AsyncDispatcher {
       return kInvalidToken;
     }
 
-    pthread_mutex_lock(&mu_);
-    Token token = ++next_token_;
-    if (token == kInvalidToken) {
-      token = ++next_token_;
-    }
-    entry->token = token;
-    entry->source.data.u64 = token;
-    LinkEntryLocked(entry);
-    const int add_rc = uevent_add(&base_, &entry->source, 0);
-    if (add_rc != 0) {
-      UnlinkEntryLocked(token);
-      pthread_mutex_unlock(&mu_);
-      uorb_subscriber_destroy_source(&entry->source);
-      orb_subscriber_destroy(&entry->sub);
-      delete entry;
-      return kInvalidToken;
-    }
-    pthread_mutex_unlock(&mu_);
-    return token;
+    return RegisterEntry(entry);
   }
 
   /// Convenience wrapper around Subscribe() returning a move-only RAII ScopedSubscription.
@@ -355,6 +337,36 @@ class AsyncDispatcher {
   ScopedSubscription SubscribeScoped(Callback &&cb, unsigned instance = 0,
                                      ConsumePolicy policy = ConsumePolicy::kSingle) {
     const Token tok = Subscribe<meta>(std::forward<Callback>(cb), instance, policy);
+    return ScopedSubscription(this, tok);
+  }
+
+  /// Register a monotonic timer callback dispatched on the worker thread.
+  /// Thread-safe: may be called before or after Start(), from any thread, or
+  /// from inside another callback. Cancel via Unsubscribe(token).
+  /// Returns kInvalidToken on failure (e.g. period_ms == 0).
+  template <typename Callback>
+  Token AddTimer(uint32_t period_ms, Callback &&cb, bool periodic = true) {
+    if (!base_._handle || period_ms == 0) return kInvalidToken;
+
+    uevent_source_t source = UEVENT_SOURCE_INITIALIZER;
+    if (uevent_timer_source_create(&source, period_ms, periodic) != 0) {
+      return kInvalidToken;
+    }
+
+    using Callable = typename std::decay<Callback>::type;
+    auto *entry = new (std::nothrow) TimerEntry<Callable>(source, std::forward<Callback>(cb));
+    if (!entry) {
+      uevent_source_destroy(&source);
+      return kInvalidToken;
+    }
+
+    return RegisterEntry(entry);
+  }
+
+  /// Convenience wrapper around AddTimer() returning a move-only RAII ScopedSubscription.
+  template <typename Callback>
+  ScopedSubscription AddTimerScoped(uint32_t period_ms, Callback &&cb, bool periodic = true) {
+    const Token tok = AddTimer(period_ms, std::forward<Callback>(cb), periodic);
     return ScopedSubscription(this, tok);
   }
 
@@ -468,6 +480,42 @@ class AsyncDispatcher {
     Callable cb;
   };
 
+  template <typename Callable>
+  struct TimerEntry final : EntryBase {
+    template <typename G>
+    TimerEntry(uevent_source_t src, G &&g)
+        : EntryBase(ORB_SUBSCRIBER_INITIALIZER, src, ConsumePolicy::kSingle),
+          cb(std::forward<G>(g)) {}
+
+    void Dispatch(const std::atomic<bool> &) override { cb(); }
+
+    Callable cb;
+  };
+
+  Token RegisterEntry(EntryBase *entry) {
+    pthread_mutex_lock(&mu_);
+    Token token = ++next_token_;
+    if (token == kInvalidToken) {
+      token = ++next_token_;
+    }
+    entry->token = token;
+    entry->source.data.u64 = token;
+    LinkEntryLocked(entry);
+    const int add_rc = uevent_add(&base_, &entry->source, 0);
+    if (add_rc != 0) {
+      UnlinkEntryLocked(token);
+      pthread_mutex_unlock(&mu_);
+      uevent_source_destroy(&entry->source);
+      if (entry->sub._handle) {
+        orb_subscriber_destroy(&entry->sub);
+      }
+      delete entry;
+      return kInvalidToken;
+    }
+    pthread_mutex_unlock(&mu_);
+    return token;
+  }
+
   static void *WorkerEntry(void *arg) {
     static_cast<AsyncDispatcher *>(arg)->WorkerLoop();
     return nullptr;
@@ -577,8 +625,10 @@ class AsyncDispatcher {
     if (base_._handle) {
       uevent_remove(&base_, &entry->source);
     }
-    uorb_subscriber_destroy_source(&entry->source);
-    orb_subscriber_destroy(&entry->sub);
+    uevent_source_destroy(&entry->source);
+    if (entry->sub._handle) {
+      orb_subscriber_destroy(&entry->sub);
+    }
     delete entry;
   }
 
