@@ -50,6 +50,11 @@ class DeviceNode {
   // Pre-allocate ring buffer storage so subsequent Publish() calls perform zero allocations.
   bool EnsureBuffer();
 
+  // Borrow / publish / discard a topic-owned message buffer for stack-free writes.
+  orb_err Loan(void **out_msg);
+  orb_err PublishLoaned(void *loaned_msg);
+  void DiscardLoan(void *loaned_msg);
+
   void FillStatus(orb_status *status) const;
 
   void add_subscriber();
@@ -120,6 +125,8 @@ class DeviceNode {
   // the reader-hot fields in Group 3 (buffer_, slot geometry, generation_).
   mutable base::Mutex data_lock_{};  // protects: buffer_ allocation & writes, generation_ writes
   std::atomic<uint64_t> last_publish_time_us_{0}; /**< monotonic timestamp of last Publish() */
+  std::atomic<uint8_t *> loan_buffer_{nullptr};   /**< lazy single-slot loan staging buffer */
+  std::atomic<bool> loan_in_use_{false};          /**< true while a loan is checked out */
 
   // --- Group 2: Cold / low-frequency callback & lifecycle fields ---
   // Naturally separates Group 1 (writer mutex) from Group 3 (reader-hot block)

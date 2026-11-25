@@ -1917,4 +1917,83 @@ TEST_F(UnitTest, custom_allocator_and_zero_heap_preallocate) {
   ASSERT_EQ(orb_set_allocator(nullptr, nullptr), ORB_OK);
 }
 
+TEST_F(UnitTest, loan_publish_discard_busy_and_raii_wrapper) {
+  static const struct orb_metadata loan_topic = {
+      "orb_loan_test", sizeof(orb_test_large_s), 0, "", 2, ORB_DURABILITY_DURABLE,
+      uorb::topic_hash("orb_loan_test"), {}};
+
+  orb_publisher_t pub = ORB_PUBLISHER_INITIALIZER;
+  orb_subscriber_t sub = ORB_SUBSCRIBER_INITIALIZER;
+  ASSERT_EQ(orb_publisher_create(&pub, &loan_topic), ORB_OK);
+  ASSERT_EQ(orb_subscriber_create(&sub, &loan_topic), ORB_OK);
+
+  // 1) Invalid arguments.
+  void *raw = nullptr;
+  EXPECT_EQ(orb_publisher_loan(ORB_PUBLISHER_INITIALIZER, &raw), ORB_ERR_INVALID);
+  EXPECT_EQ(orb_publisher_loan(pub, nullptr), ORB_ERR_INVALID);
+  EXPECT_EQ(orb_publisher_publish_loaned(pub, nullptr), ORB_ERR_INVALID);
+
+  // 2) C API loan -> busy on second loan -> publish_loaned -> copy.
+  ASSERT_EQ(orb_publisher_loan(pub, &raw), ORB_OK);
+  ASSERT_NE(raw, nullptr);
+
+  void *raw2 = nullptr;
+  EXPECT_EQ(orb_publisher_loan(pub, &raw2), ORB_ERR_BUSY);
+  EXPECT_EQ(raw2, nullptr);
+
+  auto *large = static_cast<orb_test_large_s *>(raw);
+  EXPECT_EQ(large->val, 0);  // pre-zeroed
+  large->val = 777;
+  ASSERT_EQ(orb_publisher_publish_loaned(pub, raw), ORB_OK);
+  // Publishing same pointer again without re-loaning must fail.
+  EXPECT_EQ(orb_publisher_publish_loaned(pub, raw), ORB_ERR_INVALID);
+
+  orb_test_large_s received{};
+  ASSERT_EQ(orb_subscriber_copy(sub, &received), ORB_OK);
+  EXPECT_EQ(received.val, 777);
+
+  // 3) Discard releases without publishing.
+  ASSERT_EQ(orb_publisher_loan(pub, &raw), ORB_OK);
+  static_cast<orb_test_large_s *>(raw)->val = 888;
+  orb_publisher_discard_loan(pub, raw);
+  EXPECT_FALSE(orb_subscriber_check_update(sub));
+
+  orb_subscriber_destroy(&sub);
+  orb_publisher_destroy(&pub);
+
+  // 4) C++ RAII LoanedMessage: move, auto-discard, and Publish().
+  uorb::Publication<uorb::msg::orb_test_large> cpp_pub;
+  uorb::Subscription<uorb::msg::orb_test_large> cpp_sub;
+  ASSERT_TRUE(cpp_sub.Subscribe());
+  // Drain any pre-existing sample.
+  if (cpp_sub.Updated()) {
+    orb_test_large_s drain{};
+    cpp_sub.Copy(drain);
+  }
+
+  {
+    auto loan = cpp_pub.Loan();
+    ASSERT_TRUE(loan);
+    // Second concurrent loan must fail (returns empty LoanedMessage).
+    EXPECT_FALSE(cpp_pub.Loan());
+    loan->val = 1234;
+    // Scope exit without Publish() must auto-discard.
+  }
+  EXPECT_FALSE(cpp_sub.Updated());
+
+  {
+    auto loan = cpp_pub.Loan();
+    ASSERT_TRUE(loan);
+    auto moved = std::move(loan);
+    EXPECT_FALSE(loan);
+    ASSERT_TRUE(moved);
+    moved->val = 4321;
+    ASSERT_EQ(moved.Publish(), ORB_OK);
+    EXPECT_FALSE(moved);
+  }
+  orb_test_large_s out{};
+  ASSERT_TRUE(cpp_sub.Update(out));
+  EXPECT_EQ(out.val, 4321);
+}
+
 }  // namespace uORBTest

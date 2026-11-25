@@ -127,6 +127,7 @@ uorb::DeviceNode::DeviceNode(const struct orb_metadata &meta, uint8_t instance)
 
 uorb::DeviceNode::~DeviceNode() {
   base::Allocator::Free(buffer_.load(std::memory_order_relaxed));
+  base::Allocator::Free(loan_buffer_.load(std::memory_order_relaxed));
 }
 
 bool uorb::DeviceNode::Copy(void *dst, unsigned *sub_generation_ptr) const {
@@ -237,6 +238,58 @@ bool uorb::DeviceNode::EnsureBuffer() {
 
   buffer_.store(buf, std::memory_order_release);
   return true;
+}
+
+orb_err uorb::DeviceNode::Loan(void **out_msg) {
+  if (!out_msg) {
+    return ORB_ERR_INVALID;
+  }
+  *out_msg = nullptr;
+
+  if (!EnsureBuffer()) {
+    return ORB_ERR_NO_MEM;
+  }
+
+  uint8_t *lbuf = loan_buffer_.load(std::memory_order_acquire);
+  if (!lbuf) {
+    base::LockGuard<base::Mutex> lg(data_lock_);
+    lbuf = loan_buffer_.load(std::memory_order_relaxed);
+    if (!lbuf) {
+      void *raw = base::Allocator::Alloc(item_size_);
+      if (!raw) {
+        return ORB_ERR_NO_MEM;
+      }
+      lbuf = static_cast<uint8_t *>(raw);
+      loan_buffer_.store(lbuf, std::memory_order_release);
+    }
+  }
+
+  bool expected = false;
+  if (!loan_in_use_.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
+    return ORB_ERR_BUSY;
+  }
+
+  std::memset(lbuf, 0, item_size_);
+  *out_msg = lbuf;
+  return ORB_OK;
+}
+
+orb_err uorb::DeviceNode::PublishLoaned(void *loaned_msg) {
+  uint8_t *lbuf = loan_buffer_.load(std::memory_order_acquire);
+  if (!loaned_msg || loaned_msg != lbuf || !loan_in_use_.load(std::memory_order_acquire)) {
+    return ORB_ERR_INVALID;
+  }
+
+  const bool ok = Publish(lbuf);
+  loan_in_use_.store(false, std::memory_order_release);
+  return ok ? ORB_OK : ORB_ERR_NO_MEM;
+}
+
+void uorb::DeviceNode::DiscardLoan(void *loaned_msg) {
+  uint8_t *lbuf = loan_buffer_.load(std::memory_order_acquire);
+  if (loaned_msg && loaned_msg == lbuf) {
+    loan_in_use_.store(false, std::memory_order_release);
+  }
 }
 
 bool uorb::DeviceNode::Publish(const void *data) {

@@ -200,7 +200,8 @@ extern "C" {
  * - Metadata: ORB_ID(), ORB_DECLARE(), ORB_DEFINE(), orb_metadata.
  * - Publication: orb_publisher_create(), orb_publisher_create_multi(),
  *   orb_publisher_destroy(), orb_publisher_publish(), orb_publisher_publish_once(),
- *   orb_publisher_publish_auto().
+ *   orb_publisher_publish_auto(), orb_publisher_loan(), orb_publisher_publish_loaned(),
+ *   orb_publisher_discard_loan().
  * - Subscription: orb_subscriber_create(),
  *   orb_subscriber_create_multi(), orb_subscriber_destroy(), orb_subscriber_copy(),
  *   orb_subscriber_copy_once(), orb_subscriber_check_update().
@@ -291,6 +292,41 @@ void orb_publisher_destroy(orb_publisher_t *pub);
  * @return ORB_OK on success, error code otherwise
  */
 orb_err orb_publisher_publish(orb_publisher_t pub, const void *data);
+
+/**
+ * Borrow a pre-zeroed, topic-owned message buffer for in-place construction.
+ *
+ * Avoids stack allocation for large message structs on small RTOS stacks and
+ * holds no DeviceNode mutex while the caller fills the buffer. At most one
+ * loan per topic instance may be active at a time (returns ORB_ERR_BUSY if
+ * another loan is already checked out).
+ *
+ * Every successful loan MUST be returned via orb_publisher_publish_loaned() or
+ * orb_publisher_discard_loan().
+ *
+ * @param pub     The publication handle (passed by value).
+ * @param out_msg Output pointer receiving the loaned message buffer.
+ * @return ORB_OK on success, ORB_ERR_BUSY / ORB_ERR_NO_MEM / ORB_ERR_INVALID on error
+ */
+orb_err orb_publisher_loan(orb_publisher_t pub, void **out_msg);
+
+/**
+ * Publish a message buffer previously obtained from orb_publisher_loan() and
+ * release the loan.
+ *
+ * @param pub        The publication handle (passed by value).
+ * @param loaned_msg The buffer pointer returned by orb_publisher_loan().
+ * @return ORB_OK on success, ORB_ERR_INVALID / ORB_ERR_NO_MEM on error
+ */
+orb_err orb_publisher_publish_loaned(orb_publisher_t pub, void *loaned_msg);
+
+/**
+ * Release a loaned message buffer without publishing (idempotent; NULL-safe).
+ *
+ * @param pub        The publication handle (passed by value).
+ * @param loaned_msg The buffer pointer returned by orb_publisher_loan().
+ */
+void orb_publisher_discard_loan(orb_publisher_t pub, void *loaned_msg);
 
 /**
  * Publish data on topic instance 0 without creating a publication handle.

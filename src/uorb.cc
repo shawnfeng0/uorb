@@ -92,6 +92,33 @@ orb_err orb_publisher_publish(orb_publisher_t pub, const void *data) {
   return dev.Publish(data) ? ORB_OK : ORB_ERR_NO_MEM;
 }
 
+orb_err orb_publisher_loan(orb_publisher_t pub, void **out_msg) {
+  if (!pub._handle || !out_msg) {
+    return ORB_ERR_INVALID;
+  }
+
+  auto &dev = *reinterpret_cast<uorb::DeviceNode *>(pub._handle);
+  return dev.Loan(out_msg);
+}
+
+orb_err orb_publisher_publish_loaned(orb_publisher_t pub, void *loaned_msg) {
+  if (!pub._handle || !loaned_msg) {
+    return ORB_ERR_INVALID;
+  }
+
+  auto &dev = *reinterpret_cast<uorb::DeviceNode *>(pub._handle);
+  return dev.PublishLoaned(loaned_msg);
+}
+
+void orb_publisher_discard_loan(orb_publisher_t pub, void *loaned_msg) {
+  if (!pub._handle || !loaned_msg) {
+    return;
+  }
+
+  auto &dev = *reinterpret_cast<uorb::DeviceNode *>(pub._handle);
+  dev.DiscardLoan(loaned_msg);
+}
+
 orb_err orb_publisher_publish_once(const struct orb_metadata *meta, const void *data) {
   if (!meta || !data) {
     return ORB_ERR_INVALID;

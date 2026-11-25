@@ -1,5 +1,6 @@
 #pragma once
 
+#include <uorb/publication.h>
 #include <uorb/uorb.h>
 
 namespace uorb {
@@ -35,6 +36,20 @@ class PublicationMulti {
     }
 
     return orb_publisher_publish(handle_, &data);
+  }
+
+  /// Borrow a topic-owned message buffer for stack-free in-place construction.
+  LoanedMessage<meta> Loan() {
+    if (!handle_._handle) {
+      if (orb_publisher_create_multi(&handle_, &meta, &instance_) != ORB_OK) {
+        return LoanedMessage<meta>{};
+      }
+    }
+    void *raw = nullptr;
+    if (orb_publisher_loan(handle_, &raw) != ORB_OK) {
+      return LoanedMessage<meta>{};
+    }
+    return LoanedMessage<meta>(handle_, static_cast<Type *>(raw));
   }
 
   unsigned instance() const { return instance_; }
