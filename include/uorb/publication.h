@@ -15,7 +15,8 @@ namespace uorb {
 template <const orb_metadata &meta>
 class LoanedMessage {
  public:
-  using Type = typename msg::TypeMap<meta>::type;
+  using ValueType = typename msg::TypeMap<meta>::type;
+  using Type = ValueType;
 
   LoanedMessage() noexcept = default;
   LoanedMessage(orb_pub_t pub, Type *msg) noexcept : pub_(pub), msg_(msg) {}
@@ -77,9 +78,10 @@ class LoanedMessage {
  */
 template <const orb_metadata &meta>
 class Publication {
-  using Type = typename msg::TypeMap<meta>::type;
-
  public:
+  using ValueType = typename msg::TypeMap<meta>::type;
+  using Type = ValueType;
+
   Publication() noexcept = default;
   Publication(const Publication &) = delete;
   Publication(Publication &&) = delete;
@@ -87,16 +89,27 @@ class Publication {
   Publication &operator=(Publication &&) = delete;
   ~Publication() { if (handle_._handle) orb_pub_destroy(&handle_); }
 
+  /// Eagerly create the underlying publication handle (idempotent).
+  orb_err Advertise() {
+    if (handle_._handle) {
+      return ORB_OK;
+    }
+    return orb_pub_create(&handle_, &meta);
+  }
+
+  /// Return the underlying C publication handle (advertising lazily if needed).
+  orb_pub_t handle() {
+    return (Advertise() == ORB_OK) ? handle_ : orb_pub_t{nullptr};
+  }
+
   /**
    * Publish the struct
    * @param data The uORB message struct we are updating.
    * @return ORB_OK on success, error code otherwise.
    */
-  orb_err Publish(const Type &data) {
-    if (!handle_._handle) {
-      orb_err err = orb_pub_create(&handle_, &meta);
-      if (err != ORB_OK) return err;
-    }
+  orb_err Publish(const ValueType &data) {
+    orb_err err = Advertise();
+    if (err != ORB_OK) return err;
 
     return orb_pub_publish(handle_, &data);
   }
@@ -104,16 +117,14 @@ class Publication {
   /// Borrow a topic-owned message buffer for stack-free in-place construction.
   /// Returns an empty LoanedMessage (operator bool() == false) on error / busy.
   LoanedMessage<meta> Loan() {
-    if (!handle_._handle) {
-      if (orb_pub_create(&handle_, &meta) != ORB_OK) {
-        return LoanedMessage<meta>{};
-      }
+    if (Advertise() != ORB_OK) {
+      return LoanedMessage<meta>{};
     }
     void *raw = nullptr;
     if (orb_pub_loan(handle_, &raw) != ORB_OK) {
       return LoanedMessage<meta>{};
     }
-    return LoanedMessage<meta>(handle_, static_cast<Type *>(raw));
+    return LoanedMessage<meta>(handle_, static_cast<ValueType *>(raw));
   }
 
  private:
@@ -128,21 +139,22 @@ class Publication {
  */
 template <const orb_metadata &meta>
 class PublicationData : public Publication<meta> {
-  using Type = typename msg::TypeMap<meta>::type;
-
  public:
+  using ValueType = typename msg::TypeMap<meta>::type;
+  using Type = ValueType;
+
   PublicationData() noexcept = default;
 
   using Publication<meta>::Publish;
 
-  Type &data() { return data_; }
-  const Type &data() const { return data_; }
+  ValueType &data() { return data_; }
+  const ValueType &data() const { return data_; }
 
   // Publishes the embedded struct.
   orb_err Publish() { return Publication<meta>::Publish(data_); }
 
  private:
-  Type data_{};
+  ValueType data_{};
 };
 
 }  // namespace uorb

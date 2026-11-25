@@ -1705,4 +1705,39 @@ TEST_F(UnitTest, loan_publish_discard_busy_and_raii_wrapper) {
   EXPECT_EQ(out.val, 4321);
 }
 
+TEST_F(UnitTest, publication_value_type_and_advertise) {
+  static_assert(std::is_same<uorb::Publication<uorb::msg::orb_test>::ValueType, orb_test_s>::value,
+                "Publication::ValueType must be publicly accessible");
+  static_assert(std::is_same<uorb::PublicationData<uorb::msg::orb_test>::ValueType, orb_test_s>::value,
+                "PublicationData::ValueType must be publicly accessible");
+  static_assert(std::is_same<uorb::PublicationMulti<uorb::msg::orb_test>::ValueType, orb_test_s>::value,
+                "PublicationMulti::ValueType must be publicly accessible");
+  static_assert(std::is_same<uorb::PublicationMultiData<uorb::msg::orb_test>::ValueType, orb_test_s>::value,
+                "PublicationMultiData::ValueType must be publicly accessible");
+  static_assert(std::is_same<uorb::LoanedMessage<uorb::msg::orb_test>::ValueType, orb_test_s>::value,
+                "LoanedMessage::ValueType must be publicly accessible");
+
+  orb_status before{};
+  orb_get_topic_status(ORB_ID(orb_test), 0, &before);
+
+  {
+    uorb::Publication<uorb::msg::orb_test> pub;
+    ASSERT_EQ(pub.Advertise(), ORB_OK);
+    ASSERT_EQ(pub.Advertise(), ORB_OK);  // idempotent
+    ASSERT_NE(pub.handle()._handle, nullptr);
+
+    orb_status after{};
+    ASSERT_EQ(orb_get_topic_status(ORB_ID(orb_test), 0, &after), ORB_OK);
+    EXPECT_EQ(after.publisher_count, before.publisher_count + 1);
+  }
+
+  {
+    uorb::PublicationMulti<uorb::msg::orb_test> pub_m;
+    ASSERT_EQ(pub_m.Advertise(), ORB_OK);
+    ASSERT_EQ(pub_m.Advertise(), ORB_OK);  // idempotent
+    ASSERT_NE(pub_m.handle()._handle, nullptr);
+    EXPECT_LT(pub_m.instance(), static_cast<unsigned>(ORB_MULTI_MAX_INSTANCES));
+  }
+}
+
 }  // namespace uORBTest
