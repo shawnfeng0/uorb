@@ -46,6 +46,9 @@ This codebase targets embedded/RTOS platforms. The following are
   (wraps `pthread_cond_t`).
 - `std::shared_ptr`, `std::function` — use raw pointers and function
   pointers.
+- `thread_local` — use `pthread_key_t` (`pthread_getspecific` /
+  `pthread_setspecific`) with stack-allocated state so RTOS toolchains
+  without C++11 TLS runtime support work cleanly.
 
 The two internal mutex headers (one per library) both wrap
 `pthread_mutex_t` with `PTHREAD_MUTEX_INITIALIZER` support for static

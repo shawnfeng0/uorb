@@ -1,5 +1,7 @@
 #include "device_node.h"
 
+#include <pthread.h>
+
 #include <cstring>
 #include <new>
 #include <type_traits>
@@ -16,17 +18,39 @@ static_assert(std::is_trivially_destructible<std::atomic<uint32_t>>::value,
 namespace {
 
 // Per-thread stack of currently executing synchronous callbacks.
-// Used by UnregisterCallback() to distinguish self-unregistration (including
-// self-destroy of ReceiverLocal inside its own callback) from cross-thread
-// unregistration without deadlocking or causing use-after-free.
+// Uses POSIX pthread_key_t (zero heap allocation, RTOS-safe without C++11
+// thread_local / TLS runtime requirements). Used by UnregisterCallback() to
+// distinguish self-unregistration (including self-destroy of ReceiverLocal
+// inside its own callback) from cross-thread unregistration, and by
+// DispatchCallbacks() to cap recursive sync callback depth.
 struct ActiveCallFrame {
   uorb::detail::CallbackEntry *entry;
+  uint32_t depth;
   bool detached_by_self;
   ActiveCallFrame *prev;
 };
 
-thread_local ActiveCallFrame *g_active_call_top = nullptr;
-thread_local uint32_t g_sync_callback_depth = 0;
+pthread_key_t g_active_call_key;
+pthread_once_t g_active_call_key_once = PTHREAD_ONCE_INIT;
+bool g_active_call_key_ready = false;
+
+void InitActiveCallKey() {
+  g_active_call_key_ready = (pthread_key_create(&g_active_call_key, nullptr) == 0);
+}
+
+inline ActiveCallFrame *GetActiveCallTop() {
+  pthread_once(&g_active_call_key_once, InitActiveCallKey);
+  if (!g_active_call_key_ready) {
+    return nullptr;
+  }
+  return static_cast<ActiveCallFrame *>(pthread_getspecific(g_active_call_key));
+}
+
+inline void SetActiveCallTop(ActiveCallFrame *frame) {
+  if (g_active_call_key_ready) {
+    pthread_setspecific(g_active_call_key, frame);
+  }
+}
 
 }  // namespace
 
@@ -275,7 +299,7 @@ bool uorb::DeviceNode::UnregisterCallback(detail::CallbackEntry *entry) {
   // Detach any active call frames on THIS thread for `entry` so self-unregister
   // (or self-destroy of ReceiverLocal inside its own callback) neither deadlocks
   // nor causes use-after-free when the outer DispatchCallbacks frame returns.
-  for (ActiveCallFrame *f = g_active_call_top; f != nullptr; f = f->prev) {
+  for (ActiveCallFrame *f = GetActiveCallTop(); f != nullptr; f = f->prev) {
     if (f->entry == entry && !f->detached_by_self) {
       f->detached_by_self = true;
       --entry->active_calls;
@@ -298,7 +322,9 @@ void uorb::DeviceNode::DispatchCallbacks(const void *data) {
   // Stack-overflow circuit breaker for cyclic synchronous callbacks (e.g. A -> B -> A).
   // Async consumers (uorb::EventLoop / uorb::AsyncDispatcher) never recurse here
   // because their wakeup hook only signals EventPoll (depth == 1).
-  if (g_sync_callback_depth >= kMaxSyncCallbackDepth) {
+  ActiveCallFrame *const prev_top = GetActiveCallTop();
+  const uint32_t current_depth = prev_top ? prev_top->depth : 0u;
+  if (current_depth >= kMaxSyncCallbackDepth) {
     return;
   }
 
@@ -337,9 +363,8 @@ void uorb::DeviceNode::DispatchCallbacks(const void *data) {
     const orb_callback_ctx ctx = next->ctx;
     ++next->active_calls;
 
-    ActiveCallFrame frame{next, false, g_active_call_top};
-    g_active_call_top = &frame;
-    ++g_sync_callback_depth;
+    ActiveCallFrame frame{next, current_depth + 1u, false, prev_top};
+    SetActiveCallTop(&frame);
 
     // Release callback_lock_ BEFORE invoking user code: eliminates all deadlocks
     // caused by reentrant Publish(), cross-topic AB-BA Publish(), user mutex
@@ -351,9 +376,8 @@ void uorb::DeviceNode::DispatchCallbacks(const void *data) {
       base::UniqueLock<base::Mutex> &lk;
       ActiveCallFrame &fr;
       ~CallGuard() {
-        --g_sync_callback_depth;
+        SetActiveCallTop(fr.prev);
         lk.lock();
-        g_active_call_top = fr.prev;
         if (!fr.detached_by_self) {
           detail::CallbackEntry *e = fr.entry;
           if (--e->active_calls == 0 && e->waiting_unregister) {
