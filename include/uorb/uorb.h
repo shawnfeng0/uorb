@@ -86,7 +86,8 @@ struct orb_status {
   uint8_t publisher_count;        // Number of tracked publishers
   bool has_untracked_publisher;   // Whether orb_publisher_publish_once() has been used
 
-  unsigned latest_data_index;  // The latest data index
+  unsigned latest_data_index;     // The latest data index
+  uint64_t last_publish_time_us;  // Monotonic timestamp [us] of the last Publish() (0 if never published)
 };
 
 #ifdef __cplusplus
@@ -200,7 +201,7 @@ extern "C" {
  * - Publish callback: orb_subscriber_set_callback(),
  *   orb_subscriber_clear_callback().
  * - Introspection: orb_exists(), orb_group_count(),
- *   orb_get_topic_status(), orb_version(), orb_strerror().
+ *   orb_get_topic_status(), orb_for_each_topic(), orb_version(), orb_strerror().
  * - Time: orb_absolute_time_us(), orb_elapsed_time_us().
  */
 
@@ -506,6 +507,36 @@ unsigned int orb_group_count(const struct orb_metadata *meta);
  * @return ORB_OK on success, error code otherwise
  */
 orb_err orb_get_topic_status(const struct orb_metadata *meta, unsigned int instance, struct orb_status *status);
+
+/**
+ * Visitor callback for orb_for_each_topic().
+ *
+ * Invoked once per instantiated topic instance with no internal locks held.
+ * Return true to continue iteration, or false to stop early.
+ *
+ * @param meta     Topic metadata pointer
+ * @param instance Topic instance index (0 .. ORB_MULTI_MAX_INSTANCES - 1)
+ * @param status   Snapshot of the topic instance's current status
+ * @param ctx      User context pointer passed to orb_for_each_topic()
+ * @return true to continue, false to stop
+ */
+typedef bool (*orb_topic_visitor_fn)(const struct orb_metadata *meta,
+                                     unsigned int instance,
+                                     const struct orb_status *status,
+                                     void *ctx);
+
+/**
+ * Iterate over all currently instantiated topic instances in the process.
+ *
+ * Thread-safe: snapshots the persistent node list under DeviceMaster::lock_,
+ * then invokes visitor outside any internal locks so the visitor may safely
+ * call other uORB APIs.
+ *
+ * @param visitor Callback invoked for each topic instance (must not be NULL)
+ * @param ctx     User context pointer forwarded to visitor
+ * @return Number of topic instances visited (0 if visitor is NULL or none exist)
+ */
+size_t orb_for_each_topic(orb_topic_visitor_fn visitor, void *ctx);
 
 /**
  * Get orb version string

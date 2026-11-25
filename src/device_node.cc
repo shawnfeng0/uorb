@@ -256,6 +256,7 @@ bool uorb::DeviceNode::Publish(const void *data) {
     // 3) Mark even with release semantics before advancing generation_.
     seq_base[slot].store(even_seq, std::memory_order_release);
 
+    last_publish_time_us_.store(orb_absolute_time_us(), std::memory_order_release);
     generation_.store(cur_gen + 1u, std::memory_order_seq_cst);
     if (!has_published_.load(std::memory_order_relaxed)) {
       has_published_.store(true, std::memory_order_release);
@@ -438,4 +439,5 @@ void uorb::DeviceNode::FillStatus(orb_status *status) const {
   status->publisher_count = static_cast<uint8_t>(publisher_count());
   status->has_untracked_publisher = has_untracked_publisher_.load(std::memory_order_acquire);
   status->latest_data_index = generation_.load(std::memory_order_acquire);
+  status->last_publish_time_us = last_publish_time_us_.load(std::memory_order_acquire);
 }

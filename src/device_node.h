@@ -82,6 +82,7 @@ class DeviceNode {
 
   unsigned queue_size() const { return queue_size_; }
 
+  const orb_metadata &meta() const { return meta_; }
   const char *name() const { return meta_.o_name; }
   uint8_t instance() const { return instance_; }
 
@@ -115,6 +116,7 @@ class DeviceNode {
   // the front prevents writer lock-contention cache traffic from invalidating
   // the reader-hot fields in Group 3 (buffer_, slot geometry, generation_).
   mutable base::Mutex data_lock_{};  // protects: buffer_ allocation & writes, generation_ writes
+  std::atomic<uint64_t> last_publish_time_us_{0}; /**< monotonic timestamp of last Publish() */
 
   // --- Group 2: Cold / low-frequency callback & lifecycle fields ---
   // Naturally separates Group 1 (writer mutex) from Group 3 (reader-hot block)

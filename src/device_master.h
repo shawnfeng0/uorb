@@ -37,6 +37,7 @@ class uorb::DeviceMaster {
   orb_err OpenDeviceNode(const orb_metadata &meta, unsigned int instance, DeviceNode **out);
   bool TopicExists(const orb_metadata &meta, uint8_t instance) const;
   bool GetTopicStatus(const orb_metadata &meta, uint8_t instance, orb_status *status) const;
+  size_t ForEachTopic(orb_topic_visitor_fn visitor, void *ctx) const;
 
   /**
    * Public interface for GetDeviceNodeLocked(). Takes care of synchronization.

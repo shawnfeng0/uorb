@@ -1771,4 +1771,94 @@ TEST_F(UnitTest, callback_self_destroy_sibling_destroy_and_cross_thread_drain) {
   EXPECT_EQ(orb_publisher_destroy(&pub), ORB_OK);
 }
 
+TEST_F(UnitTest, topic_enumeration_and_last_publish_time_us) {
+  static const struct orb_metadata enum_topic_a = {
+      "orb_enum_test_a", sizeof(orb_test_s), 0, "", 2, ORB_DURABILITY_DURABLE, {}};
+  static const struct orb_metadata enum_topic_b = {
+      "orb_enum_test_b", sizeof(orb_test_s), 0, "", 1, ORB_DURABILITY_VOLATILE, {}};
+
+  // Null visitor returns 0 cleanly.
+  EXPECT_EQ(orb_for_each_topic(nullptr, nullptr), 0u);
+
+  orb_subscriber_t sub_a = ORB_SUBSCRIBER_INITIALIZER;
+  ASSERT_EQ(orb_subscriber_create(&sub_a, &enum_topic_a), ORB_OK);
+
+  // Before first publish, last_publish_time_us must be 0.
+  orb_status st_before{};
+  ASSERT_EQ(orb_get_topic_status(&enum_topic_a, 0, &st_before), ORB_OK);
+  EXPECT_EQ(st_before.last_publish_time_us, 0u);
+
+  const orb_abstime_us t_before = orb_absolute_time_us();
+  orb_publisher_t pub_a = ORB_PUBLISHER_INITIALIZER;
+  ASSERT_EQ(orb_publisher_create(&pub_a, &enum_topic_a), ORB_OK);
+  orb_test_s msg{};
+  msg.val = 7;
+  ASSERT_EQ(orb_publisher_publish(&pub_a, &msg), ORB_OK);
+  const orb_abstime_us t_after = orb_absolute_time_us();
+
+  orb_status st_after{};
+  ASSERT_EQ(orb_get_topic_status(&enum_topic_a, 0, &st_after), ORB_OK);
+  EXPECT_GE(st_after.last_publish_time_us, t_before);
+  EXPECT_LE(st_after.last_publish_time_us, t_after);
+
+  // Create second topic and verify orb_for_each_topic visits both with accurate snapshots,
+  // and safely allows calling other uORB APIs inside the visitor (no DeviceMaster::lock_ held).
+  orb_publisher_t pub_b = ORB_PUBLISHER_INITIALIZER;
+  ASSERT_EQ(orb_publisher_create(&pub_b, &enum_topic_b), ORB_OK);
+
+  struct VisitCtx {
+    const orb_metadata *meta_a;
+    const orb_metadata *meta_b;
+    bool found_a{false};
+    bool found_b{false};
+    uint64_t a_last_pub{0};
+    size_t stop_after{0};
+    size_t count{0};
+  } ctx{&enum_topic_a, &enum_topic_b, false, false, 0, 0, 0};
+
+  const size_t total = orb_for_each_topic(
+      [](const orb_metadata *meta, unsigned int instance, const orb_status *status,
+         void *user_ctx) -> bool {
+        auto *c = static_cast<VisitCtx *>(user_ctx);
+        ++c->count;
+        // Reentrant uORB introspection call inside visitor must not deadlock.
+        orb_status check{};
+        EXPECT_EQ(orb_get_topic_status(meta, instance, &check), ORB_OK);
+        if (meta == c->meta_a && instance == 0) {
+          c->found_a = true;
+          c->a_last_pub = status->last_publish_time_us;
+          EXPECT_EQ(status->queue_size, 2u);
+          EXPECT_EQ(status->subscriber_count, 1u);
+          EXPECT_EQ(status->publisher_count, 1u);
+        } else if (meta == c->meta_b && instance == 0) {
+          c->found_b = true;
+          EXPECT_EQ(status->last_publish_time_us, 0u);
+        }
+        return (c->stop_after == 0) || (c->count < c->stop_after);
+      },
+      &ctx);
+
+  EXPECT_EQ(total, ctx.count);
+  EXPECT_GE(total, 2u);
+  EXPECT_TRUE(ctx.found_a);
+  EXPECT_TRUE(ctx.found_b);
+  EXPECT_EQ(ctx.a_last_pub, st_after.last_publish_time_us);
+
+  // Early termination when visitor returns false.
+  ctx.count = 0;
+  ctx.stop_after = 1;
+  const size_t early = orb_for_each_topic(
+      [](const orb_metadata *, unsigned int, const orb_status *, void *user_ctx) -> bool {
+        auto *c = static_cast<VisitCtx *>(user_ctx);
+        ++c->count;
+        return c->count < c->stop_after;
+      },
+      &ctx);
+  EXPECT_EQ(early, 1u);
+
+  EXPECT_EQ(orb_subscriber_destroy(&sub_a), ORB_OK);
+  EXPECT_EQ(orb_publisher_destroy(&pub_a), ORB_OK);
+  EXPECT_EQ(orb_publisher_destroy(&pub_b), ORB_OK);
+}
+
 }  // namespace uORBTest

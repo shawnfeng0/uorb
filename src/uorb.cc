@@ -256,6 +256,11 @@ orb_err orb_get_topic_status(const struct orb_metadata *meta, unsigned int insta
   return master.GetTopicStatus(*meta, instance, status) ? ORB_OK : ORB_ERR_NO_ENTRY;
 }
 
+size_t orb_for_each_topic(orb_topic_visitor_fn visitor, void *ctx) {
+  auto &master = DeviceMaster::get_instance();
+  return master.ForEachTopic(visitor, ctx);
+}
+
 const char *orb_version(void) { return UORB_GIT_TAG; }
 
 const char *orb_strerror(orb_err err) {

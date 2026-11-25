@@ -80,6 +80,35 @@ bool uorb::DeviceMaster::GetTopicStatus(const orb_metadata &meta, uint8_t instan
   return true;
 }
 
+size_t uorb::DeviceMaster::ForEachTopic(orb_topic_visitor_fn visitor, void *ctx) const {
+  if (!visitor) {
+    return 0;
+  }
+
+  // Snapshot the head of node_list_ under lock_. Because DeviceNodes are persistent
+  // and only ever prepended via push_front(), existing nodes' `next` pointers are
+  // immutable once linked — so we can safely walk outside lock_ with zero allocations
+  // and zero risk of deadlocking if the visitor calls back into uORB APIs.
+  intrusive_list::forward_list<DeviceNode, &DeviceNode::device_list_node_>::Iterator it(nullptr);
+  {
+    base::LockGuard<base::Mutex> lg(lock_);
+    it = node_list_.begin();
+  }
+
+  size_t visited = 0;
+  const auto end = node_list_.end();
+  for (; it != end; ++it) {
+    const DeviceNode &node = *it;
+    orb_status status{};
+    node.FillStatus(&status);
+    ++visited;
+    if (!visitor(&node.meta(), node.instance(), &status, ctx)) {
+      break;
+    }
+  }
+  return visited;
+}
+
 uorb::DeviceNode *uorb::DeviceMaster::GetDeviceNodeLocked(const orb_metadata &meta, uint8_t instance) const {
   if (instance >= ORB_MULTI_MAX_INSTANCES) {
     return nullptr;
