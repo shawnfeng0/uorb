@@ -5,6 +5,8 @@
 #include <pthread.h>
 #include <unistd.h>
 
+#include <cstdio>
+
 #include "uevent/uevent.h"
 #include "uorb/publication.h"
 #include "uorb/publication_multi.h"

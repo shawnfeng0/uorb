@@ -44,11 +44,9 @@ void uorb_subscriber_destroy_source(uevent_source_t *src);
 }
 
 #include <atomic>
-#include <memory>
 #include <new>
 #include <type_traits>
 #include <utility>
-#include <vector>
 
 namespace uorb {
 
@@ -66,13 +64,21 @@ class EventLoop {
  public:
   EventLoop() { uevent_create(&base_); }
   ~EventLoop() {
-    if (!base_._handle) return;
-    for (auto &entry : entries_) {
-      uevent_remove(&base_, &entry->source);
-      orb_subscriber_destroy(&entry->sub);
-      uorb_subscriber_destroy_source(&entry->source);
+    EntryBase *cur = entries_head_;
+    entries_head_ = nullptr;
+    while (cur != nullptr) {
+      EntryBase *next = cur->next;
+      if (base_._handle) {
+        uevent_remove(&base_, &cur->source);
+      }
+      uorb_subscriber_destroy_source(&cur->source);
+      orb_subscriber_destroy(&cur->sub);
+      delete cur;
+      cur = next;
     }
-    uevent_destroy(&base_);
+    if (base_._handle) {
+      uevent_destroy(&base_);
+    }
   }
 
   EventLoop(const EventLoop &) = delete;
@@ -95,22 +101,24 @@ class EventLoop {
 
     using MsgType = typename msg::TypeMap<meta>::type;
     using Callable = typename std::decay<Callback>::type;
-    std::unique_ptr<EntryBase> entry(
-        new (std::nothrow) TypedEntry<MsgType, Callable>(sub, source, std::forward<Callback>(cb)));
+    auto *entry =
+        new (std::nothrow) TypedEntry<MsgType, Callable>(sub, source, std::forward<Callback>(cb));
     if (!entry) {
       uorb_subscriber_destroy_source(&source);
       orb_subscriber_destroy(&sub);
       return false;
     }
 
-    entry->source.data.ptr = entry.get();
+    entry->source.data.ptr = entry;
     if (uevent_add(&base_, &entry->source, 0) != 0) {
       uorb_subscriber_destroy_source(&entry->source);
       orb_subscriber_destroy(&entry->sub);
+      delete entry;
       return false;
     }
 
-    entries_.push_back(std::move(entry));
+    entry->next = entries_head_;
+    entries_head_ = entry;
     return true;
   }
 
@@ -141,7 +149,7 @@ class EventLoop {
   bool Run() {
     quit_requested_.store(false);
     while (!quit_requested_.load()) {
-      if (entries_.empty()) {
+      if (entries_head_ == nullptr) {
         return false;
       }
       int n = RunOnce(-1);
@@ -165,6 +173,7 @@ class EventLoop {
 
     orb_subscriber_t sub;
     uevent_source_t source;
+    EntryBase *next{nullptr};
   };
 
   template <typename MsgType, typename Callable>
@@ -186,7 +195,7 @@ class EventLoop {
   };
 
   uevent_t base_ = UEVENT_INITIALIZER;
-  std::vector<std::unique_ptr<EntryBase>> entries_;
+  EntryBase *entries_head_{nullptr};
   std::atomic<bool> quit_requested_{false};
 };
 
