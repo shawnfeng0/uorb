@@ -6,23 +6,17 @@ changes.
 
 ## 1. Architecture
 
-Three libraries, each independently buildable:
+Two cleanly layered libraries:
 
 ```
-uorb (core pub/sub)          — src/, include/uorb/
-  ├── uevent (event loop)     — components/uevent/
-  └── uorb_uevent (bridge)    — components/uorb_uevent/
+uorb (pub/sub + EventLoop/AsyncDispatcher) — src/, include/uorb/
+  └── depends on uevent (generic event/wait primitive) — components/uevent/
 ```
 
-- **uorb**: Topic-based publish/subscribe. No dependency on uevent.
-- **uevent**: Generic event loop (poll sources, wait for readiness). No
-  dependency on uorb. Can be used standalone.
-- **uorb_uevent**: Bridges uORB subscriptions into uevent sources. Depends
-  on both.
+- **uevent**: Generic event/wait primitive (poll sources, timers, wait for readiness). Zero dependency on uorb; zero threads. Can be used standalone.
+- **uorb**: Topic-based publish/subscribe built directly on `uevent::EventSource`. Spawns zero implicit threads and exposes **no raw synchronous callback hooks** (`ReceiverLocal` inherits `uevent::EventSource` directly and is exposed as a borrowed view via `orb_subscriber_event_source()`). C++ callback dispatch is provided via `uorb::EventLoop` (user-driven, zero threads) and `uorb::AsyncDispatcher` (explicit `Start()` worker thread).
 
-The C API surface lives in headers: `include/uorb/uorb.h`,
-`components/uevent/include/uevent/uevent.h`,
-`components/uorb_uevent/include/uorb_uevent/uorb_uevent.h`.
+The C API surface lives in headers: `include/uorb/uorb.h` and `components/uevent/include/uevent/uevent.h`.
 
 ## 2. Build System
 
@@ -56,19 +50,13 @@ storage.
 
 ## 4. Per-Library Base Headers (`base/` vs `uevent_base/`)
 
-To keep `uorb` and `uevent` independently buildable with zero shared
-dependencies, each library keeps its own private synchronization helpers
-under distinct include prefixes:
+Each library keeps its own private synchronization helpers under distinct include prefixes so test targets putting both `src/` and `components/uevent/src/` on the include path never collide:
 
-- `src/base/` — namespace `uorb::base` (`#include "base/mutex.h"`)
+- `src/base/` — namespace `uorb::base` (`#include "base/mutex.h"`, `"base/allocator.h"`)
 - `components/uevent/src/uevent_base/` — namespace `uevent::base`
-  (`#include "uevent_base/mutex.h"`)
+  (`#include "uevent_base/mutex.h"`, `"uevent_base/condition_variable.h"`)
 
-Using distinct directory names prevents include-path collisions when test
-or bridge targets put both `src/` and `components/uevent/src/` on the
-include path. `uevent_source.h` (public header) still uses raw
-`pthread_mutex_t` directly via `<pthread.h>` so public headers do not
-depend on private `uevent_base/` headers.
+`uevent_source.h` (public header) uses raw `pthread_mutex_t` directly via `<pthread.h>` so public headers do not depend on private `uevent_base/` headers.
 
 ## 5. Lock Ordering
 
@@ -78,8 +66,7 @@ depend on private `uevent_base/` headers.
 DeviceMaster::lock_  →  data_lock_        (node lookup)
 DeviceNode::Publish:
   1. data_lock_      →  (write slot, release)
-  2. callback_lock_  →  (advance stack cursor, increment active_calls, release)
-  3. user callback   →  (NO DeviceNode locks held!)
+  2. waiter_lock_    →  EventSource::notify_mu_  →  EventPoll::mu_  (O(1) wakeup only; NO user code)
 ```
 
 - `data_lock_` only serializes concurrent writers in `Publish()`. `Copy()` is
@@ -87,24 +74,20 @@ DeviceNode::Publish:
   SeqLock tags (`physical_slots = (queue_size == 1) ? 2 : queue_size`, single
   allocation with `std::atomic<size_t>` payload words), so readers never block
   writers or each other.
-- `data_lock_` and `callback_lock_` are **NEVER held simultaneously**, and
-  `callback_lock_` is **NEVER held while invoking `entry.on_publish()`**.
-  Therefore callbacks may safely call `Copy()`, `Publish()` (even on the same
-  topic, bounded by `kMaxSyncCallbackDepth = 16`), `ClearCallback()`,
-  `orb_subscriber_destroy()`, or acquire application mutexes without
-  lock-order deadlocks.
-- Cross-thread `UnregisterCallback()` blocks on `callback_cv_` until other
-  threads' in-flight invocations of that entry finish; self-unregistration
-  detaches the current thread's `ActiveCallFrame`s to avoid self-deadlock and
-  use-after-free.
-- For business callbacks (which may chain publishes or perform heavier work),
-  prefer `uorb::EventLoop` or `uorb::AsyncDispatcher` so publisher threads only
-  perform O(1) wakeup signals.
+- `data_lock_` and `waiter_lock_` are **NEVER held simultaneously**.
+- `uorb` exposes **no raw synchronous user callback hook**: `DeviceNode::NotifyWaiters()`
+  only calls `EventSource::notify_waiters()` on bound subscribers (which never
+  invokes user code, never re-enters `DeviceNode`, and obeys the strict DAG
+  `waiter_lock_ → notify_mu_ → EventPoll::mu_`).
+- All user callbacks execute asynchronously off the publisher path via
+  `uorb::EventLoop` (`<uorb/event_loop.h>`, caller thread) or
+  `uorb::AsyncDispatcher` (`<uorb/async_dispatcher.h>`, dedicated worker thread)
+  with zero uORB locks held.
 
-### AsyncDispatcher (uorb_uevent)
+### AsyncDispatcher (`<uorb/async_dispatcher.h>`)
 
 ```
-AsyncDispatcher::mu_  →  DeviceNode::callback_lock_ / EventPoll::mu_  (Subscribe)
+AsyncDispatcher::mu_  →  EventSource::notify_mu_ / DeviceNode::waiter_lock_ / EventPoll::mu_  (Subscribe)
 WorkerLoop: EventPoll::mu_ (released) → AsyncDispatcher::mu_ (released) → user callback (NO locks held)
 ```
 
@@ -140,33 +123,23 @@ so the EventPoll can be safely freed. `ClearWakeup()` is called from
 call `ClearWakeup()` outside `mu_`, then re-check `ready_queue_` under
 `mu_` (to clean entries from a racing `NotifyReady`).
 
-## 7. Callback API
+## 7. Event Notification Model (No Raw Sync Callbacks)
+
+`uorb` intentionally exposes **no raw synchronous callback registration API**.
+Instead, every `orb_subscriber_t` (`ReceiverLocal`) directly inherits
+`uevent::EventSource` and exposes a zero-allocation borrowed view:
 
 ```c
-typedef union {
-    void *ptr;
-    uint32_t u32;
-    uint64_t u64;
-} orb_callback_ctx;
-
-typedef void (*orb_subscriber_callback_fn)(const void *msg, orb_callback_ctx ctx);
-
-orb_err orb_subscriber_set_callback(orb_subscriber_t *sub,
-                                    orb_subscriber_callback_fn cb,
-                                    orb_callback_ctx ctx);
+uevent_source_t orb_subscriber_event_source(orb_subscriber_t sub);
 ```
 
-- `msg` is the published message pointer, valid only during the
-  synchronous callback (it's the caller's source buffer, not a copy).
-- `ctx` uses the union so callers can pass either a pointer or an
-  integer, similar to POSIX `union sigval`.
-- **Callback safety**: dispatched with **no DeviceNode locks held**. May
-  safely call `orb_subscriber_copy()` (lock-free), `orb_publisher_publish()`
-  (even on the same topic, bounded by `kMaxSyncCallbackDepth = 16`),
-  `orb_subscriber_clear_callback()`, `orb_subscriber_destroy()`, or acquire
-  application mutexes without lock-order deadlocks.
-- `set_callback`, `clear_callback`, and `destroy` on the same subscriber
-  must not be called concurrently with each other.
+- Callers add this source to a `uevent_t` loop via `uevent_add()` and remove it
+  via `uevent_remove()` before calling `orb_subscriber_destroy()`.
+- `ReceiverLocal::is_owned_by_uevent()` returns `false`, so accidentally calling
+  `uevent_source_destroy()` on a borrowed subscriber source is a safe no-op.
+- C++ callers use `uorb::EventLoop` (`<uorb/event_loop.h>`, user-driven thread)
+  or `uorb::AsyncDispatcher` (`<uorb/async_dispatcher.h>`, explicit worker
+  thread) for type-safe callbacks.
 
 ### Internal flow
 
@@ -174,12 +147,11 @@ orb_err orb_subscriber_set_callback(orb_subscriber_t *sub,
 Publish(data)
   → write to ring buffer under data_lock_
   → release data_lock_
-  → if callback_count_ > 0 (Dekker seq_cst fast-path):
-      DispatchCallbacks(data):
-        advance stack cursor & increment active_calls under callback_lock_
-        release callback_lock_
-        entry.on_publish(data, entry.ctx)   // direct call, NO locks held
-        re-acquire callback_lock_, decrement active_calls, notify callback_cv_
+  → if waiter_count_ > 0 (Dekker seq_cst fast-path):
+      NotifyWaiters():
+        lock waiter_lock_
+        for each bound ReceiverLocal: entry.source->notify_waiters()
+        unlock waiter_lock_
 ```
 
 ## 8. DeviceNode Lifecycle
@@ -219,19 +191,19 @@ map them to `errno` values. Callers test with `err != ORB_OK` or
     -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address" ...`
   - macOS `leaks` tool: `leaks --atExit -- ./test_binary`
   - ThreadSanitizer (TSan): same pattern with `-fsanitize=thread`
-- Tests live in `src/base/condition_variable_test.cc`, `tests/` (uorb core),
-  `components/uevent/tests/`, and `components/uorb_uevent/tests/`, and are built
-  into a single unified test executable `uorb_test` (run via `ctest` or
-  `./build/tests/uorb_test`).
-- When adding tests that create uevent sources via
-  `uorb_subscriber_create_source()`, always pair with
-  `uorb_subscriber_destroy_source()` to avoid leaking `UorbEventSource`.
+- Tests live in `tests/` (uorb core, event source integration, EventLoop,
+  AsyncDispatcher, EventPoll internals) and `components/uevent/tests/`
+  (`uevent_test.cc`, `condition_variable_test.cc`), and are built into a single
+  unified test executable `uorb_test` (run via `ctest` or `./build/tests/uorb_test`).
+- Always call `uevent_remove()` on a subscriber's borrowed event source before
+  calling `orb_subscriber_destroy()`.
 
 ## 12. Common Pitfalls
 
 1. **Forgetting to destroy handles**: Every `*_create` must be paired
    with `*_destroy`. For uevent sources, `uevent_remove()` must be
-   called before `uevent_source_destroy()`.
+   called before `uevent_source_destroy()` (or `orb_subscriber_destroy()` for
+   borrowed subscriber sources).
 
 2. **Do not include private `uevent_base/` headers from public headers**:
    Public headers like `uevent_source.h` must use raw `pthread_mutex_t`
@@ -240,12 +212,10 @@ map them to `errno` values. Callers test with `err != ORB_OK` or
 3. **Using std primitives**: See RTOS constraints above. Always use
    `base::` wrappers or raw pthread.
 
-4. **Heavy work or cyclic publish in sync callbacks**: Sync callbacks run
-   on the publisher's thread with no DeviceNode locks held (so re-publishing
-   or locking application mutexes won't deadlock `callback_lock_`), but
-   deep cyclic chains hit `kMaxSyncCallbackDepth = 16` (skipping further
-   notifications for that publish) and slow callbacks stall publishers.
-   Prefer `uorb::EventLoop` or `uorb::AsyncDispatcher` for business logic.
+4. **Do not expose raw synchronous publish callbacks in `uorb`**: Keeping
+   `uorb` strictly event-source based (`EventSource::notify_waiters()`) prevents
+   user-code reentrancy, AB-BA deadlocks, and publisher stalls by construction.
+   All user callbacks go through `uorb::EventLoop` or `uorb::AsyncDispatcher`.
 
 5. **ClearWakeup inside mu_**: Never call `ClearWakeup()` while holding
    `EventPoll::mu_`. It internally calls `notify_waiters()` which

@@ -215,16 +215,15 @@ if (sub_example_string.Update()) {
 }
 ```
 
-或使用 `uevent` API 配合 `uorb_subscriber_create_source()`，提供事件驱动的调度（推荐此用法）：
+或使用 `uevent` API 配合 `sub.event_source()`（C 接口为 `orb_subscriber_event_source()`），提供零额外分配的事件驱动调度（推荐此用法）：
 
 ```c++
 #include <uevent/uevent.h>
-#include <uorb_uevent/uorb_uevent.h>
+#include <uorb/subscription.h>
 
 uevent_t base = UEVENT_INITIALIZER;
 uevent_create(&base);
-uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
-uorb_subscriber_create_source(&src, sub_example_string.handle());
+uevent_source_t src = sub_example_string.event_source();
 uevent_add(&base, &src, 0);
 
 uevent_source_t ready[1] = {UEVENT_SOURCE_INITIALIZER};
@@ -234,9 +233,8 @@ if (0 < uevent_loop(&base, ready, 1, timeout_ms)) {
   }
 }
 
-// 清理
+// 清理（在销毁订阅前先从 uevent 移除）
 uevent_remove(&base, &src);
-uorb_subscriber_destroy_source(&src);
 uevent_destroy(&base);
 ```
 
@@ -252,12 +250,13 @@ printf("timestamp: %" PRIu64 "[us], Receive msg: \"%s\"\n", data.timestamp,
 
 ## 使用 EventLoop 进行基于回调的订阅
 
-除了手动轮询 / `uevent` API，uORB 还提供了一个 C++ 事件循环 `uorb::EventLoop`。它把"等待多个订阅" + "对每个订阅执行回调"这两件事包装成一个简单的 API，非常适合用在专门跑订阅回调的工作线程里。
+除了手动轮询 / `uevent` API，uORB 还提供了 C++ 事件循环 `uorb::EventLoop`（零线程、用户线程驱动）与 `uorb::AsyncDispatcher`（显式 `Start()` 启动工作线程），将“等待多个订阅/定时器”与“类型安全回调分发”统一封装。
 
 包含头文件：
 
 ```c++
-#include "uorb_uevent/uorb_uevent.h"
+#include <uorb/event_loop.h>       // 单线程、用户自驱
+// 或 #include <uorb/async_dispatcher.h>  // 独立工作线程
 ```
 
 ### 注册回调

@@ -216,16 +216,15 @@ if (sub_example_string.Update()) {
 }
 ```
 
-Or use `uevent` API with `uorb_subscriber_create_source()`, which provides event-driven dispatch (Recommend this usage):
+Or use the `uevent` API with `sub.event_source()` (or `orb_subscriber_event_source()` in C), which provides zero-allocation event-driven dispatch (recommended):
 
 ```c++
 #include <uevent/uevent.h>
-#include <uorb_uevent/uorb_uevent.h>
+#include <uorb/subscription.h>
 
 uevent_t base = UEVENT_INITIALIZER;
 uevent_create(&base);
-uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
-uorb_subscriber_create_source(&src, sub_example_string.handle());
+uevent_source_t src = sub_example_string.event_source();
 uevent_add(&base, &src, 0);
 
 uevent_source_t ready[1] = {UEVENT_SOURCE_INITIALIZER};
@@ -235,9 +234,8 @@ if (0 < uevent_loop(&base, ready, 1, timeout_ms)) {
   }
 }
 
-// Cleanup
+// Cleanup (remove from uevent base before destroying subscription)
 uevent_remove(&base, &src);
-uorb_subscriber_destroy_source(&src);
 uevent_destroy(&base);
 ```
 
@@ -253,12 +251,13 @@ Please refer to the complete routine: [examples/cpp_pub_sub/cpp_pub_sub.cc](../e
 
 ## Callback-based subscription with `EventLoop`
 
-In addition to manual polling / `uevent` API, uORB ships a small C++ event loop, `uorb::EventLoop`, that wraps "wait on many subscriptions" + "run a callback per subscription" behind a simple API. It fits well on a dedicated worker thread that only runs subscription callbacks.
+In addition to manual polling / `uevent` API, uORB ships a small C++ event loop, `uorb::EventLoop` (zero threads, caller-driven) and `uorb::AsyncDispatcher` (dedicated worker thread via explicit `Start()`).
 
 Include the header:
 
 ```c++
-#include "uorb_uevent/uorb_uevent.h"
+#include <uorb/event_loop.h>       // single-threaded, caller-driven
+// or #include <uorb/async_dispatcher.h>  // background worker thread
 ```
 
 ### Registering a callback
