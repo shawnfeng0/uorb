@@ -212,14 +212,17 @@ TEST(EventLoopTest, CallbackCanQuitLoop) {
   ASSERT_TRUE(loop);
 
   std::atomic<int> call_count{0};
+  bool armed = false;
   ASSERT_TRUE(loop.Subscribe<uorb::msg::orb_test_large>(
       [&](const orb_test_large_s &) {
+        if (!armed) return;
         ++call_count;
         loop.Quit();
       }));
 
-  // Drain any stale data from previous tests
+  // Drain any stale data from previous tests before arming Quit().
   DrainPendingEvents(loop);
+  armed = true;
   call_count = 0;
 
   uorb::PublicationData<uorb::msg::orb_test_large> pub;
