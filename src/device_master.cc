@@ -27,21 +27,17 @@ orb_err uorb::DeviceMaster::CreateAdvertiser(const orb_metadata &meta, unsigned 
   // - Single instance device
   // - Unregistered device
   do {
-    device_node = GetDeviceNodeLocked(meta, static_cast<uint8_t>(group_tries));
+    device_node = static_cast<DeviceNode *>(meta.instances[group_tries].load(std::memory_order_relaxed));
     if (device_node && (!device_node->publisher_count() || is_single_instance)) {
       device_node->add_publisher();
       break;  // Find a unadvertised device or single instance device
     }
 
     if (!device_node) {
-      void *raw = base::Allocator::Alloc(sizeof(DeviceNode));
-      if (!raw) {
+      device_node = CreateNodeLocked(meta, static_cast<uint8_t>(group_tries), true);
+      if (!device_node) {
         return ORB_ERR_NO_MEM;
       }
-      device_node = new (raw) DeviceNode(meta, static_cast<uint8_t>(group_tries));
-      device_node->add_publisher();
-      node_list_.push_front(*device_node);
-      meta.instances[group_tries].store(device_node, std::memory_order_release);
       break;  // Create new device
     }
     group_tries++;
@@ -111,11 +107,19 @@ size_t uorb::DeviceMaster::ForEachTopic(orb_topic_visitor_fn visitor, void *ctx)
   return visited;
 }
 
-uorb::DeviceNode *uorb::DeviceMaster::GetDeviceNodeLocked(const orb_metadata &meta, uint8_t instance) const {
-  if (instance >= ORB_MULTI_MAX_INSTANCES) {
+uorb::DeviceNode *uorb::DeviceMaster::CreateNodeLocked(const orb_metadata &meta, uint8_t instance,
+                                                       bool add_initial_publisher) {
+  void *raw = base::Allocator::Alloc(sizeof(DeviceNode));
+  if (!raw) {
     return nullptr;
   }
-  return static_cast<DeviceNode *>(meta.instances[instance].load(std::memory_order_relaxed));
+  auto *node = new (raw) DeviceNode(meta, instance);
+  if (add_initial_publisher) {
+    node->add_publisher();
+  }
+  node_list_.push_front(*node);
+  meta.instances[instance].store(node, std::memory_order_release);
+  return node;
 }
 
 orb_err uorb::DeviceMaster::OpenDeviceNode(const orb_metadata &meta, unsigned int instance, DeviceNode **out) {
@@ -132,20 +136,17 @@ orb_err uorb::DeviceMaster::OpenDeviceNode(const orb_metadata &meta, unsigned in
 
   base::LockGuard<base::Mutex> lg(lock_);
 
-  device_node = GetDeviceNodeLocked(meta, static_cast<uint8_t>(instance));
+  device_node = static_cast<DeviceNode *>(meta.instances[instance].load(std::memory_order_relaxed));
   if (device_node) {
     *out = device_node;
     return ORB_OK;
   }
 
-  void *raw = base::Allocator::Alloc(sizeof(DeviceNode));
-  if (!raw) {
+  device_node = CreateNodeLocked(meta, static_cast<uint8_t>(instance));
+  if (!device_node) {
     return ORB_ERR_NO_MEM;
   }
-  device_node = new (raw) DeviceNode(meta, static_cast<uint8_t>(instance));
 
-  node_list_.push_front(*device_node);
-  meta.instances[instance].store(device_node, std::memory_order_release);
   *out = device_node;
   return ORB_OK;
 }

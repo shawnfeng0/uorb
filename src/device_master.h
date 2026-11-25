@@ -46,14 +46,9 @@ class uorb::DeviceMaster {
   DeviceNode *GetDeviceNode(const orb_metadata &meta, uint8_t instance) const;
 
  private:
-  /**
-   * Find a node give its name.
-   * lock_ must already be held when calling this.
-   * @return node if exists, nullptr otherwise
-   */
-  DeviceNode *GetDeviceNodeLocked(const orb_metadata &meta, uint8_t instance) const;
+  DeviceNode *CreateNodeLocked(const orb_metadata &meta, uint8_t instance,
+                               bool add_initial_publisher = false);
 
-  // Private constructor, uorb::Manager takes care of its creation
   DeviceMaster() = default;
   ~DeviceMaster() = default;
 

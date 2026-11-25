@@ -59,26 +59,19 @@ class DeviceNode {
 
   void add_subscriber();
   void remove_subscriber();
-  uint16_t subscriber_count() const {
+  uint8_t subscriber_count() const {
     const uint32_t c = subscriber_count_.load(std::memory_order_acquire);
-    return static_cast<uint16_t>(c > kMaxCounterValue ? kMaxCounterValue : c);
+    return static_cast<uint8_t>(c > kMaxCounterValue ? kMaxCounterValue : c);
   }
   void mark_untracked_subscriber();
 
   void add_publisher();
   void remove_publisher();
-  uint16_t publisher_count() const {
+  uint8_t publisher_count() const {
     const uint32_t c = publisher_count_.load(std::memory_order_acquire);
-    return static_cast<uint16_t>(c > kMaxCounterValue ? kMaxCounterValue : c);
+    return static_cast<uint8_t>(c > kMaxCounterValue ? kMaxCounterValue : c);
   }
   void mark_untracked_publisher();
-
-  // Whether meta and instance are the same as the current one
-  inline bool IsSameWith(const orb_metadata &meta, uint8_t instance) const {
-    return IsSameWith(meta) && (instance_ == instance);
-  }
-
-  inline bool IsSameWith(const orb_metadata &meta) const { return &meta_ == &meta; }
 
   // add item to list of work items to schedule on node update
   bool RegisterCallback(detail::CallbackEntry *entry);
@@ -88,10 +81,7 @@ class DeviceNode {
   unsigned updates_available(unsigned generation) const;
   unsigned initial_generation() const;
 
-  unsigned queue_size() const { return queue_size_; }
-
   const orb_metadata &meta() const { return meta_; }
-  const char *name() const { return meta_.o_name; }
   uint8_t instance() const { return instance_; }
 
   /**
@@ -117,9 +107,9 @@ class DeviceNode {
 
   // --- Group 1: Writer-only mutex (isolated from lock-free Copy() readers) ---
   // Lock ordering:
-  //   DeviceMaster::lock_  →  data_lock_     (node lookup)
-  //   callback_lock_       →  NEVER held across user callbacks (out-of-lock dispatch)
-  //   Copy()               →  100% lock-free (never acquires data_lock_ or callback_lock_)
+  //   data_lock_     →  leaf lock (only serializes concurrent writers & lazy allocation)
+  //   callback_lock_ →  leaf lock (NEVER held across user callbacks; out-of-lock dispatch)
+  //   Copy()         →  100% lock-free (never acquires data_lock_ or callback_lock_)
   // data_lock_ only serializes concurrent writers in Publish(). Keeping it at
   // the front prevents writer lock-contention cache traffic from invalidating
   // the reader-hot fields in Group 3 (buffer_, slot geometry, generation_).

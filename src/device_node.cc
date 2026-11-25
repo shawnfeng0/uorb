@@ -504,9 +504,9 @@ void uorb::DeviceNode::mark_untracked_publisher() {
 
 void uorb::DeviceNode::FillStatus(orb_status *status) const {
   status->queue_size = queue_size_;
-  status->subscriber_count = static_cast<uint8_t>(subscriber_count());
+  status->subscriber_count = subscriber_count();
   status->has_untracked_subscriber = has_untracked_subscriber_.load(std::memory_order_acquire);
-  status->publisher_count = static_cast<uint8_t>(publisher_count());
+  status->publisher_count = publisher_count();
   status->has_untracked_publisher = has_untracked_publisher_.load(std::memory_order_acquire);
   status->latest_data_index = generation_.load(std::memory_order_acquire);
   status->last_publish_time_us = last_publish_time_us_.load(std::memory_order_acquire);
