@@ -90,6 +90,12 @@ class EventSource {
   virtual uint32_t timer_period_ms() const { return 0; }
   virtual bool timer_periodic() const { return false; }
 
+  // Returns true if uevent_source_destroy() should delete this instance.
+  // Borrowed EventSource views owned by another object (e.g. a uORB subscriber)
+  // override this to return false so uevent_source_destroy() only clears the
+  // handle without double-freeing the owner.
+  virtual bool is_owned_by_uevent() const { return true; }
+
   // Wake the EventPoll blocked in Wait(). Call this from the event-producing
   // path (e.g., publisher thread). Thread-safe.
   void notify_waiters();

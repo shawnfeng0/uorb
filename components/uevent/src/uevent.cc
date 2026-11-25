@@ -173,7 +173,10 @@ uevent_err uevent_source_create(uevent_source_t *src,
 
 void uevent_source_destroy(uevent_source_t *src) {
   if (!src || !src->_handle) return;
-  delete reinterpret_cast<uevent::EventSource *>(src->_handle);
+  auto *es = reinterpret_cast<uevent::EventSource *>(src->_handle);
+  if (es->is_owned_by_uevent()) {
+    delete es;
+  }
   src->_handle = nullptr;
   src->data.u64 = 0;
 }
