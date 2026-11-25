@@ -7,9 +7,6 @@
 #include <stdint.h>
 #include <time.h>
 
-#include <atomic>
-#include <chrono>
-
 #include "base/mutex.h"
 
 namespace uorb {
@@ -89,20 +86,16 @@ class ConditionVariable {
   // Return true if successful
   template <typename Predicate>
   bool wait_for(Mutex &lock, uint32_t time_ms, Predicate p) {  // NOLINT
-    const auto deadline = std::chrono::steady_clock::now() +
-                          std::chrono::milliseconds(time_ms);
+    const struct timespec deadline =
+        timespec_get_after(get_now_time(), time_ms);
 
     while (!p()) {
-      const auto now = std::chrono::steady_clock::now();
-      if (now >= deadline) {
+      const struct timespec now = get_now_time();
+      if (timespec_ge(now, deadline)) {
         return p();
       }
 
-      const auto remaining_ns =
-          std::chrono::duration_cast<std::chrono::nanoseconds>(deadline - now)
-              .count();
-      uint32_t remaining_ms =
-          static_cast<uint32_t>((remaining_ns + 999999) / 1000000);
+      uint32_t remaining_ms = timespec_diff_ms(now, deadline);
       if (remaining_ms == 0) {
         remaining_ms = 1;
       }
@@ -124,14 +117,15 @@ class ConditionVariable {
     clock_gettime(kWhichClock, &result);
     return result;
   }
+
   static inline struct timespec timespec_get_after(const struct timespec &now,
                                                    uint32_t time_ms) {
-    static const auto kNSecPerS = 1000 * 1000 * 1000;
+    static const int64_t kNSecPerS = 1000000000LL;
 
     struct timespec result = now;
 
     result.tv_sec += time_ms / 1000;
-    result.tv_nsec += (time_ms % 1000) * 1000 * 1000;
+    result.tv_nsec += static_cast<long>((time_ms % 1000) * 1000000LL);
 
     if (result.tv_nsec >= kNSecPerS) {
       result.tv_sec += result.tv_nsec / kNSecPerS;
@@ -139,6 +133,21 @@ class ConditionVariable {
     }
 
     return result;
+  }
+
+  static inline bool timespec_ge(const struct timespec &a,
+                                 const struct timespec &b) {
+    if (a.tv_sec != b.tv_sec) return a.tv_sec > b.tv_sec;
+    return a.tv_nsec >= b.tv_nsec;
+  }
+
+  static inline uint32_t timespec_diff_ms(const struct timespec &a,
+                                          const struct timespec &b) {
+    const int64_t diff_ns =
+        static_cast<int64_t>(b.tv_sec - a.tv_sec) * 1000000000LL +
+        static_cast<int64_t>(b.tv_nsec - a.tv_nsec);
+    if (diff_ns <= 0) return 0;
+    return static_cast<uint32_t>((diff_ns + 999999LL) / 1000000LL);
   }
 
   pthread_cond_t cond_{};
