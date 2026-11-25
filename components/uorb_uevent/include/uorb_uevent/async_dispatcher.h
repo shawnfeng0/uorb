@@ -18,11 +18,13 @@
 #ifdef __cplusplus
 
 #include <pthread.h>
+#include <sched.h>
 #include <uevent/uevent.h>
 #include <uorb/uorb.h>
 
 #include <atomic>
 #include <cstdint>
+#include <cstring>
 #include <new>
 #include <type_traits>
 #include <utility>
@@ -52,6 +54,21 @@ class AsyncDispatcher {
  public:
   using Token = uint64_t;
   static constexpr Token kInvalidToken = 0;
+
+  /// Optional POSIX worker thread configuration passed to Start(const ThreadConfig &).
+  struct ThreadConfig {
+    const char *name{nullptr};  ///< Optional thread name (truncated to 15 chars on Linux/macOS)
+    size_t stack_size{0};       ///< Stack size in bytes (0 = OS default)
+    int sched_policy{-1};       ///< <0 = inherit; otherwise e.g. SCHED_OTHER / SCHED_FIFO / SCHED_RR
+    int sched_priority{0};      ///< Priority used when sched_policy >= 0
+  };
+
+  /// Per-subscription queue consumption policy when the worker wakes up.
+  enum class ConsumePolicy : uint8_t {
+    kSingle,      ///< Default: copy at most 1 sample per wakeup (fair across topics)
+    kLatestOnly,  ///< Drain backlog and invoke callback once with the newest sample
+    kDrainAll,    ///< Drain queued samples (bounded per turn) and invoke callback for each
+  };
 
   /// Move-only RAII subscription guard that automatically unsubscribes on destruction.
   /// Must not outlive the AsyncDispatcher that created it.
@@ -158,10 +175,14 @@ class AsyncDispatcher {
 
   explicit operator bool() const { return base_._handle != nullptr; }
 
-  /// Start the background worker thread. Idempotent (returns true if already started).
+  /// Start the background worker thread with default POSIX attributes.
+  bool Start() { return Start(ThreadConfig{}); }
+
+  /// Start the background worker thread with custom thread configuration.
+  /// Idempotent (returns true if already started).
   /// Thread-safe: serializes with concurrent Stop() calls and reclaims a worker
   /// that previously exited via self-Stop() before spawning a new thread.
-  bool Start() {
+  bool Start(const ThreadConfig &config) {
     if (!base_._handle) return false;
 
     pthread_mutex_lock(&mu_);
@@ -184,8 +205,45 @@ class AsyncDispatcher {
       pthread_cond_broadcast(&done_cv_);
     }
 
+    worker_name_[0] = '\0';
+    if (config.name && config.name[0] != '\0') {
+      std::strncpy(worker_name_, config.name, sizeof(worker_name_) - 1);
+      worker_name_[sizeof(worker_name_) - 1] = '\0';
+    }
+
+    pthread_attr_t attr;
+    const bool attr_ok = (pthread_attr_init(&attr) == 0);
+    if (!attr_ok) {
+      pthread_mutex_unlock(&mu_);
+      return false;
+    }
+
+    bool attr_configured = true;
+    if (config.stack_size > 0) {
+      if (pthread_attr_setstacksize(&attr, config.stack_size) != 0) {
+        attr_configured = false;
+      }
+    }
+    if (attr_configured && config.sched_policy >= 0) {
+      struct sched_param param{};
+      param.sched_priority = config.sched_priority;
+      if (pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED) != 0 ||
+          pthread_attr_setschedpolicy(&attr, config.sched_policy) != 0 ||
+          pthread_attr_setschedparam(&attr, &param) != 0) {
+        attr_configured = false;
+      }
+    }
+
+    if (!attr_configured) {
+      pthread_attr_destroy(&attr);
+      pthread_mutex_unlock(&mu_);
+      return false;
+    }
+
     stop_requested_.store(false, std::memory_order_release);
-    if (pthread_create(&worker_tid_, nullptr, &AsyncDispatcher::WorkerEntry, this) != 0) {
+    const int create_rc = pthread_create(&worker_tid_, &attr, &AsyncDispatcher::WorkerEntry, this);
+    pthread_attr_destroy(&attr);
+    if (create_rc != 0) {
       pthread_mutex_unlock(&mu_);
       return false;
     }
@@ -246,7 +304,8 @@ class AsyncDispatcher {
   /// from inside another dispatched callback.
   /// Returns kInvalidToken on failure.
   template <const orb_metadata &meta, typename Callback>
-  Token Subscribe(Callback &&cb, unsigned instance = 0) {
+  Token Subscribe(Callback &&cb, unsigned instance = 0,
+                  ConsumePolicy policy = ConsumePolicy::kSingle) {
     if (!base_._handle) return kInvalidToken;
 
     orb_subscriber_t sub = ORB_SUBSCRIBER_INITIALIZER;
@@ -262,8 +321,8 @@ class AsyncDispatcher {
 
     using MsgType = typename msg::TypeMap<meta>::type;
     using Callable = typename std::decay<Callback>::type;
-    auto *entry =
-        new (std::nothrow) TypedEntry<MsgType, Callable>(sub, source, std::forward<Callback>(cb));
+    auto *entry = new (std::nothrow)
+        TypedEntry<MsgType, Callable>(sub, source, policy, std::forward<Callback>(cb));
     if (!entry) {
       uorb_subscriber_destroy_source(&source);
       orb_subscriber_destroy(&sub);
@@ -293,8 +352,9 @@ class AsyncDispatcher {
 
   /// Convenience wrapper around Subscribe() returning a move-only RAII ScopedSubscription.
   template <const orb_metadata &meta, typename Callback>
-  ScopedSubscription SubscribeScoped(Callback &&cb, unsigned instance = 0) {
-    const Token tok = Subscribe<meta>(std::forward<Callback>(cb), instance);
+  ScopedSubscription SubscribeScoped(Callback &&cb, unsigned instance = 0,
+                                     ConsumePolicy policy = ConsumePolicy::kSingle) {
+    const Token tok = Subscribe<meta>(std::forward<Callback>(cb), instance, policy);
     return ScopedSubscription(this, tok);
   }
 
@@ -318,6 +378,7 @@ class AsyncDispatcher {
     if (entry->in_callback) {
       if (state_ != WorkerState::kStopped && pthread_equal(pthread_self(), worker_tid_)) {
         entry->pending_destroy = true;
+        entry->stop_drain.store(true, std::memory_order_release);
         defer_destroy = true;
       } else {
         entry->waiting_unsubscribe = true;
@@ -336,31 +397,70 @@ class AsyncDispatcher {
   }
 
  private:
+  static constexpr uint32_t kMaxDrainIterations = 64u;
+
   struct EntryBase {
-    EntryBase(orb_subscriber_t s, uevent_source_t src) : sub(s), source(src) {}
+    EntryBase(orb_subscriber_t s, uevent_source_t src, ConsumePolicy p)
+        : sub(s), source(src), policy(p) {}
     virtual ~EntryBase() = default;
-    virtual void Dispatch() = 0;
+    virtual void Dispatch(const std::atomic<bool> &stop_requested) = 0;
 
     orb_subscriber_t sub;
     uevent_source_t source;
     Token token{kInvalidToken};
     EntryBase *next{nullptr};
+    ConsumePolicy policy{ConsumePolicy::kSingle};
     bool in_callback{false};
     bool pending_destroy{false};
     bool waiting_unsubscribe{false};
+    std::atomic<bool> stop_drain{false};
   };
 
   template <typename MsgType, typename Callable>
   struct TypedEntry final : EntryBase {
     template <typename G>
-    TypedEntry(orb_subscriber_t s, uevent_source_t src, G &&g)
-        : EntryBase(s, src), cb(std::forward<G>(g)) {}
+    TypedEntry(orb_subscriber_t s, uevent_source_t src, ConsumePolicy p, G &&g)
+        : EntryBase(s, src, p), cb(std::forward<G>(g)) {}
 
-    void Dispatch() override {
-      if (orb_subscriber_check_update(&sub)) {
-        MsgType msg;
-        if (orb_subscriber_copy(&sub, &msg) == ORB_OK) {
-          cb(msg);
+    void Dispatch(const std::atomic<bool> &stop_requested) override {
+      switch (policy) {
+        case ConsumePolicy::kSingle: {
+          if (orb_subscriber_check_update(&sub)) {
+            MsgType msg;
+            if (orb_subscriber_copy(&sub, &msg) == ORB_OK) {
+              cb(msg);
+            }
+          }
+          break;
+        }
+        case ConsumePolicy::kLatestOnly: {
+          MsgType msg;
+          bool has_msg = false;
+          for (uint32_t i = 0; i < kMaxDrainIterations && orb_subscriber_check_update(&sub); ++i) {
+            if (orb_subscriber_copy(&sub, &msg) == ORB_OK) {
+              has_msg = true;
+            } else {
+              break;
+            }
+          }
+          if (has_msg) {
+            cb(msg);
+          }
+          break;
+        }
+        case ConsumePolicy::kDrainAll: {
+          for (uint32_t i = 0; i < kMaxDrainIterations && orb_subscriber_check_update(&sub); ++i) {
+            MsgType msg;
+            if (orb_subscriber_copy(&sub, &msg) != ORB_OK) {
+              break;
+            }
+            cb(msg);
+            if (stop_requested.load(std::memory_order_acquire) ||
+                stop_drain.load(std::memory_order_acquire)) {
+              break;
+            }
+          }
+          break;
         }
       }
     }
@@ -374,9 +474,19 @@ class AsyncDispatcher {
   }
 
   void WorkerLoop() {
-    // Synchronize with Start() so worker_tid_ and state_ are visible.
+    // Synchronize with Start() so worker_tid_, state_, and worker_name_ are visible.
     pthread_mutex_lock(&mu_);
+    char name_copy[sizeof(worker_name_)];
+    std::memcpy(name_copy, worker_name_, sizeof(worker_name_));
     pthread_mutex_unlock(&mu_);
+
+    if (name_copy[0] != '\0') {
+#if defined(__APPLE__)
+      pthread_setname_np(name_copy);
+#elif defined(__linux__)
+      pthread_setname_np(pthread_self(), name_copy);
+#endif
+    }
 
     uevent_source_t ready[32];
     for (;;) {
@@ -409,7 +519,7 @@ class AsyncDispatcher {
           continue;
         }
 
-        entry->Dispatch();
+        entry->Dispatch(stop_requested_);
 
         bool destroy_now = false;
         pthread_mutex_lock(&mu_);
@@ -486,6 +596,7 @@ class AsyncDispatcher {
   EntryBase *entries_head_{nullptr};
   Token next_token_{0};
   WorkerState state_{WorkerState::kStopped};
+  char worker_name_[16]{};
   std::atomic<bool> stop_requested_{false};
   std::atomic<bool> running_{false};
 };

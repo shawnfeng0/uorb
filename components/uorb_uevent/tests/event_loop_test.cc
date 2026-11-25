@@ -12,12 +12,15 @@
 #include <uorb/topics/orb_test.h>
 #include <uorb/topics/orb_test_large.h>
 #include <uorb/topics/orb_test_medium.h>
+#include <uorb/topics/orb_test_queue_poll.h>
 #include <uorb/topics/orb_test_volatile.h>
 
 #include <atomic>
 #include <cerrno>
 #include <chrono>
+#include <cstring>
 #include <thread>
+#include <vector>
 
 namespace uORBTest {
 
@@ -793,6 +796,120 @@ TEST(AsyncDispatcherTest, ScopedSubscriptionAutoUnsubscribesMoveAndRelease) {
   EXPECT_EQ(released_calls.load(), 1);
   EXPECT_TRUE(dispatcher.Unsubscribe(raw_tok));
   dispatcher.Stop();
+}
+
+TEST(AsyncDispatcherTest, ThreadConfigAndConsumePolicies) {
+  // 1) ThreadConfig: custom thread name and stack size.
+  {
+    uorb::AsyncDispatcher dispatcher;
+    ASSERT_TRUE(dispatcher);
+
+    std::atomic<bool> checked_name{false};
+    char observed_name[32]{};
+    auto guard = dispatcher.SubscribeScoped<uorb::msg::orb_test_volatile>(
+        [&](const orb_test_volatile_s &) {
+#if defined(__APPLE__) || defined(__linux__)
+          pthread_getname_np(pthread_self(), observed_name, sizeof(observed_name));
+#endif
+          checked_name.store(true, std::memory_order_release);
+        });
+    ASSERT_TRUE(guard);
+
+    uorb::AsyncDispatcher::ThreadConfig cfg;
+    cfg.name = "uorb_worker";
+    cfg.stack_size = 256 * 1024;
+    ASSERT_TRUE(dispatcher.Start(cfg));
+
+    orb_test_volatile_s m{};
+    m.val = 7;
+    ASSERT_EQ(uorb::publish<uorb::msg::orb_test_volatile>(m), ORB_OK);
+
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    while (!checked_name.load(std::memory_order_acquire) &&
+           std::chrono::steady_clock::now() < deadline) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    EXPECT_TRUE(checked_name.load());
+#if defined(__APPLE__) || defined(__linux__)
+    EXPECT_STREQ(observed_name, "uorb_worker");
+#endif
+    dispatcher.Stop();
+  }
+
+  // 2) ConsumePolicy::kLatestOnly vs kDrainAll on a queued topic (orb_test_queue_poll).
+  {
+    uorb::AsyncDispatcher dispatcher;
+    ASSERT_TRUE(dispatcher);
+
+    // Subscribe BEFORE Start() so queued samples accumulate cleanly before the first wakeup.
+    std::atomic<int> latest_calls{0};
+    std::atomic<int> latest_val{0};
+    auto latest_guard = dispatcher.SubscribeScoped<uorb::msg::orb_test_queue_poll>(
+        [&](const orb_test_queue_poll_s &msg) {
+          latest_val.store(msg.val, std::memory_order_release);
+          latest_calls.fetch_add(1, std::memory_order_acq_rel);
+        },
+        0, uorb::AsyncDispatcher::ConsumePolicy::kLatestOnly);
+    ASSERT_TRUE(latest_guard);
+
+    std::vector<int> drained_vals;
+    std::atomic<int> drain_count{0};
+    auto drain_guard = dispatcher.SubscribeScoped<uorb::msg::orb_test_queue_poll>(
+        [&](const orb_test_queue_poll_s &msg) {
+          drained_vals.push_back(msg.val);
+          drain_count.fetch_add(1, std::memory_order_acq_rel);
+        },
+        0, uorb::AsyncDispatcher::ConsumePolicy::kDrainAll);
+    ASSERT_TRUE(drain_guard);
+
+    // Self-unsubscribe mid-drain under kDrainAll must stop immediately after 1st sample.
+    std::atomic<int> stop_drain_calls{0};
+    std::atomic<uorb::AsyncDispatcher::Token> stop_drain_tok{
+        uorb::AsyncDispatcher::kInvalidToken};
+    const auto tok = dispatcher.Subscribe<uorb::msg::orb_test_queue_poll>(
+        [&](const orb_test_queue_poll_s &) {
+          stop_drain_calls.fetch_add(1, std::memory_order_acq_rel);
+          dispatcher.Unsubscribe(stop_drain_tok.load(std::memory_order_acquire));
+        },
+        0, uorb::AsyncDispatcher::ConsumePolicy::kDrainAll);
+    ASSERT_NE(tok, uorb::AsyncDispatcher::kInvalidToken);
+    stop_drain_tok.store(tok, std::memory_order_release);
+
+    // Publish 4 samples into the queue before starting the worker.
+    for (int v = 1; v <= 4; ++v) {
+      orb_test_queue_poll_s q{};
+      q.val = v;
+      ASSERT_EQ(uorb::publish<uorb::msg::orb_test_queue_poll>(q), ORB_OK);
+    }
+
+    ASSERT_TRUE(dispatcher.Start());
+
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    while ((latest_val.load(std::memory_order_acquire) != 4 ||
+            drain_count.load(std::memory_order_acquire) < 4 ||
+            stop_drain_calls.load(std::memory_order_acquire) < 1) &&
+           std::chrono::steady_clock::now() < deadline) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+
+    dispatcher.Stop();
+
+    // kLatestOnly skips intermediate backlog and delivers the newest sample (4) in 1 call.
+    EXPECT_EQ(latest_val.load(), 4);
+    EXPECT_EQ(latest_calls.load(), 1);
+
+    // kDrainAll delivers every queued sample in FIFO order (tail of drained_vals is 1,2,3,4;
+    // note durable topic may have 1 pre-existing sample from an earlier test before 1..4).
+    ASSERT_GE(drained_vals.size(), 4u);
+    const size_t base_idx = drained_vals.size() - 4u;
+    EXPECT_EQ(drained_vals[base_idx + 0], 1);
+    EXPECT_EQ(drained_vals[base_idx + 1], 2);
+    EXPECT_EQ(drained_vals[base_idx + 2], 3);
+    EXPECT_EQ(drained_vals[base_idx + 3], 4);
+
+    // Self-unsubscribe stopped kDrainAll immediately on the first invocation.
+    EXPECT_EQ(stop_drain_calls.load(), 1);
+  }
 }
 
 }  // namespace uORBTest
