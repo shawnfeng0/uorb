@@ -20,7 +20,7 @@ void *thread_publisher(void *arg) {
     snprintf((char *)example_string.str, EXAMPLE_STRING_STRING_LENGTH, "%d: %s",
              i, "This is a string message.");
 
-    if (orb_publisher_publish(&pub_example_string, &example_string) != ORB_OK) {
+    if (orb_publisher_publish(pub_example_string, &example_string) != ORB_OK) {
       printf("Publish error\n");
     }
     usleep(1 * 1000 * 1000);
@@ -40,7 +40,7 @@ void *thread_subscriber(void *unused) {
   uevent_t poll = UEVENT_INITIALIZER;
   uevent_create(&poll);
   uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
-  uorb_subscriber_create_source(&src, &sub_example_string);
+  uorb_subscriber_create_source(&src, sub_example_string);
   uevent_add(&poll, &src, 0);
   int timeout = 2000;
 
@@ -48,7 +48,7 @@ void *thread_subscriber(void *unused) {
     uevent_source_t ready[1] = {UEVENT_SOURCE_INITIALIZER};
     if (0 < uevent_loop(&poll, ready, 1, timeout)) {
       struct example_string_s example_string;
-      orb_subscriber_copy(&sub_example_string, &example_string);
+      orb_subscriber_copy(sub_example_string, &example_string);
       printf("Receive msg: \"%s\"\n", example_string.str);
     } else {
       printf("Got no data within %d milliseconds\n", timeout);

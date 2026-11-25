@@ -271,12 +271,11 @@ orb_err orb_publisher_create(orb_publisher_t *pub, const struct orb_metadata *me
 orb_err orb_publisher_create_multi(orb_publisher_t *pub, const struct orb_metadata *meta, unsigned int *instance);
 
 /**
- * Destroy a publication handle.
+ * Destroy a publication handle (idempotent; NULL-safe).
  *
- * @param pub Pointer to the publication handle; it will be destroyed and set to NULL.
- * @return ORB_OK on success
+ * @param pub Pointer to the publication handle; its _handle will be reset to NULL.
  */
-orb_err orb_publisher_destroy(orb_publisher_t *pub);
+void orb_publisher_destroy(orb_publisher_t *pub);
 
 /**
  * Publish new data to a topic.
@@ -285,12 +284,12 @@ orb_err orb_publisher_destroy(orb_publisher_t *pub);
  * will be notified.  Subscribers that are not waiting can check the topic
  * for updates using orb_subscriber_check_update().
  *
- * @param pub   The publication handle.
+ * @param pub   The publication handle (passed by value).
  * @param data  A pointer to the data to be published.
  *              The length must correspond to the topic structure.
  * @return ORB_OK on success, error code otherwise
  */
-orb_err orb_publisher_publish(orb_publisher_t *pub, const void *data);
+orb_err orb_publisher_publish(orb_publisher_t pub, const void *data);
 
 /**
  * Publish data on topic instance 0 without creating a publication handle.
@@ -325,7 +324,7 @@ static inline orb_err orb_publisher_publish_auto(const struct orb_metadata *meta
       return err;
     }
   }
-  return orb_publisher_publish(pub, data);
+  return orb_publisher_publish(*pub, data);
 }
 
 /**
@@ -377,12 +376,11 @@ orb_err orb_subscriber_create(orb_subscriber_t *sub, const struct orb_metadata *
 orb_err orb_subscriber_create_multi(orb_subscriber_t *sub, const struct orb_metadata *meta, unsigned instance);
 
 /**
- * Destroy a subscription handle.
+ * Destroy a subscription handle (idempotent; NULL-safe).
  *
- * @param sub Pointer to the subscription handle; it will be destroyed and set to NULL.
- * @return ORB_OK on success
+ * @param sub Pointer to the subscription handle; its _handle will be reset to NULL.
  */
-orb_err orb_subscriber_destroy(orb_subscriber_t *sub);
+void orb_subscriber_destroy(orb_subscriber_t *sub);
 
 /**
  * Fetch data from a topic.
@@ -392,12 +390,12 @@ orb_err orb_subscriber_destroy(orb_subscriber_t *sub);
  * or orb_subscriber_check_update() returns indicating that an update is available, this
  * call must be used to update the subscription.
  *
- * @param sub     A handle returned from orb_subscriber_create.
+ * @param sub     A handle returned from orb_subscriber_create (passed by value).
  * @param buffer  Pointer to the buffer receiving the data.
  *                The length must correspond to the topic structure.
  * @return ORB_OK on success, error code otherwise
  */
-orb_err orb_subscriber_copy(orb_subscriber_t *sub, void *buffer);
+orb_err orb_subscriber_copy(orb_subscriber_t sub, void *buffer);
 
 /**
  * Copy data from topic instance 0 without creating a subscription handle.
@@ -426,7 +424,7 @@ orb_err orb_subscriber_copy_once(const struct orb_metadata *meta, void *buffer);
  * @return true if the topic has been updated since the last time it was copied
  * using this handle.
  */
-bool orb_subscriber_check_update(orb_subscriber_t *sub);
+bool orb_subscriber_check_update(orb_subscriber_t sub);
 
 /**
  * Callback context union, similar to POSIX union sigval.
@@ -476,16 +474,16 @@ typedef void (*orb_subscriber_callback_fn)(const void *msg, orb_callback_ctx ctx
  * @param ctx user context (pointer or integer) passed to cb
  * @return ORB_OK on success, error code otherwise
  */
-orb_err orb_subscriber_set_callback(orb_subscriber_t *sub, orb_subscriber_callback_fn cb,
+orb_err orb_subscriber_set_callback(orb_subscriber_t sub, orb_subscriber_callback_fn cb,
                                     orb_callback_ctx ctx);
 
 /**
  * Remove a previously registered publish callback.
  *
- * @param sub subscription handle
+ * @param sub subscription handle (passed by value)
  * @return ORB_OK on success, error code otherwise
  */
-orb_err orb_subscriber_clear_callback(orb_subscriber_t *sub);
+orb_err orb_subscriber_clear_callback(orb_subscriber_t sub);
 
 /**
  * Check if a topic has already been created and published (advertised)

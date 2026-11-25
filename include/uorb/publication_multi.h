@@ -34,7 +34,7 @@ class PublicationMulti {
       if (err != ORB_OK) return err;
     }
 
-    return orb_publisher_publish(&handle_, &data);
+    return orb_publisher_publish(handle_, &data);
   }
 
   unsigned instance() const { return instance_; }

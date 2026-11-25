@@ -33,12 +33,14 @@ class SubscriptionBase {
     return orb_subscriber_create_multi(&handle_, &meta, instance_) == ORB_OK;
   }
 
-  orb_subscriber_t *handle() { return Subscribe() ? &handle_ : nullptr; }
+  orb_subscriber_t handle() {
+    return Subscribe() ? handle_ : orb_subscriber_t{nullptr};
+  }
 
   /// Register a synchronous publish callback on this subscription.
   orb_err SetCallback(orb_subscriber_callback_fn cb, orb_callback_ctx ctx) {
-    auto *h = handle();
-    if (!h) {
+    auto h = handle();
+    if (!h._handle) {
       return ORB_ERR_NO_MEM;
     }
     return orb_subscriber_set_callback(h, cb, ctx);
@@ -49,11 +51,11 @@ class SubscriptionBase {
     if (!handle_._handle) {
       return ORB_OK;
     }
-    return orb_subscriber_clear_callback(&handle_);
+    return orb_subscriber_clear_callback(handle_);
   }
 
   /// Check if there is a new update.
-  bool Updated() { return Subscribe() && orb_subscriber_check_update(&handle_); }
+  bool Updated() { return Subscribe() && orb_subscriber_check_update(handle_); }
 
   /// Update the struct if new data is available.
   /// Dispatches to Derived::Updated() and Derived::Copy() via CRTP.
@@ -64,7 +66,7 @@ class SubscriptionBase {
   bool Update(ValueType &dst) { return Update(&dst); }
 
   /// Copy the struct unconditionally.
-  bool Copy(ValueType *dst) { return Subscribe() && orb_subscriber_copy(&handle_, dst) == ORB_OK; }
+  bool Copy(ValueType *dst) { return Subscribe() && orb_subscriber_copy(handle_, dst) == ORB_OK; }
   bool Copy(ValueType &dst) { return Copy(&dst); }
 
  protected:

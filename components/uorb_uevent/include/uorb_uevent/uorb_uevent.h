@@ -28,7 +28,7 @@ extern "C" {
  * @param sub uORB subscription handle
  * @return 0 on success, -1 on error
  */
-uevent_err uorb_subscriber_create_source(uevent_source_t *src, orb_subscriber_t *sub);
+uevent_err uorb_subscriber_create_source(uevent_source_t *src, orb_subscriber_t sub);
 
 /**
  * Destroy an event source created by uorb_subscriber_create_source().
@@ -92,7 +92,7 @@ class EventLoop {
     if (orb_subscriber_create_multi(&sub, &meta, instance) != ORB_OK) return kInvalidToken;
 
     uevent_source_t source = UEVENT_SOURCE_INITIALIZER;
-    if (uorb_subscriber_create_source(&source, &sub) != 0) {
+    if (uorb_subscriber_create_source(&source, sub) != 0) {
       orb_subscriber_destroy(&sub);
       return kInvalidToken;
     }
@@ -228,9 +228,9 @@ class EventLoop {
         : EntryBase(s, src), cb(std::forward<G>(g)) {}
 
     void Dispatch() override {
-      if (orb_subscriber_check_update(&sub)) {
+      if (orb_subscriber_check_update(sub)) {
         MsgType msg;
-        if (orb_subscriber_copy(&sub, &msg) == ORB_OK) {
+        if (orb_subscriber_copy(sub, &msg) == ORB_OK) {
           cb(msg);
         }
       }

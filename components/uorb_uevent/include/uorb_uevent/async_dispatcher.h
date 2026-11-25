@@ -31,7 +31,7 @@
 
 #ifndef UORB_UEVENT_API_DECLARED
 extern "C" {
-uevent_err uorb_subscriber_create_source(uevent_source_t *src, orb_subscriber_t *sub);
+uevent_err uorb_subscriber_create_source(uevent_source_t *src, orb_subscriber_t sub);
 void uorb_subscriber_destroy_source(uevent_source_t *src);
 }
 #endif
@@ -314,7 +314,7 @@ class AsyncDispatcher {
     }
 
     uevent_source_t source = UEVENT_SOURCE_INITIALIZER;
-    if (uorb_subscriber_create_source(&source, &sub) != 0) {
+    if (uorb_subscriber_create_source(&source, sub) != 0) {
       orb_subscriber_destroy(&sub);
       return kInvalidToken;
     }
@@ -470,9 +470,9 @@ class AsyncDispatcher {
     void Dispatch(const std::atomic<bool> &stop_requested) override {
       switch (policy) {
         case ConsumePolicy::kSingle: {
-          if (orb_subscriber_check_update(&sub)) {
+          if (orb_subscriber_check_update(sub)) {
             MsgType msg;
-            if (orb_subscriber_copy(&sub, &msg) == ORB_OK) {
+            if (orb_subscriber_copy(sub, &msg) == ORB_OK) {
               cb(msg);
             }
           }
@@ -481,8 +481,8 @@ class AsyncDispatcher {
         case ConsumePolicy::kLatestOnly: {
           MsgType msg;
           bool has_msg = false;
-          for (uint32_t i = 0; i < kMaxDrainIterations && orb_subscriber_check_update(&sub); ++i) {
-            if (orb_subscriber_copy(&sub, &msg) == ORB_OK) {
+          for (uint32_t i = 0; i < kMaxDrainIterations && orb_subscriber_check_update(sub); ++i) {
+            if (orb_subscriber_copy(sub, &msg) == ORB_OK) {
               has_msg = true;
             } else {
               break;
@@ -494,9 +494,9 @@ class AsyncDispatcher {
           break;
         }
         case ConsumePolicy::kDrainAll: {
-          for (uint32_t i = 0; i < kMaxDrainIterations && orb_subscriber_check_update(&sub); ++i) {
+          for (uint32_t i = 0; i < kMaxDrainIterations && orb_subscriber_check_update(sub); ++i) {
             MsgType msg;
-            if (orb_subscriber_copy(&sub, &msg) != ORB_OK) {
+            if (orb_subscriber_copy(sub, &msg) != ORB_OK) {
               break;
             }
             cb(msg);

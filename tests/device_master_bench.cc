@@ -101,7 +101,7 @@ static void run_subscribe_lookup(int num_threads, int duration_ms) {
     while (running.load(std::memory_order_relaxed)) {
       orb_subscriber_t sub = ORB_SUBSCRIBER_INITIALIZER;
       orb_subscriber_create_multi(&sub, ORB_ID(orb_test), 0);
-      orb_subscriber_check_update(&sub);
+      orb_subscriber_check_update(sub);
       orb_subscriber_destroy(&sub);
       ++ops;
     }
@@ -137,7 +137,7 @@ static void run_publish(int num_threads, int duration_ms) {
     orb_test_s msg{};
     long long ops = 0;
     while (running.load(std::memory_order_relaxed)) {
-      orb_publisher_publish(&pub, &msg);
+      orb_publisher_publish(pub, &msg);
       ++ops;
     }
     total_ops.fetch_add(ops, std::memory_order_relaxed);
@@ -176,7 +176,7 @@ static void run_mixed(int num_threads, int duration_ms) {
     orb_test_s msg{};
     long long ops = 0;
     while (running.load(std::memory_order_relaxed)) {
-      orb_publisher_publish(&pub, &msg);
+      orb_publisher_publish(pub, &msg);
       ++ops;
     }
     pub_ops.fetch_add(ops, std::memory_order_relaxed);
@@ -188,7 +188,7 @@ static void run_mixed(int num_threads, int duration_ms) {
     orb_test_s msg{};
     long long ops = 0;
     while (running.load(std::memory_order_relaxed)) {
-      orb_subscriber_copy(&sub, &msg);
+      orb_subscriber_copy(sub, &msg);
       ++ops;
     }
     sub_ops.fetch_add(ops, std::memory_order_relaxed);
@@ -227,12 +227,12 @@ static void run_uevent_poll_many_subs(
 
   for (int i = 0; i < num_subs; ++i) {
     orb_subscriber_create_multi(&subs[i], ORB_ID(orb_test), 0);
-    uorb_subscriber_create_source(&sources[i], &subs[i]);
+    uorb_subscriber_create_source(&sources[i], subs[i]);
     uevent_add(&poll, &sources[i], 0);
   }
 
   orb_test_s msg{};
-  orb_publisher_publish(&pub, &msg);
+  orb_publisher_publish(pub, &msg);
 
   std::vector<uevent_source_t> ready(num_subs, UEVENT_SOURCE_INITIALIZER);
   const auto t0 = std::chrono::steady_clock::now();
@@ -245,15 +245,15 @@ static void run_uevent_poll_many_subs(
         for (int i = 0; i < n; ++i) {
           for (int j = 0; j < num_subs; ++j) {
             if (ready[i]._handle == sources[j]._handle) {
-              orb_subscriber_copy(&subs[j], &msg);
+              orb_subscriber_copy(subs[j], &msg);
               break;
             }
           }
         }
       } else {
-        orb_subscriber_copy(&subs[0], &msg);
+        orb_subscriber_copy(subs[0], &msg);
       }
-      orb_publisher_publish(&pub, &msg);
+      orb_publisher_publish(pub, &msg);
       ++loops;
       ready_total += n;
     }
@@ -283,16 +283,16 @@ static void run_uevent_poll_blocking(int num_subs, int duration_ms) {
   std::vector<uevent_source_t> sources(num_subs, UEVENT_SOURCE_INITIALIZER);
   for (int i = 0; i < num_subs; ++i) {
     orb_subscriber_create_multi(&subs[i], ORB_ID(orb_test), 0);
-    uorb_subscriber_create_source(&sources[i], &subs[i]);
+    uorb_subscriber_create_source(&sources[i], subs[i]);
     uevent_add(&poll, &sources[i], 0);
   }
 
   // Drain initial state.
   orb_test_s msg{};
-  orb_publisher_publish(&pub, &msg);
+  orb_publisher_publish(pub, &msg);
   std::vector<uevent_source_t> ready(num_subs, UEVENT_SOURCE_INITIALIZER);
   uevent_loop(&poll, ready.data(), num_subs, 0);
-  for (int i = 0; i < num_subs; ++i) orb_subscriber_copy(&subs[i], &msg);
+  for (int i = 0; i < num_subs; ++i) orb_subscriber_copy(subs[i], &msg);
 
   std::atomic<bool> running{true};
 
@@ -300,7 +300,7 @@ static void run_uevent_poll_blocking(int num_subs, int duration_ms) {
     orb_test_s m{};
     while (running.load(std::memory_order_relaxed)) {
       m.val++;
-      orb_publisher_publish(&pub, &m);
+      orb_publisher_publish(pub, &m);
       std::this_thread::yield();
     }
   });
@@ -313,7 +313,7 @@ static void run_uevent_poll_blocking(int num_subs, int duration_ms) {
       for (int i = 0; i < n; ++i) {
         for (int j = 0; j < num_subs; ++j) {
           if (ready[i]._handle == sources[j]._handle) {
-            orb_subscriber_copy(&subs[j], &msg);
+            orb_subscriber_copy(subs[j], &msg);
             break;
           }
         }

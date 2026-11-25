@@ -64,25 +64,23 @@ orb_err orb_publisher_create_multi(orb_publisher_t *pub, const struct orb_metada
   return ORB_OK;
 }
 
-orb_err orb_publisher_destroy(orb_publisher_t *pub) {
+void orb_publisher_destroy(orb_publisher_t *pub) {
   if (!pub || !pub->_handle) {
-    return ORB_ERR_INVALID;
+    return;
   }
 
   auto *dev = reinterpret_cast<uorb::DeviceNode *>(pub->_handle);
   dev->remove_publisher();
 
   pub->_handle = nullptr;
-
-  return ORB_OK;
 }
 
-orb_err orb_publisher_publish(orb_publisher_t *pub, const void *data) {
-  if (!pub || !pub->_handle || !data) {
+orb_err orb_publisher_publish(orb_publisher_t pub, const void *data) {
+  if (!pub._handle || !data) {
     return ORB_ERR_INVALID;
   }
 
-  auto &dev = *reinterpret_cast<uorb::DeviceNode *>(pub->_handle);
+  auto &dev = *reinterpret_cast<uorb::DeviceNode *>(pub._handle);
   return dev.Publish(data) ? ORB_OK : ORB_ERR_NO_MEM;
 }
 
@@ -128,9 +126,9 @@ orb_err orb_subscriber_create_multi(orb_subscriber_t *sub, const struct orb_meta
   return ORB_OK;
 }
 
-orb_err orb_subscriber_destroy(orb_subscriber_t *sub) {
+void orb_subscriber_destroy(orb_subscriber_t *sub) {
   if (!sub || !sub->_handle) {
-    return ORB_ERR_INVALID;
+    return;
   }
 
   auto *r = reinterpret_cast<ReceiverLocal *>(sub->_handle);
@@ -141,15 +139,14 @@ orb_err orb_subscriber_destroy(orb_subscriber_t *sub) {
   }
   delete r;
   sub->_handle = nullptr;
-  return ORB_OK;
 }
 
-orb_err orb_subscriber_copy(orb_subscriber_t *sub, void *buffer) {
-  if (!sub || !sub->_handle || !buffer) {
+orb_err orb_subscriber_copy(orb_subscriber_t sub, void *buffer) {
+  if (!sub._handle || !buffer) {
     return ORB_ERR_INVALID;
   }
 
-  auto &r = *reinterpret_cast<ReceiverLocal *>(sub->_handle);
+  auto &r = *reinterpret_cast<ReceiverLocal *>(sub._handle);
 
   return r.Copy(buffer) ? ORB_OK : ORB_ERR_NO_ENTRY;
 }
@@ -175,22 +172,22 @@ orb_err orb_subscriber_copy_once(const struct orb_metadata *meta, void *buffer) 
   return dev->Copy(buffer, &last_generation_) ? ORB_OK : ORB_ERR_NO_ENTRY;
 }
 
-bool orb_subscriber_check_update(orb_subscriber_t *sub) {
-  if (!sub || !sub->_handle) {
+bool orb_subscriber_check_update(orb_subscriber_t sub) {
+  if (!sub._handle) {
     return false;
   }
 
-  auto &r = *reinterpret_cast<ReceiverLocal *>(sub->_handle);
+  auto &r = *reinterpret_cast<ReceiverLocal *>(sub._handle);
 
   return r.updates_available() > 0;
 }
 
-orb_err orb_subscriber_set_callback(orb_subscriber_t *sub, orb_subscriber_callback_fn cb,
+orb_err orb_subscriber_set_callback(orb_subscriber_t sub, orb_subscriber_callback_fn cb,
                                     orb_callback_ctx ctx) {
-  if (!sub || !sub->_handle || !cb) {
+  if (!sub._handle || !cb) {
     return ORB_ERR_INVALID;
   }
-  auto *r = reinterpret_cast<ReceiverLocal *>(sub->_handle);
+  auto *r = reinterpret_cast<ReceiverLocal *>(sub._handle);
   if (r->callback_registered) {
     return ORB_ERR_BUSY;
   }
@@ -206,11 +203,11 @@ orb_err orb_subscriber_set_callback(orb_subscriber_t *sub, orb_subscriber_callba
   return ORB_OK;
 }
 
-orb_err orb_subscriber_clear_callback(orb_subscriber_t *sub) {
-  if (!sub || !sub->_handle) {
+orb_err orb_subscriber_clear_callback(orb_subscriber_t sub) {
+  if (!sub._handle) {
     return ORB_ERR_INVALID;
   }
-  auto *r = reinterpret_cast<ReceiverLocal *>(sub->_handle);
+  auto *r = reinterpret_cast<ReceiverLocal *>(sub._handle);
   if (!r->callback_registered) {
     return ORB_OK;
   }

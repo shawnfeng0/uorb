@@ -34,7 +34,7 @@ class Publication {
       if (err != ORB_OK) return err;
     }
 
-    return orb_publisher_publish(&handle_, &data);
+    return orb_publisher_publish(handle_, &data);
   }
 
  private:

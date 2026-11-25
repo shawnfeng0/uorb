@@ -22,16 +22,17 @@ TEST(UorbUeventTest, CreateDestroySource) {
   ASSERT_NE(sub._handle, nullptr);
 
   uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
-  ASSERT_EQ(uorb_subscriber_create_source(&src, &sub), 0);
+  ASSERT_EQ(uorb_subscriber_create_source(&src, sub), 0);
   ASSERT_NE(src._handle, nullptr);
 
   uorb_subscriber_destroy_source(&src);
-  EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
+  orb_subscriber_destroy(&sub);
 }
 
 TEST(UorbUeventTest, CreateSourceFromNullSubscriptionFails) {
   uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
-  EXPECT_EQ(uorb_subscriber_create_source(&src, nullptr), UEVENT_ERR_INVALID);
+  orb_subscriber_t empty_sub = ORB_SUBSCRIBER_INITIALIZER;
+  EXPECT_EQ(uorb_subscriber_create_source(&src, empty_sub), UEVENT_ERR_INVALID);
   EXPECT_EQ(src._handle, nullptr);
 }
 
@@ -47,7 +48,7 @@ TEST(UorbUeventTest, SourceAddRemoveLoop) {
   ASSERT_NE(sub._handle, nullptr);
 
   uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
-  ASSERT_EQ(uorb_subscriber_create_source(&src, &sub), 0);
+  ASSERT_EQ(uorb_subscriber_create_source(&src, sub), 0);
   ASSERT_NE(src._handle, nullptr);
 
   uevent_t base = UEVENT_INITIALIZER;
@@ -64,7 +65,7 @@ TEST(UorbUeventTest, SourceAddRemoveLoop) {
 
   uorb_subscriber_destroy_source(&src);
   uevent_destroy(&base);
-  EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
+  orb_subscriber_destroy(&sub);
 }
 
 // ---- Publish triggers source ready ----
@@ -80,12 +81,12 @@ TEST(UorbUeventTest, PublishTriggersReady) {
 
   // Drain initial data
   orb_test_s drain{};
-  for (int i = 0; i < 8 && orb_subscriber_check_update(&sub); ++i) {
-    orb_subscriber_copy(&sub, &drain);
+  for (int i = 0; i < 8 && orb_subscriber_check_update(sub); ++i) {
+    orb_subscriber_copy(sub, &drain);
   }
 
   uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
-  ASSERT_EQ(uorb_subscriber_create_source(&src, &sub), 0);
+  ASSERT_EQ(uorb_subscriber_create_source(&src, sub), 0);
   ASSERT_NE(src._handle, nullptr);
 
   uevent_t base = UEVENT_INITIALIZER;
@@ -100,14 +101,14 @@ TEST(UorbUeventTest, PublishTriggersReady) {
   // Publish
   orb_test_s msg{};
   msg.val = 42;
-  ASSERT_EQ(orb_publisher_publish(&pub, &msg), ORB_OK);
+  ASSERT_EQ(orb_publisher_publish(pub, &msg), ORB_OK);
 
   // Loop should return the source
   ASSERT_EQ(uevent_loop(&base, ready, 1, 100), 1);
   EXPECT_EQ(ready[0]._handle, src._handle);
 
   // Copy data
-  ASSERT_EQ(orb_subscriber_copy(&sub, &msg), ORB_OK);
+  ASSERT_EQ(orb_subscriber_copy(sub, &msg), ORB_OK);
   EXPECT_EQ(msg.val, 42);
 
   // No more data
@@ -116,8 +117,8 @@ TEST(UorbUeventTest, PublishTriggersReady) {
   ASSERT_EQ(uevent_remove(&base, &src), 0);
   uorb_subscriber_destroy_source(&src);
   uevent_destroy(&base);
-  EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
-  EXPECT_EQ(orb_publisher_destroy(&pub), ORB_OK);
+  orb_subscriber_destroy(&sub);
+  orb_publisher_destroy(&pub);
 }
 
 // ---- Publish from another thread wakes blocking loop ----
@@ -133,12 +134,12 @@ TEST(UorbUeventTest, PublishFromThreadWakesBlockingLoop) {
 
   // Drain initial data
   orb_test_s drain{};
-  for (int i = 0; i < 8 && orb_subscriber_check_update(&sub); ++i) {
-    orb_subscriber_copy(&sub, &drain);
+  for (int i = 0; i < 8 && orb_subscriber_check_update(sub); ++i) {
+    orb_subscriber_copy(sub, &drain);
   }
 
   uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
-  ASSERT_EQ(uorb_subscriber_create_source(&src, &sub), 0);
+  ASSERT_EQ(uorb_subscriber_create_source(&src, sub), 0);
   ASSERT_NE(src._handle, nullptr);
 
   uevent_t base = UEVENT_INITIALIZER;
@@ -150,7 +151,7 @@ TEST(UorbUeventTest, PublishFromThreadWakesBlockingLoop) {
     std::this_thread::sleep_for(std::chrono::milliseconds(30));
     orb_test_s msg{};
     msg.val = 99;
-    orb_publisher_publish(&pub, &msg);
+    orb_publisher_publish(pub, &msg);
   });
 
   uevent_source_t ready[1] = {UEVENT_SOURCE_INITIALIZER};
@@ -167,8 +168,8 @@ TEST(UorbUeventTest, PublishFromThreadWakesBlockingLoop) {
   ASSERT_EQ(uevent_remove(&base, &src), 0);
   uorb_subscriber_destroy_source(&src);
   uevent_destroy(&base);
-  EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
-  EXPECT_EQ(orb_publisher_destroy(&pub), ORB_OK);
+  orb_subscriber_destroy(&sub);
+  orb_publisher_destroy(&pub);
 }
 
 // ---- orb_subscriber_set_callback / clear_callback ----
@@ -184,8 +185,8 @@ TEST(UorbUeventTest, SetCallbackReceivesPublish) {
 
   // Drain initial data
   orb_test_s drain{};
-  for (int i = 0; i < 8 && orb_subscriber_check_update(&sub); ++i) {
-    orb_subscriber_copy(&sub, &drain);
+  for (int i = 0; i < 8 && orb_subscriber_check_update(sub); ++i) {
+    orb_subscriber_copy(sub, &drain);
   }
 
   std::atomic<int> callback_count{0};
@@ -193,20 +194,20 @@ TEST(UorbUeventTest, SetCallbackReceivesPublish) {
     static_cast<std::atomic<int> *>(ctx.ptr)->fetch_add(1);
   };
 
-  ASSERT_EQ(orb_subscriber_set_callback(&sub, cb, orb_callback_ctx{&callback_count}), ORB_OK);
+  ASSERT_EQ(orb_subscriber_set_callback(sub, cb, orb_callback_ctx{&callback_count}), ORB_OK);
 
   orb_test_s msg{};
   callback_count = 0;
-  orb_publisher_publish(&pub, &msg);
+  orb_publisher_publish(pub, &msg);
   EXPECT_EQ(callback_count.load(), 1);  // exactly one callback
 
-  ASSERT_EQ(orb_subscriber_clear_callback(&sub), ORB_OK);
+  ASSERT_EQ(orb_subscriber_clear_callback(sub), ORB_OK);
   int before = callback_count.load();
-  orb_publisher_publish(&pub, &msg);
+  orb_publisher_publish(pub, &msg);
   EXPECT_EQ(callback_count.load(), before);  // no more callbacks
 
-  EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
-  EXPECT_EQ(orb_publisher_destroy(&pub), ORB_OK);
+  orb_subscriber_destroy(&sub);
+  orb_publisher_destroy(&pub);
 }
 
 TEST(UorbUeventTest, SetCallbackTwiceFails) {
@@ -215,24 +216,24 @@ TEST(UorbUeventTest, SetCallbackTwiceFails) {
   ASSERT_NE(sub._handle, nullptr);
 
   auto cb = [](const void *, orb_callback_ctx) {};
-  ASSERT_EQ(orb_subscriber_set_callback(&sub, cb, {}), ORB_OK);
+  ASSERT_EQ(orb_subscriber_set_callback(sub, cb, {}), ORB_OK);
 
-  EXPECT_EQ(orb_subscriber_set_callback(&sub, cb, {}), ORB_ERR_BUSY);
+  EXPECT_EQ(orb_subscriber_set_callback(sub, cb, {}), ORB_ERR_BUSY);
 
-  ASSERT_EQ(orb_subscriber_clear_callback(&sub), ORB_OK);
+  ASSERT_EQ(orb_subscriber_clear_callback(sub), ORB_OK);
   // Now should work again
-  ASSERT_EQ(orb_subscriber_set_callback(&sub, cb, {}), ORB_OK);
-  ASSERT_EQ(orb_subscriber_clear_callback(&sub), ORB_OK);
+  ASSERT_EQ(orb_subscriber_set_callback(sub, cb, {}), ORB_OK);
+  ASSERT_EQ(orb_subscriber_clear_callback(sub), ORB_OK);
 
-  EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
+  orb_subscriber_destroy(&sub);
 }
 
 TEST(UorbUeventTest, ClearCallbackWithoutSetIsNoop) {
   orb_subscriber_t sub = ORB_SUBSCRIBER_INITIALIZER;
   EXPECT_EQ(orb_subscriber_create(&sub, ORB_ID(orb_test)), ORB_OK);
   ASSERT_NE(sub._handle, nullptr);
-  EXPECT_EQ(orb_subscriber_clear_callback(&sub), ORB_OK);
-  EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
+  EXPECT_EQ(orb_subscriber_clear_callback(sub), ORB_OK);
+  orb_subscriber_destroy(&sub);
 }
 
 // ---- EventLoop C++ wrapper ----
@@ -257,13 +258,13 @@ TEST(UorbUeventTest, MultipleTopicsMultipleSources) {
   // Drain initial data
   orb_test_s drain1{};
   orb_test_medium_s drain2{};
-  for (int i = 0; i < 8 && orb_subscriber_check_update(&sub1); ++i) orb_subscriber_copy(&sub1, &drain1);
-  for (int i = 0; i < 8 && orb_subscriber_check_update(&sub2); ++i) orb_subscriber_copy(&sub2, &drain2);
+  for (int i = 0; i < 8 && orb_subscriber_check_update(sub1); ++i) orb_subscriber_copy(sub1, &drain1);
+  for (int i = 0; i < 8 && orb_subscriber_check_update(sub2); ++i) orb_subscriber_copy(sub2, &drain2);
 
   uevent_source_t src1 = UEVENT_SOURCE_INITIALIZER;
   uevent_source_t src2 = UEVENT_SOURCE_INITIALIZER;
-  ASSERT_EQ(uorb_subscriber_create_source(&src1, &sub1), 0);
-  ASSERT_EQ(uorb_subscriber_create_source(&src2, &sub2), 0);
+  ASSERT_EQ(uorb_subscriber_create_source(&src1, sub1), 0);
+  ASSERT_EQ(uorb_subscriber_create_source(&src2, sub2), 0);
   ASSERT_NE(src1._handle, nullptr);
   ASSERT_NE(src2._handle, nullptr);
 
@@ -276,7 +277,7 @@ TEST(UorbUeventTest, MultipleTopicsMultipleSources) {
   // Publish to topic 1 only
   orb_test_s msg1{};
   msg1.val = 111;
-  orb_publisher_publish(&pub1, &msg1);
+  orb_publisher_publish(pub1, &msg1);
 
   uevent_source_t ready[2] = {UEVENT_SOURCE_INITIALIZER};
   int n = uevent_loop(&base, ready, 2, 100);
@@ -284,25 +285,25 @@ TEST(UorbUeventTest, MultipleTopicsMultipleSources) {
   EXPECT_EQ(ready[0]._handle, src1._handle);
   // Copy to clear readiness
   orb_test_s recv1{};
-  orb_subscriber_copy(&sub1, &recv1);
+  orb_subscriber_copy(sub1, &recv1);
 
   // Publish to topic 2 only
   orb_test_medium_s msg2{};
   msg2.val = 222;
-  orb_publisher_publish(&pub2, &msg2);
+  orb_publisher_publish(pub2, &msg2);
 
   n = uevent_loop(&base, ready, 2, 100);
   ASSERT_EQ(n, 1);
   EXPECT_EQ(ready[0]._handle, src2._handle);
   // Copy to clear readiness
   orb_test_medium_s recv2{};
-  orb_subscriber_copy(&sub2, &recv2);
+  orb_subscriber_copy(sub2, &recv2);
 
   // Publish to both
   msg1.val = 333;
-  orb_publisher_publish(&pub1, &msg1);
+  orb_publisher_publish(pub1, &msg1);
   msg2.val = 444;
-  orb_publisher_publish(&pub2, &msg2);
+  orb_publisher_publish(pub2, &msg2);
 
   n = uevent_loop(&base, ready, 2, 100);
   ASSERT_EQ(n, 2);
@@ -312,10 +313,10 @@ TEST(UorbUeventTest, MultipleTopicsMultipleSources) {
   uorb_subscriber_destroy_source(&src1);
   uorb_subscriber_destroy_source(&src2);
   uevent_destroy(&base);
-  EXPECT_EQ(orb_subscriber_destroy(&sub1), ORB_OK);
-  EXPECT_EQ(orb_subscriber_destroy(&sub2), ORB_OK);
-  EXPECT_EQ(orb_publisher_destroy(&pub1), ORB_OK);
-  EXPECT_EQ(orb_publisher_destroy(&pub2), ORB_OK);
+  orb_subscriber_destroy(&sub1);
+  orb_subscriber_destroy(&sub2);
+  orb_publisher_destroy(&pub1);
+  orb_publisher_destroy(&pub2);
 }
 
 // ---- Callback triggered from publisher thread ----
@@ -331,21 +332,21 @@ TEST(UorbUeventTest, CallbackTriggeredFromPublisherThread) {
 
   // Drain initial data
   orb_test_s drain{};
-  for (int i = 0; i < 8 && orb_subscriber_check_update(&sub); ++i) orb_subscriber_copy(&sub, &drain);
+  for (int i = 0; i < 8 && orb_subscriber_check_update(sub); ++i) orb_subscriber_copy(sub, &drain);
 
   std::atomic<int> callback_count{0};
   auto cb = [](const void *, orb_callback_ctx ctx) {
     static_cast<std::atomic<int> *>(ctx.ptr)->fetch_add(1, std::memory_order_relaxed);
   };
 
-  ASSERT_EQ(orb_subscriber_set_callback(&sub, cb, orb_callback_ctx{&callback_count}), ORB_OK);
+  ASSERT_EQ(orb_subscriber_set_callback(sub, cb, orb_callback_ctx{&callback_count}), ORB_OK);
 
   // Publish from another thread
   std::thread publisher([&]() {
     orb_test_s msg{};
     for (int i = 0; i < 10; ++i) {
       msg.val = i;
-      orb_publisher_publish(&pub, &msg);
+      orb_publisher_publish(pub, &msg);
       std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
   });
@@ -355,9 +356,9 @@ TEST(UorbUeventTest, CallbackTriggeredFromPublisherThread) {
   // Should have received callbacks
   EXPECT_EQ(callback_count.load(), 10);
 
-  ASSERT_EQ(orb_subscriber_clear_callback(&sub), ORB_OK);
-  EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
-  EXPECT_EQ(orb_publisher_destroy(&pub), ORB_OK);
+  ASSERT_EQ(orb_subscriber_clear_callback(sub), ORB_OK);
+  orb_subscriber_destroy(&sub);
+  orb_publisher_destroy(&pub);
 }
 
 // ---- Full lifecycle: create source, add, publish, copy, remove, destroy ----
@@ -373,7 +374,7 @@ TEST(UorbUeventTest, FullLifecycleMultipleCycles) {
 
   // Drain initial data
   orb_test_s drain{};
-  for (int i = 0; i < 8 && orb_subscriber_check_update(&sub); ++i) orb_subscriber_copy(&sub, &drain);
+  for (int i = 0; i < 8 && orb_subscriber_check_update(sub); ++i) orb_subscriber_copy(sub, &drain);
 
   uevent_t base = UEVENT_INITIALIZER;
   ASSERT_EQ(uevent_create(&base), 0);
@@ -382,19 +383,19 @@ TEST(UorbUeventTest, FullLifecycleMultipleCycles) {
   // Run 10 cycles of: create source -> add -> publish -> loop -> copy -> remove -> destroy
   for (int cycle = 0; cycle < 10; ++cycle) {
     uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
-    ASSERT_EQ(uorb_subscriber_create_source(&src, &sub), 0);
+    ASSERT_EQ(uorb_subscriber_create_source(&src, sub), 0);
     ASSERT_NE(src._handle, nullptr);
     ASSERT_EQ(uevent_add(&base, &src, 0), 0);
 
     orb_test_s msg{};
     msg.val = cycle * 10;
-    ASSERT_EQ(orb_publisher_publish(&pub, &msg), ORB_OK);
+    ASSERT_EQ(orb_publisher_publish(pub, &msg), ORB_OK);
 
     uevent_source_t ready[1] = {UEVENT_SOURCE_INITIALIZER};
     ASSERT_EQ(uevent_loop(&base, ready, 1, 100), 1);
     EXPECT_EQ(ready[0]._handle, src._handle);
 
-    ASSERT_EQ(orb_subscriber_copy(&sub, &msg), ORB_OK);
+    ASSERT_EQ(orb_subscriber_copy(sub, &msg), ORB_OK);
     EXPECT_EQ(msg.val, cycle * 10);
 
     ASSERT_EQ(uevent_remove(&base, &src), 0);
@@ -402,8 +403,8 @@ TEST(UorbUeventTest, FullLifecycleMultipleCycles) {
   }
 
   uevent_destroy(&base);
-  EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
-  EXPECT_EQ(orb_publisher_destroy(&pub), ORB_OK);
+  orb_subscriber_destroy(&sub);
+  orb_publisher_destroy(&pub);
 }
 
 // ---- Multi-instance publisher + subscriber via bridge ----
@@ -432,12 +433,12 @@ TEST(UorbUeventTest, MultiInstanceBridge) {
 
   // Drain any initial data.
   orb_test_s drain{};
-  for (int i = 0; i < 8 && orb_subscriber_check_update(&sub_multi); ++i) {
-    orb_subscriber_copy(&sub_multi, &drain);
+  for (int i = 0; i < 8 && orb_subscriber_check_update(sub_multi); ++i) {
+    orb_subscriber_copy(sub_multi, &drain);
   }
 
   uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
-  ASSERT_EQ(uorb_subscriber_create_source(&src, &sub_multi), 0);
+  ASSERT_EQ(uorb_subscriber_create_source(&src, sub_multi), 0);
   ASSERT_NE(src._handle, nullptr);
 
   uevent_t base = UEVENT_INITIALIZER;
@@ -448,7 +449,7 @@ TEST(UorbUeventTest, MultiInstanceBridge) {
   // Publish to instance 1 — the subscriber should become ready.
   orb_test_s msg{};
   msg.val = 777;
-  ASSERT_EQ(orb_publisher_publish(&pub1, &msg), ORB_OK);
+  ASSERT_EQ(orb_publisher_publish(pub1, &msg), ORB_OK);
 
   uevent_source_t ready[1] = {UEVENT_SOURCE_INITIALIZER};
   ASSERT_EQ(uevent_loop(&base, ready, 1, 100), 1);
@@ -456,20 +457,20 @@ TEST(UorbUeventTest, MultiInstanceBridge) {
 
   // Copy the data.
   orb_test_s recv{};
-  ASSERT_EQ(orb_subscriber_copy(&sub_multi, &recv), ORB_OK);
+  ASSERT_EQ(orb_subscriber_copy(sub_multi, &recv), ORB_OK);
   EXPECT_EQ(recv.val, 777);
 
   // Publishing to instance 0 should NOT wake the instance-1 source.
   msg.val = 888;
-  ASSERT_EQ(orb_publisher_publish(&pub0, &msg), ORB_OK);
+  ASSERT_EQ(orb_publisher_publish(pub0, &msg), ORB_OK);
   EXPECT_EQ(uevent_loop(&base, ready, 1, 0), 0);
 
   ASSERT_EQ(uevent_remove(&base, &src), 0);
   uorb_subscriber_destroy_source(&src);
   uevent_destroy(&base);
-  EXPECT_EQ(orb_subscriber_destroy(&sub_multi), ORB_OK);
-  EXPECT_EQ(orb_publisher_destroy(&pub1), ORB_OK);
-  EXPECT_EQ(orb_publisher_destroy(&pub0), ORB_OK);
+  orb_subscriber_destroy(&sub_multi);
+  orb_publisher_destroy(&pub1);
+  orb_publisher_destroy(&pub0);
 }
 
 // ---- Burst publish coalescing: 1000 messages, one event ----
@@ -485,12 +486,12 @@ TEST(UorbUeventTest, BurstPublishCoalescing) {
 
   // Drain initial data.
   orb_test_s drain{};
-  for (int i = 0; i < 8 && orb_subscriber_check_update(&sub); ++i) {
-    orb_subscriber_copy(&sub, &drain);
+  for (int i = 0; i < 8 && orb_subscriber_check_update(sub); ++i) {
+    orb_subscriber_copy(sub, &drain);
   }
 
   uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
-  ASSERT_EQ(uorb_subscriber_create_source(&src, &sub), 0);
+  ASSERT_EQ(uorb_subscriber_create_source(&src, sub), 0);
   ASSERT_NE(src._handle, nullptr);
 
   uevent_t base = UEVENT_INITIALIZER;
@@ -504,7 +505,7 @@ TEST(UorbUeventTest, BurstPublishCoalescing) {
   orb_test_s msg{};
   for (int i = 0; i < burst_count; ++i) {
     msg.val = i;
-    ASSERT_EQ(orb_publisher_publish(&pub, &msg), ORB_OK);
+    ASSERT_EQ(orb_publisher_publish(pub, &msg), ORB_OK);
   }
 
   // With timeout=0, uevent_loop should return at least 1 event.
@@ -514,14 +515,14 @@ TEST(UorbUeventTest, BurstPublishCoalescing) {
 
   // Copying should yield the *latest* published data.
   orb_test_s recv{};
-  ASSERT_EQ(orb_subscriber_copy(&sub, &recv), ORB_OK);
+  ASSERT_EQ(orb_subscriber_copy(sub, &recv), ORB_OK);
   EXPECT_EQ(recv.val, last_val);
 
   ASSERT_EQ(uevent_remove(&base, &src), 0);
   uorb_subscriber_destroy_source(&src);
   uevent_destroy(&base);
-  EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
-  EXPECT_EQ(orb_publisher_destroy(&pub), ORB_OK);
+  orb_subscriber_destroy(&sub);
+  orb_publisher_destroy(&pub);
 }
 
 // ---- Fan-out: one publication, 50 subscribers ----
@@ -544,8 +545,8 @@ TEST(UorbUeventTest, FanOutManySubscribers) {
   // Drain initial data for all subscribers.
   orb_test_s drain{};
   for (int i = 0; i < kN; ++i) {
-    for (int j = 0; j < 8 && orb_subscriber_check_update(&subs[i]); ++j) {
-      orb_subscriber_copy(&subs[i], &drain);
+    for (int j = 0; j < 8 && orb_subscriber_check_update(subs[i]); ++j) {
+      orb_subscriber_copy(subs[i], &drain);
     }
   }
 
@@ -553,7 +554,7 @@ TEST(UorbUeventTest, FanOutManySubscribers) {
   uevent_source_t srcs[kN];
   for (int i = 0; i < kN; ++i) {
     srcs[i] = UEVENT_SOURCE_INITIALIZER;
-    ASSERT_EQ(uorb_subscriber_create_source(&srcs[i], &subs[i]), 0);
+    ASSERT_EQ(uorb_subscriber_create_source(&srcs[i], subs[i]), 0);
     ASSERT_NE(srcs[i]._handle, nullptr);
   }
 
@@ -567,7 +568,7 @@ TEST(UorbUeventTest, FanOutManySubscribers) {
   // Publish one message — every subscriber should be ready.
   orb_test_s msg{};
   msg.val = 12345;
-  ASSERT_EQ(orb_publisher_publish(&pub, &msg), ORB_OK);
+  ASSERT_EQ(orb_publisher_publish(pub, &msg), ORB_OK);
 
   uevent_source_t ready[kN];
   for (int i = 0; i < kN; ++i) ready[i] = UEVENT_SOURCE_INITIALIZER;
@@ -581,7 +582,7 @@ TEST(UorbUeventTest, FanOutManySubscribers) {
     for (int j = 0; j < kN; ++j) {
       if (ready[i]._handle == srcs[j]._handle) {
         orb_test_s recv{};
-        ASSERT_EQ(orb_subscriber_copy(&subs[j], &recv), ORB_OK);
+        ASSERT_EQ(orb_subscriber_copy(subs[j], &recv), ORB_OK);
         EXPECT_EQ(recv.val, 12345);
         matched = true;
         break;
@@ -597,9 +598,9 @@ TEST(UorbUeventTest, FanOutManySubscribers) {
   }
   uevent_destroy(&base);
   for (int i = 0; i < kN; ++i) {
-    EXPECT_EQ(orb_subscriber_destroy(&subs[i]), ORB_OK);
+    orb_subscriber_destroy(&subs[i]);
   }
-  EXPECT_EQ(orb_publisher_destroy(&pub), ORB_OK);
+  orb_publisher_destroy(&pub);
 }
 
 // ---- set_callback then create_source: uevent_add must fail ----
@@ -611,11 +612,11 @@ TEST(UorbUeventTest, SetCallbackThenCreateSource) {
 
   // Set a callback on the subscriber manually.
   auto cb = [](const void *, orb_callback_ctx) {};
-  ASSERT_EQ(orb_subscriber_set_callback(&sub, cb, {}), ORB_OK);
+  ASSERT_EQ(orb_subscriber_set_callback(sub, cb, {}), ORB_OK);
 
   // Creating the source should still succeed — it just copies the handle.
   uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
-  ASSERT_EQ(uorb_subscriber_create_source(&src, &sub), 0);
+  ASSERT_EQ(uorb_subscriber_create_source(&src, sub), 0);
   ASSERT_NE(src._handle, nullptr);
 
   // uevent_add must fail because bridge_register calls
@@ -631,31 +632,19 @@ TEST(UorbUeventTest, SetCallbackThenCreateSource) {
   uevent_destroy(&base);
 
   // Clear the callback and destroy the subscriber.
-  ASSERT_EQ(orb_subscriber_clear_callback(&sub), ORB_OK);
-  EXPECT_EQ(orb_subscriber_destroy(&sub), ORB_OK);
+  ASSERT_EQ(orb_subscriber_clear_callback(sub), ORB_OK);
+  orb_subscriber_destroy(&sub);
 }
 
 // ---- Source created from an uninitialized subscriber ----
 
-// Creating a source from an uninitialized subscriber succeeds, but adding it
-// to an event base fails because the bridge cannot register a callback on a
-// NULL handle.
+// Creating a source from an uninitialized subscriber must fail immediately with
+// UEVENT_ERR_INVALID.
 TEST(UorbUeventTest, CreateSourceWithUninitializedSubscriber) {
   orb_subscriber_t sub = ORB_SUBSCRIBER_INITIALIZER;
-
   uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
-  ASSERT_EQ(uorb_subscriber_create_source(&src, &sub), 0);
-
-  uevent_t base = UEVENT_INITIALIZER;
-  ASSERT_EQ(uevent_create(&base), 0);
-
-  // uevent_add must fail: bridge_register calls orb_subscriber_set_callback
-  // which returns ORB_ERR_INVALID for a NULL handle.
-  EXPECT_EQ(uevent_add(&base, &src, 0), UEVENT_ERR_INVALID);
-
-  // Source was never added, so just destroy it directly.
-  uorb_subscriber_destroy_source(&src);
-  uevent_destroy(&base);
+  EXPECT_EQ(uorb_subscriber_create_source(&src, sub), UEVENT_ERR_INVALID);
+  EXPECT_EQ(src._handle, nullptr);
 }
 
 // NOTE: SubscriberDestroyedBeforeSource test intentionally omitted.

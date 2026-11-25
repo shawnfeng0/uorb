@@ -109,7 +109,7 @@ void uORBTest::UnitTest::latency_test(const orb_metadata *T) {
   orb_publisher_create(&pfd0, T);
   ASSERT_NE(pfd0._handle, nullptr) << "orb_publisher_create failed: " << errno;
 
-  orb_publisher_publish(&pfd0, &pub_data);
+  orb_publisher_publish(pfd0, &pub_data);
 
   std::atomic<bool> pub_sub_test_passed{false};
   std::atomic<float> mean_latency{0.0f};
@@ -134,18 +134,18 @@ void uORBTest::UnitTest::latency_test(const orb_metadata *T) {
     orb_test_large_s pub_data_large{};
 
     /* clear all ready flags */
-    orb_subscriber_copy(&test_multi_sub, &pub_data_large);
-    orb_subscriber_copy(&test_multi_sub_medium, &pub_data_large);
-    orb_subscriber_copy(&test_multi_sub_large, &pub_data_large);
+    orb_subscriber_copy(test_multi_sub, &pub_data_large);
+    orb_subscriber_copy(test_multi_sub_medium, &pub_data_large);
+    orb_subscriber_copy(test_multi_sub_large, &pub_data_large);
 
     uevent_t poll = UEVENT_INITIALIZER;
     uevent_create(&poll);
     uevent_source_t src1 = UEVENT_SOURCE_INITIALIZER;
-    uorb_subscriber_create_source(&src1, &test_multi_sub);
+    uorb_subscriber_create_source(&src1, test_multi_sub);
     uevent_source_t src2 = UEVENT_SOURCE_INITIALIZER;
-    uorb_subscriber_create_source(&src2, &test_multi_sub_medium);
+    uorb_subscriber_create_source(&src2, test_multi_sub_medium);
     uevent_source_t src3 = UEVENT_SOURCE_INITIALIZER;
-    uorb_subscriber_create_source(&src3, &test_multi_sub_large);
+    uorb_subscriber_create_source(&src3, test_multi_sub_large);
     uevent_add(&poll, &src1, 0);
     uevent_add(&poll, &src2, 0);
     uevent_add(&poll, &src3, 0);
@@ -167,13 +167,13 @@ void uORBTest::UnitTest::latency_test(const orb_metadata *T) {
 
       for (int j = 0; j < pret; ++j) {
         if (ready[j]._handle == src1._handle) {
-          orb_subscriber_copy(&test_multi_sub, &pub_data_large);
+          orb_subscriber_copy(test_multi_sub, &pub_data_large);
 
         } else if (ready[j]._handle == src2._handle) {
-          orb_subscriber_copy(&test_multi_sub_medium, &pub_data_large);
+          orb_subscriber_copy(test_multi_sub_medium, &pub_data_large);
 
         } else if (ready[j]._handle == src3._handle) {
-          orb_subscriber_copy(&test_multi_sub_large, &pub_data_large);
+          orb_subscriber_copy(test_multi_sub_large, &pub_data_large);
         }
       }
 
@@ -237,7 +237,7 @@ void uORBTest::UnitTest::latency_test(const orb_metadata *T) {
     ++pub_data.val;
     pub_data.timestamp = orb_absolute_time_us();
 
-    ASSERT_EQ(orb_publisher_publish(&pfd0, &pub_data), ORB_OK) << "mult. pub0 timing fail";
+    ASSERT_EQ(orb_publisher_publish(pfd0, &pub_data), ORB_OK) << "mult. pub0 timing fail";
 
     /* simulate >800 Hz system operation */
     usleep(1000);
