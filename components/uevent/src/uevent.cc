@@ -111,25 +111,7 @@ int uevent_loop(uevent_t *ev, uevent_source_t *ready, int max_ready, int timeout
     return -1;
   }
   auto *poll = reinterpret_cast<uevent::EventPoll *>(ev->_handle);
-  constexpr int kStackCap = 64;
-  uevent::EventSource *stack_buf[kStackCap];
-  uevent::EventSource **buf = stack_buf;
-  uevent::EventSource **heap_buf = nullptr;
-  if (max_ready > kStackCap) {
-    heap_buf = new (std::nothrow) uevent::EventSource *[static_cast<size_t>(max_ready)];
-    if (!heap_buf) {
-      errno = ENOMEM;
-      return -1;
-    }
-    buf = heap_buf;
-  }
-  const int n = poll->Wait(buf, max_ready, timeout_ms);
-  for (int i = 0; i < n; ++i) {
-    ready[i]._handle = buf[i];
-    ready[i].data = buf[i]->user_data();
-  }
-  delete[] heap_buf;
-  return n;
+  return poll->WaitSources(ready, max_ready, timeout_ms);
 }
 
 int uevent_loopbreak(uevent_t *ev) {

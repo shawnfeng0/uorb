@@ -1087,3 +1087,44 @@ TEST(UeventTest, ManualSourceRejectsInvalidAndNonManualHandles) {
 
   uevent_source_destroy(&custom);
 }
+
+// ---- Concurrent remove + destroy while uevent_loop() returns user_data ----
+
+TEST(UeventTest, ConcurrentRemoveDestroyWhileLoopReturnsUserData) {
+  uevent_t base = UEVENT_INITIALIZER;
+  ASSERT_EQ(uevent_create(&base), 0);
+
+  std::atomic<bool> stop{false};
+  std::atomic<int> seen{0};
+
+  std::thread looper([&]() {
+    uevent_source_t ready[8] = {};
+    while (!stop.load(std::memory_order_acquire)) {
+      int n = uevent_loop(&base, ready, 8, 5);
+      for (int i = 0; i < n; ++i) {
+        // user_data must be valid and read inside EventPoll::mu_, never UAF.
+        EXPECT_GE(ready[i].data.u64, 1ULL);
+        seen.fetch_add(1, std::memory_order_relaxed);
+      }
+    }
+  });
+
+  // Rapidly create, add, trigger, remove, and destroy sources concurrently with uevent_loop().
+  for (uint64_t i = 1; i <= 200; ++i) {
+    uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
+    ASSERT_EQ(uevent_manual_source_create(&src), 0);
+    src.data.u64 = i;
+    ASSERT_EQ(uevent_add(&base, &src, 0), 0);
+    ASSERT_EQ(uevent_manual_source_trigger(&src), 0);
+    if ((i & 3U) == 0) {
+      std::this_thread::yield();
+    }
+    ASSERT_EQ(uevent_remove(&base, &src), 0);
+    uevent_source_destroy(&src);
+  }
+
+  stop.store(true, std::memory_order_release);
+  uevent_loopbreak(&base);
+  looper.join();
+  uevent_destroy(&base);
+}

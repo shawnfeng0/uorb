@@ -213,7 +213,63 @@ class EventPoll {
       errno = EINVAL;
       return -1;
     }
+    return WaitImpl(max_ready, timeout_ms, [ready](int idx, EventSource *s) {
+      ready[idx] = s;
+    });
+  }
 
+  // Copies both the source handle and user_data while mu_ is held, preventing
+  // use-after-free if another thread removes and destroys the EventSource
+  // immediately after Wait() releases mu_.
+  int WaitSources(uevent_source_t *ready, int max_ready, const int timeout_ms) {
+    if (!ready || max_ready <= 0) {
+      errno = EINVAL;
+      return -1;
+    }
+    return WaitImpl(max_ready, timeout_ms, [ready](int idx, EventSource *s) {
+      ready[idx]._handle = s;
+      ready[idx].data = s->user_data();
+    });
+  }
+
+  void Stop() {
+    bool should_notify = false;
+    {
+      base::LockGuard<base::Mutex> lk(mu_);
+      stop_ = true;
+      if (waiters_ > 0) {
+        signaled_ = true;
+        should_notify = true;
+      }
+    }
+    if (should_notify) {
+      cv_.notify_all();
+    }
+  }
+
+  void NotifyReady(EventSource *source) {
+    bool needs_notify = false;
+    {
+      base::LockGuard<base::Mutex> lk(mu_);
+      if (!source->in_ready_queue()) {
+        if (ready_queue_.push(source)) {
+          source->set_in_ready_queue(true);
+          ++ready_count_;
+          if (waiters_ > 0 && (!signaled_ || waiters_ > 1)) {
+            signaled_ = true;
+            needs_notify = true;
+          }
+        }
+      }
+    }
+    if (needs_notify) {
+      cv_.notify_one();
+    }
+  }
+
+ private:
+  template <typename EmitFn>
+  int WaitImpl(int max_ready, const int timeout_ms, EmitFn &&emit) {
     base::UniqueLock<base::Mutex> lk(mu_);
     if (stop_) {
       stop_ = false;
@@ -248,7 +304,7 @@ class EventPoll {
           if (s->timeout_fired_) {
             s->timeout_fired_ = false;
             --timeout_fired_count_;
-            ready[count++] = s;
+            emit(count++, s);
             if (s->in_ready_queue()) {
               s->set_in_ready_queue(false);
               ready_queue_.remove(s);
@@ -267,17 +323,17 @@ class EventPoll {
         std::atomic_thread_fence(std::memory_order_seq_cst);
         if (ready_count_ > 0) --ready_count_;
         if (s->is_ready()) {
-          ready[count++] = s;
+          emit(count++, s);
         }
       }
 
       // Level-triggered fallback scan when nothing collected and ready_queue_ is empty.
-      // Collect directly into ready[] to avoid double is_ready() calls and queue churn.
+      // Collect directly via emit() to avoid double is_ready() calls and queue churn.
       if (count == 0 && ready_queue_.empty()) {
         for (EventSource *s = sources_head_; s != nullptr; s = s->poll_next_) {
           if (s->is_ready()) {
             if (count < max_ready) {
-              ready[count++] = s;
+              emit(count++, s);
             } else if (!s->in_ready_queue()) {
               if (ready_queue_.push(s)) {
                 s->set_in_ready_queue(true);
@@ -358,42 +414,6 @@ class EventPoll {
     }
   }
 
-  void Stop() {
-    bool should_notify = false;
-    {
-      base::LockGuard<base::Mutex> lk(mu_);
-      stop_ = true;
-      if (waiters_ > 0) {
-        signaled_ = true;
-        should_notify = true;
-      }
-    }
-    if (should_notify) {
-      cv_.notify_all();
-    }
-  }
-
-  void NotifyReady(EventSource *source) {
-    bool needs_notify = false;
-    {
-      base::LockGuard<base::Mutex> lk(mu_);
-      if (!source->in_ready_queue()) {
-        if (ready_queue_.push(source)) {
-          source->set_in_ready_queue(true);
-          ++ready_count_;
-          if (waiters_ > 0 && (!signaled_ || waiters_ > 1)) {
-            signaled_ = true;
-            needs_notify = true;
-          }
-        }
-      }
-    }
-    if (needs_notify) {
-      cv_.notify_one();
-    }
-  }
-
- private:
   void LinkSource(EventSource *s) {
     if (s->in_poll_list_) return;
     s->poll_prev_ = sources_tail_;
