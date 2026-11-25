@@ -142,7 +142,7 @@ static void CmdStatus(uorb::listener::Fd &fd,
 
         char line[256];
         snprintf(line, sizeof(line),
-                 "%-20s %-10u %-10u %-10s %-10s %-10u %-10s\n", meta->o_name,
+                 "%-20s %-10u %-10u %-10s %-10s %-10" PRIu32 " %-10s\n", meta->o_name,
                  instance, status->queue_size, sub_count_str.c_str(),
                  pub_count_str.c_str(), status->latest_data_index,
                  age_str.c_str());

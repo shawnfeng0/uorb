@@ -31,9 +31,6 @@ typedef enum {
   ORB_ERR_BUSY = -3,
   ORB_ERR_EXIST = -4,
   ORB_ERR_NO_ENTRY = -5,
-  ORB_ERR_TIMEOUT = -6,
-  ORB_ERR_AGAIN = -7,
-  ORB_ERR_UNKNOWN = -8,
 } orb_err;
 
 /**
@@ -89,7 +86,7 @@ struct orb_status {
   uint8_t publisher_count;        // Number of tracked publishers
   bool has_untracked_publisher;   // Whether orb_pub_publish_once() has been used
 
-  unsigned latest_data_index;     // The latest data index
+  uint32_t latest_data_index;     // The latest data index
   uint64_t last_publish_time_us;  // Monotonic timestamp [us] of the last Publish() (0 if never published)
 };
 
@@ -386,7 +383,7 @@ orb_err orb_sub_create(orb_sub_t *sub, const struct orb_metadata *meta);
  *                  are for topics created with orb_pub_create_multi().
  * @return ORB_OK on success, error code otherwise
  */
-orb_err orb_sub_create_multi(orb_sub_t *sub, const struct orb_metadata *meta, unsigned instance);
+orb_err orb_sub_create_multi(orb_sub_t *sub, const struct orb_metadata *meta, unsigned int instance);
 
 /**
  * Destroy a subscription handle (idempotent; NULL-safe).

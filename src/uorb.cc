@@ -168,7 +168,7 @@ orb_err orb_sub_create(orb_sub_t *sub, const struct orb_metadata *meta) {
   return orb_sub_create_multi(sub, meta, 0);
 }
 
-orb_err orb_sub_create_multi(orb_sub_t *sub, const struct orb_metadata *meta, unsigned instance) {
+orb_err orb_sub_create_multi(orb_sub_t *sub, const struct orb_metadata *meta, unsigned int instance) {
   if (!sub || !meta) {
     return ORB_ERR_INVALID;
   }
@@ -322,11 +322,6 @@ const char *orb_strerror(orb_err err) {
       return "Already exists";
     case ORB_ERR_NO_ENTRY:
       return "Not found / no data";
-    case ORB_ERR_TIMEOUT:
-      return "Timed out";
-    case ORB_ERR_AGAIN:
-      return "Try again";
-    case ORB_ERR_UNKNOWN:
     default:
       return "Unknown error";
   }

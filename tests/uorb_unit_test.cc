@@ -1186,9 +1186,7 @@ TEST_F(UnitTest, orb_strerror_and_no_entry_semantics) {
   EXPECT_NE(orb_strerror(ORB_ERR_BUSY), nullptr);
   EXPECT_NE(orb_strerror(ORB_ERR_EXIST), nullptr);
   EXPECT_NE(orb_strerror(ORB_ERR_NO_ENTRY), nullptr);
-  EXPECT_NE(orb_strerror(ORB_ERR_TIMEOUT), nullptr);
-  EXPECT_NE(orb_strerror(ORB_ERR_AGAIN), nullptr);
-  EXPECT_STREQ(orb_strerror(ORB_ERR_UNKNOWN), "Unknown error");
+  EXPECT_STREQ(orb_strerror(static_cast<orb_err>(-99)), "Unknown error");
 
   static const struct orb_metadata empty_topic = {
       "orb_empty_copy_test", sizeof(orb_test_s), 0, "", 1, ORB_DURABILITY_DURABLE, {}};
