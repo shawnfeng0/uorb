@@ -59,8 +59,8 @@ class uorb::DeviceMaster {
   static DeviceMaster instance_;
 
   intrusive_list::forward_list<DeviceNode, &DeviceNode::device_list_node_> node_list_;
-  // Lock order:
-  //   DeviceMaster::lock_       →  DeviceNode::data_lock_  (node creation/lookup)
-  //   DeviceNode::callback_lock_ →  DeviceNode::data_lock_  (callbacks calling Copy)
+  // Protects DeviceNode creation and node_list_ insertion (lock-free fast path
+  // reads meta.instances[] directly). Neither Copy() nor user publish callbacks
+  // acquire DeviceMaster::lock_.
   mutable base::Mutex lock_{};
 };

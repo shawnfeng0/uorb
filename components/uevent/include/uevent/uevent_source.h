@@ -60,10 +60,11 @@ class EventSource {
   // called while mu_ is held.
   void ClearWakeup();
 
-  // Called when the source is removed from an EventPoll. Override to perform
-  // cleanup (e.g., unregister callbacks). This is called BEFORE wakeup_ is
-  // cleared, so HasWakeup() still returns true. Can be called outside the
-  // EventPoll lock to avoid lock-ordering deadlocks.
+  // Called outside EventPoll::mu_ when the source is removed from an EventPoll
+  // (e.g., to unregister publish callbacks without lock-ordering deadlocks).
+  // Note: EventPoll::Remove() clears wakeup_ before calling OnRemoved(),
+  // whereas RemoveWakeup() (used by ~EventPoll() and failed Add()) calls
+  // OnRemoved() before ClearWakeup().
   virtual void OnRemoved() {}
 
   bool HasWakeup() const { return wakeup_.load(std::memory_order_acquire) != nullptr; }

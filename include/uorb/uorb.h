@@ -35,9 +35,12 @@ typedef enum {
 } orb_err;
 
 /**
- * Maximum number of multi topic instances
+ * Maximum number of multi topic instances (overridable at compile time;
+ * all translation units must use the same value).
  */
+#ifndef ORB_MULTI_MAX_INSTANCES
 #define ORB_MULTI_MAX_INSTANCES 4
+#endif
 
 /**
  * Topic durability policy.
