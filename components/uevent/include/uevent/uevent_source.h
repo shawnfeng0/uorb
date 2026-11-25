@@ -111,6 +111,10 @@ class EventSource {
   EventSource *poll_next_{nullptr};
   bool in_poll_list_{false};
 
+  // Intrusive FIFO ready-queue links owned by EventPoll (guarded by EventPoll::mu_).
+  EventSource *ready_prev_{nullptr};
+  EventSource *ready_next_{nullptr};
+
   // Per-event timeout state owned by EventPoll (guarded by EventPoll::mu_).
   struct timespec deadline_{};
   bool has_deadline_{false};

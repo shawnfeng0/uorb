@@ -7,89 +7,11 @@
 
 #include <atomic>
 #include <cstddef>
-#include <cstring>
-#include <new>
 
 #include "uevent_base/mutex.h"
 #include "uevent_base/condition_variable.h"
 
 namespace uevent {
-
-class RingBuffer {
- public:
-  RingBuffer() = default;
-  ~RingBuffer() { delete[] buf_; }
-  RingBuffer(const RingBuffer &) = delete;
-  RingBuffer &operator=(const RingBuffer &) = delete;
-
-  bool Reserve(size_t capacity) {
-    if (capacity <= capacity_) return true;
-    size_t new_cap = 16;
-    while (new_cap < capacity) new_cap <<= 1;
-
-    auto **new_buf = new (std::nothrow) EventSource *[new_cap]();
-    if (!new_buf) return false;
-
-    size_t count = size();
-    if (capacity_ > 0) {
-      size_t mask = capacity_ - 1;
-      for (size_t i = 0; i < count; ++i) {
-        new_buf[i] = buf_[(head_ + i) & mask];
-      }
-    }
-    delete[] buf_;
-    buf_ = new_buf;
-    head_ = 0;
-    tail_ = count;
-    capacity_ = new_cap;
-    return true;
-  }
-
-  bool empty() const { return head_ == tail_; }
-  size_t size() const { return tail_ - head_; }
-
-  bool push(EventSource *s) {
-    if (tail_ - head_ >= capacity_) {
-      if (!Reserve(capacity_ == 0 ? 16 : capacity_ * 2)) return false;
-    }
-    buf_[tail_ & (capacity_ - 1)] = s;
-    ++tail_;
-    return true;
-  }
-
-  EventSource *pop() {
-    if (head_ == tail_) return nullptr;
-    size_t idx = head_ & (capacity_ - 1);
-    EventSource *s = buf_[idx];
-    buf_[idx] = nullptr;
-    ++head_;
-    return s;
-  }
-
-  void remove(EventSource *s) {
-    if (capacity_ == 0 || head_ == tail_) return;
-    size_t mask = capacity_ - 1;
-    for (size_t i = head_; i < tail_; ++i) {
-      if (buf_[i & mask] == s) {
-        buf_[i & mask] = nullptr;
-      }
-    }
-  }
-
-  void clear() {
-    if (capacity_ > 0) {
-      std::memset(buf_, 0, capacity_ * sizeof(EventSource *));
-    }
-    head_ = 0;
-    tail_ = 0;
-  }
-
- private:
-  EventSource **buf_{nullptr};
-  size_t head_{0};
-  size_t tail_{0};
-  size_t capacity_{0};
-};
 
 class EventPoll {
  public:
@@ -101,7 +23,8 @@ class EventPoll {
       {
         base::LockGuard<base::Mutex> lk(mu_);
         if (!sources_head_) {
-          ready_queue_.clear();
+          ready_head_ = nullptr;
+          ready_tail_ = nullptr;
           ready_count_ = 0;
           deadline_count_ = 0;
           timeout_fired_count_ = 0;
@@ -109,11 +32,16 @@ class EventPoll {
         }
         s = sources_head_;
         UnlinkSource(s);
+        RemoveReadyLocked(s);
         ClearTimeoutStateLocked(s);
       }
       s->RemoveWakeup();
-      // Safe after RemoveWakeup(): no notify_waiters() for this poll is in flight.
-      s->set_in_ready_queue(false);
+      // Re-check under mu_ in case a racing notify_waiters() enqueued `s`
+      // before RemoveWakeup() cleared wakeup_.
+      {
+        base::LockGuard<base::Mutex> lk(mu_);
+        RemoveReadyLocked(s);
+      }
     }
   }
 
@@ -137,42 +65,31 @@ class EventPoll {
     if (wakeup_err != UEVENT_OK) return wakeup_err;
 
     bool needs_notify = false;
-    bool reserved = false;
     {
       base::LockGuard<base::Mutex> lk(mu_);
-      reserved = ready_queue_.Reserve(source_count_ + 1);
-      if (reserved) {
-        source.set_user_data(data);
-        LinkSource(&source);
-        if (source.is_ready() && !source.in_ready_queue()) {
-          source.set_in_ready_queue(true);
-          ready_queue_.push(&source);
-          ++ready_count_;
-          if (waiters_ > 0 && (!signaled_ || waiters_ > 1)) {
-            signaled_ = true;
-            needs_notify = true;
-          }
-        }
-        const uint32_t effective_timeout_ms =
-            (timeout_ms > 0) ? static_cast<uint32_t>(timeout_ms) : source.timer_period_ms();
-        if (effective_timeout_ms > 0) {
-          source.deadline_ = cv_.timespec_add_ms(cv_.get_now(), effective_timeout_ms);
-          if (!source.has_deadline_) {
-            source.has_deadline_ = true;
-            ++deadline_count_;
-          }
-          deadlines_changed_ = true;
-          if (waiters_ > 0 && (!signaled_ || waiters_ > 1)) {
-            signaled_ = true;
-            needs_notify = true;
-          }
+      source.set_user_data(data);
+      LinkSource(&source);
+      if (source.is_ready() && !source.in_ready_queue()) {
+        EnqueueReadyLocked(&source);
+        if (waiters_ > 0 && (!signaled_ || waiters_ > 1)) {
+          signaled_ = true;
+          needs_notify = true;
         }
       }
-    }
-    if (!reserved) {
-      source.RemoveWakeup();
-      source.set_in_ready_queue(false);
-      return UEVENT_ERR_NO_MEM;
+      const uint32_t effective_timeout_ms =
+          (timeout_ms > 0) ? static_cast<uint32_t>(timeout_ms) : source.timer_period_ms();
+      if (effective_timeout_ms > 0) {
+        source.deadline_ = cv_.timespec_add_ms(cv_.get_now(), effective_timeout_ms);
+        if (!source.has_deadline_) {
+          source.has_deadline_ = true;
+          ++deadline_count_;
+        }
+        deadlines_changed_ = true;
+        if (waiters_ > 0 && (!signaled_ || waiters_ > 1)) {
+          signaled_ = true;
+          needs_notify = true;
+        }
+      }
     }
     if (needs_notify) {
       cv_.notify_one();
@@ -187,21 +104,13 @@ class EventPoll {
     {
       base::LockGuard<base::Mutex> lk(mu_);
       UnlinkSource(&source);
-      if (source.in_ready_queue()) {
-        source.set_in_ready_queue(false);
-        ready_queue_.remove(&source);
-        if (ready_count_ > 0) --ready_count_;
-      }
+      RemoveReadyLocked(&source);
       ClearTimeoutStateLocked(&source);
     }
     source.ClearWakeup();
     {
       base::LockGuard<base::Mutex> lk(mu_);
-      if (source.in_ready_queue()) {
-        source.set_in_ready_queue(false);
-        ready_queue_.remove(&source);
-        if (ready_count_ > 0) --ready_count_;
-      }
+      RemoveReadyLocked(&source);
     }
     source.OnRemoved();
     return UEVENT_OK;
@@ -249,13 +158,10 @@ class EventPoll {
     {
       base::LockGuard<base::Mutex> lk(mu_);
       if (!source->in_ready_queue()) {
-        if (ready_queue_.push(source)) {
-          source->set_in_ready_queue(true);
-          ++ready_count_;
-          if (waiters_ > 0 && (!signaled_ || waiters_ > 1)) {
-            signaled_ = true;
-            needs_notify = true;
-          }
+        EnqueueReadyLocked(source);
+        if (waiters_ > 0 && (!signaled_ || waiters_ > 1)) {
+          signaled_ = true;
+          needs_notify = true;
         }
       }
     }
@@ -313,40 +219,29 @@ class EventPoll {
             s->timeout_fired_ = false;
             --timeout_fired_count_;
             emit(count++, s);
-            if (s->in_ready_queue()) {
-              s->set_in_ready_queue(false);
-              ready_queue_.remove(s);
-              if (ready_count_ > 0) --ready_count_;
-            }
+            RemoveReadyLocked(s);
           }
         }
       }
 
-      while (!ready_queue_.empty() && count < max_ready) {
-        auto *s = ready_queue_.pop();
-        if (!s) continue;
-        if (!s->in_ready_queue()) continue;
-        s->set_in_ready_queue(false);
+      while (ready_head_ != nullptr && count < max_ready) {
+        auto *s = DequeueReadyLocked();
         // Dekker fence: pairs with notify_waiters() fence before in_ready_queue_ load.
         std::atomic_thread_fence(std::memory_order_seq_cst);
-        if (ready_count_ > 0) --ready_count_;
         if (s->is_ready()) {
           emit(count++, s);
         }
       }
 
-      // Level-triggered fallback scan when nothing collected and ready_queue_ is empty.
+      // Level-triggered fallback scan when nothing collected and ready queue is empty.
       // Collect directly via emit() to avoid double is_ready() calls and queue churn.
-      if (count == 0 && ready_queue_.empty()) {
+      if (count == 0 && ready_head_ == nullptr) {
         for (EventSource *s = sources_head_; s != nullptr; s = s->poll_next_) {
           if (s->is_ready()) {
             if (count < max_ready) {
               emit(count++, s);
-            } else if (!s->in_ready_queue()) {
-              if (ready_queue_.push(s)) {
-                s->set_in_ready_queue(true);
-                ++ready_count_;
-              }
+            } else {
+              EnqueueReadyLocked(s);
             }
           }
         }
@@ -454,6 +349,54 @@ class EventPoll {
     --source_count_;
   }
 
+  void EnqueueReadyLocked(EventSource *s) {
+    if (s->in_ready_queue()) return;
+    s->ready_prev_ = ready_tail_;
+    s->ready_next_ = nullptr;
+    if (ready_tail_) {
+      ready_tail_->ready_next_ = s;
+    } else {
+      ready_head_ = s;
+    }
+    ready_tail_ = s;
+    s->set_in_ready_queue(true);
+    ++ready_count_;
+  }
+
+  EventSource *DequeueReadyLocked() {
+    EventSource *s = ready_head_;
+    if (!s) return nullptr;
+    ready_head_ = s->ready_next_;
+    if (ready_head_) {
+      ready_head_->ready_prev_ = nullptr;
+    } else {
+      ready_tail_ = nullptr;
+    }
+    s->ready_prev_ = nullptr;
+    s->ready_next_ = nullptr;
+    s->set_in_ready_queue(false);
+    if (ready_count_ > 0) --ready_count_;
+    return s;
+  }
+
+  void RemoveReadyLocked(EventSource *s) {
+    if (!s->in_ready_queue()) return;
+    if (s->ready_prev_) {
+      s->ready_prev_->ready_next_ = s->ready_next_;
+    } else {
+      ready_head_ = s->ready_next_;
+    }
+    if (s->ready_next_) {
+      s->ready_next_->ready_prev_ = s->ready_prev_;
+    } else {
+      ready_tail_ = s->ready_prev_;
+    }
+    s->ready_prev_ = nullptr;
+    s->ready_next_ = nullptr;
+    s->set_in_ready_queue(false);
+    if (ready_count_ > 0) --ready_count_;
+  }
+
   void ClearTimeoutStateLocked(EventSource *s) {
     if (s->has_deadline_) {
       s->has_deadline_ = false;
@@ -470,7 +413,8 @@ class EventPoll {
   EventSource *sources_head_{nullptr};
   EventSource *sources_tail_{nullptr};
   size_t source_count_{0};
-  RingBuffer ready_queue_;
+  EventSource *ready_head_{nullptr};
+  EventSource *ready_tail_{nullptr};
   size_t ready_count_{0};
   size_t deadline_count_{0};
   size_t timeout_fired_count_{0};
