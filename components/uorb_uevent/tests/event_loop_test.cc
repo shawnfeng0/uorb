@@ -967,4 +967,97 @@ TEST(AsyncDispatcherTest, TimersPeriodicOneShotSelfUnsubscribeAndScoped) {
   dispatcher.Stop();
 }
 
+TEST(EventLoopTest, UnsubscribeAddTimerAndMemberFunctionBinding) {
+  struct Receiver {
+    int last_val{0};
+    int msg_calls{0};
+    int timer_ticks{0};
+    void OnMsg(const orb_test_volatile_s &m) {
+      last_val = m.val;
+      ++msg_calls;
+    }
+    void OnTick() { ++timer_ticks; }
+  };
+
+  uorb::EventLoop loop;
+  ASSERT_TRUE(loop);
+  Receiver recv;
+
+  const auto msg_tok = loop.Subscribe<uorb::msg::orb_test_volatile>(&Receiver::OnMsg, &recv);
+  ASSERT_NE(msg_tok, uorb::EventLoop::kInvalidToken);
+  const auto timer_tok = loop.AddTimer(15, &Receiver::OnTick, &recv, true);
+  ASSERT_NE(timer_tok, uorb::EventLoop::kInvalidToken);
+
+  // Self-unsubscribing callback.
+  int self_calls = 0;
+  uorb::EventLoop::Token self_tok = uorb::EventLoop::kInvalidToken;
+  self_tok = loop.Subscribe<uorb::msg::orb_test_volatile>(
+      [&](const orb_test_volatile_s &) {
+        ++self_calls;
+        EXPECT_TRUE(loop.Unsubscribe(self_tok));
+      });
+  ASSERT_NE(self_tok, uorb::EventLoop::kInvalidToken);
+
+  orb_test_volatile_s m{};
+  m.val = 55;
+  ASSERT_EQ(uorb::publish<uorb::msg::orb_test_volatile>(m), ORB_OK);
+  EXPECT_GE(loop.RunOnce(100), 1);
+  EXPECT_EQ(recv.last_val, 55);
+  EXPECT_EQ(recv.msg_calls, 1);
+  EXPECT_EQ(self_calls, 1);
+
+  // Publish again: self-unsubscribed callback must not fire; member callback still fires.
+  m.val = 66;
+  ASSERT_EQ(uorb::publish<uorb::msg::orb_test_volatile>(m), ORB_OK);
+  EXPECT_GE(loop.RunOnce(100), 1);
+  EXPECT_EQ(recv.last_val, 66);
+  EXPECT_EQ(recv.msg_calls, 2);
+  EXPECT_EQ(self_calls, 1);
+
+  // Wait for at least 1 timer tick, then cancel timer & unsubscribe member callback.
+  EXPECT_GE(loop.RunOnce(200), 1);
+  EXPECT_GE(recv.timer_ticks, 1);
+  EXPECT_TRUE(loop.Unsubscribe(timer_tok));
+  EXPECT_FALSE(loop.Unsubscribe(timer_tok));
+  EXPECT_TRUE(loop.Unsubscribe(msg_tok));
+}
+
+TEST(AsyncDispatcherTest, MemberFunctionBindingForTopicsAndTimers) {
+  struct Handler {
+    std::atomic<int> msg_val{0};
+    std::atomic<int> ticks{0};
+    void OnMsg(const orb_test_volatile_s &m) {
+      msg_val.store(m.val, std::memory_order_release);
+    }
+    void OnTimer() { ticks.fetch_add(1, std::memory_order_acq_rel); }
+  };
+
+  uorb::AsyncDispatcher dispatcher;
+  ASSERT_TRUE(dispatcher);
+  ASSERT_TRUE(dispatcher.Start());
+
+  Handler h;
+  auto msg_guard = dispatcher.SubscribeScoped<uorb::msg::orb_test_volatile>(&Handler::OnMsg, &h);
+  auto timer_guard = dispatcher.AddTimerScoped(15, &Handler::OnTimer, &h, true);
+  ASSERT_TRUE(msg_guard);
+  ASSERT_TRUE(timer_guard);
+
+  orb_test_volatile_s m{};
+  m.val = 88;
+  ASSERT_EQ(uorb::publish<uorb::msg::orb_test_volatile>(m), ORB_OK);
+
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+  while ((h.msg_val.load(std::memory_order_acquire) != 88 ||
+          h.ticks.load(std::memory_order_acquire) < 1) &&
+         std::chrono::steady_clock::now() < deadline) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  EXPECT_EQ(h.msg_val.load(), 88);
+  EXPECT_GE(h.ticks.load(), 1);
+
+  msg_guard.Reset();
+  timer_guard.Reset();
+  dispatcher.Stop();
+}
+
 }  // namespace uORBTest

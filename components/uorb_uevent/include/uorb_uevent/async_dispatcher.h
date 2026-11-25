@@ -340,6 +340,25 @@ class AsyncDispatcher {
     return ScopedSubscription(this, tok);
   }
 
+  /// Member-function overload for Subscribe().
+  template <const orb_metadata &meta, typename C, typename R>
+  Token Subscribe(R (C::*method)(const typename msg::TypeMap<meta>::type &),
+                  C *obj, unsigned instance = 0,
+                  ConsumePolicy policy = ConsumePolicy::kSingle) {
+    if (!obj) return kInvalidToken;
+    return Subscribe<meta>(
+        [obj, method](const typename msg::TypeMap<meta>::type &m) { (obj->*method)(m); },
+        instance, policy);
+  }
+
+  /// Member-function overload for SubscribeScoped().
+  template <const orb_metadata &meta, typename C, typename R>
+  ScopedSubscription SubscribeScoped(R (C::*method)(const typename msg::TypeMap<meta>::type &),
+                                     C *obj, unsigned instance = 0,
+                                     ConsumePolicy policy = ConsumePolicy::kSingle) {
+    return ScopedSubscription(this, Subscribe<meta>(method, obj, instance, policy));
+  }
+
   /// Register a monotonic timer callback dispatched on the worker thread.
   /// Thread-safe: may be called before or after Start(), from any thread, or
   /// from inside another callback. Cancel via Unsubscribe(token).
@@ -368,6 +387,20 @@ class AsyncDispatcher {
   ScopedSubscription AddTimerScoped(uint32_t period_ms, Callback &&cb, bool periodic = true) {
     const Token tok = AddTimer(period_ms, std::forward<Callback>(cb), periodic);
     return ScopedSubscription(this, tok);
+  }
+
+  /// Member-function overload for AddTimer().
+  template <typename C, typename R>
+  Token AddTimer(uint32_t period_ms, R (C::*method)(), C *obj, bool periodic = true) {
+    if (!obj) return kInvalidToken;
+    return AddTimer(period_ms, [obj, method]() { (obj->*method)(); }, periodic);
+  }
+
+  /// Member-function overload for AddTimerScoped().
+  template <typename C, typename R>
+  ScopedSubscription AddTimerScoped(uint32_t period_ms, R (C::*method)(), C *obj,
+                                    bool periodic = true) {
+    return ScopedSubscription(this, AddTimer(period_ms, method, obj, periodic));
   }
 
   /// Unsubscribe a previously registered callback by token.

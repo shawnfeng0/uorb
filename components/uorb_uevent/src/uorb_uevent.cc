@@ -11,6 +11,7 @@
 #include <new>
 
 namespace uorb {
+constexpr EventLoop::Token EventLoop::kInvalidToken;
 constexpr AsyncDispatcher::Token AsyncDispatcher::kInvalidToken;
 }  // namespace uorb
 

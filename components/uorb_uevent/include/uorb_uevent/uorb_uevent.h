@@ -62,18 +62,16 @@ namespace uorb {
  */
 class EventLoop {
  public:
+  using Token = uint64_t;
+  static constexpr Token kInvalidToken = 0;
+
   EventLoop() { uevent_create(&base_); }
   ~EventLoop() {
     EntryBase *cur = entries_head_;
     entries_head_ = nullptr;
     while (cur != nullptr) {
       EntryBase *next = cur->next;
-      if (base_._handle) {
-        uevent_remove(&base_, &cur->source);
-      }
-      uorb_subscriber_destroy_source(&cur->source);
-      orb_subscriber_destroy(&cur->sub);
-      delete cur;
+      DestroyEntry(cur);
       cur = next;
     }
     if (base_._handle) {
@@ -87,16 +85,16 @@ class EventLoop {
   explicit operator bool() const { return base_._handle != nullptr; }
 
   template <const orb_metadata &meta, typename Callback>
-  bool Subscribe(Callback &&cb) {
-    if (!base_._handle) return false;
+  Token Subscribe(Callback &&cb, unsigned instance = 0) {
+    if (!base_._handle) return kInvalidToken;
 
     orb_subscriber_t sub = ORB_SUBSCRIBER_INITIALIZER;
-    if (orb_subscriber_create(&sub, &meta) != ORB_OK) return false;
+    if (orb_subscriber_create_multi(&sub, &meta, instance) != ORB_OK) return kInvalidToken;
 
     uevent_source_t source = UEVENT_SOURCE_INITIALIZER;
     if (uorb_subscriber_create_source(&source, &sub) != 0) {
       orb_subscriber_destroy(&sub);
-      return false;
+      return kInvalidToken;
     }
 
     using MsgType = typename msg::TypeMap<meta>::type;
@@ -106,19 +104,59 @@ class EventLoop {
     if (!entry) {
       uorb_subscriber_destroy_source(&source);
       orb_subscriber_destroy(&sub);
-      return false;
+      return kInvalidToken;
     }
 
-    entry->source.data.ptr = entry;
-    if (uevent_add(&base_, &entry->source, 0) != 0) {
-      uorb_subscriber_destroy_source(&entry->source);
-      orb_subscriber_destroy(&entry->sub);
-      delete entry;
-      return false;
+    return RegisterEntry(entry);
+  }
+
+  /// Member-function overload for Subscribe().
+  template <const orb_metadata &meta, typename C, typename R>
+  Token Subscribe(R (C::*method)(const typename msg::TypeMap<meta>::type &),
+                  C *obj, unsigned instance = 0) {
+    if (!obj) return kInvalidToken;
+    return Subscribe<meta>(
+        [obj, method](const typename msg::TypeMap<meta>::type &m) { (obj->*method)(m); },
+        instance);
+  }
+
+  /// Register a monotonic timer callback dispatched inside Run()/RunOnce().
+  template <typename Callback>
+  Token AddTimer(uint32_t period_ms, Callback &&cb, bool periodic = true) {
+    if (!base_._handle || period_ms == 0) return kInvalidToken;
+
+    uevent_source_t source = UEVENT_SOURCE_INITIALIZER;
+    if (uevent_timer_source_create(&source, period_ms, periodic) != 0) {
+      return kInvalidToken;
     }
 
-    entry->next = entries_head_;
-    entries_head_ = entry;
+    using Callable = typename std::decay<Callback>::type;
+    auto *entry = new (std::nothrow) TimerEntry<Callable>(source, std::forward<Callback>(cb));
+    if (!entry) {
+      uevent_source_destroy(&source);
+      return kInvalidToken;
+    }
+
+    return RegisterEntry(entry);
+  }
+
+  /// Member-function overload for AddTimer().
+  template <typename C, typename R>
+  Token AddTimer(uint32_t period_ms, R (C::*method)(), C *obj, bool periodic = true) {
+    if (!obj) return kInvalidToken;
+    return AddTimer(period_ms, [obj, method]() { (obj->*method)(); }, periodic);
+  }
+
+  /// Unsubscribe a topic or cancel a timer by token. Safe to call from inside a callback.
+  bool Unsubscribe(Token token) {
+    if (token == kInvalidToken) return false;
+    EntryBase *entry = UnlinkEntry(token);
+    if (!entry) return false;
+    if (entry->in_callback) {
+      entry->pending_destroy = true;
+      return true;
+    }
+    DestroyEntry(entry);
     return true;
   }
 
@@ -130,9 +168,13 @@ class EventLoop {
     if (n <= 0) return n;
 
     for (int i = 0; i < n; ++i) {
-      auto *entry = static_cast<EntryBase *>(ready[i].data.ptr);
-      if (entry) {
-        entry->Dispatch();
+      EntryBase *entry = FindEntry(ready[i].data.u64);
+      if (!entry) continue;
+      entry->in_callback = true;
+      entry->Dispatch();
+      entry->in_callback = false;
+      if (entry->pending_destroy) {
+        DestroyEntry(entry);
       }
     }
     return n;
@@ -173,7 +215,10 @@ class EventLoop {
 
     orb_subscriber_t sub;
     uevent_source_t source;
+    Token token{kInvalidToken};
     EntryBase *next{nullptr};
+    bool in_callback{false};
+    bool pending_destroy{false};
   };
 
   template <typename MsgType, typename Callable>
@@ -194,8 +239,72 @@ class EventLoop {
     Callable cb;
   };
 
+  template <typename Callable>
+  struct TimerEntry final : EntryBase {
+    template <typename G>
+    TimerEntry(uevent_source_t src, G &&g)
+        : EntryBase(ORB_SUBSCRIBER_INITIALIZER, src), cb(std::forward<G>(g)) {}
+
+    void Dispatch() override { cb(); }
+
+    Callable cb;
+  };
+
+  Token RegisterEntry(EntryBase *entry) {
+    Token tok = ++next_token_;
+    if (tok == kInvalidToken) {
+      tok = ++next_token_;
+    }
+    entry->token = tok;
+    entry->source.data.u64 = tok;
+    if (uevent_add(&base_, &entry->source, 0) != 0) {
+      uevent_source_destroy(&entry->source);
+      if (entry->sub._handle) {
+        orb_subscriber_destroy(&entry->sub);
+      }
+      delete entry;
+      return kInvalidToken;
+    }
+    entry->next = entries_head_;
+    entries_head_ = entry;
+    return tok;
+  }
+
+  EntryBase *FindEntry(Token token) const {
+    for (EntryBase *cur = entries_head_; cur != nullptr; cur = cur->next) {
+      if (cur->token == token) return cur;
+    }
+    return nullptr;
+  }
+
+  EntryBase *UnlinkEntry(Token token) {
+    EntryBase **pp = &entries_head_;
+    while (*pp != nullptr) {
+      if ((*pp)->token == token) {
+        EntryBase *found = *pp;
+        *pp = found->next;
+        found->next = nullptr;
+        return found;
+      }
+      pp = &((*pp)->next);
+    }
+    return nullptr;
+  }
+
+  void DestroyEntry(EntryBase *entry) {
+    if (base_._handle) {
+      uevent_remove(&base_, &entry->source);
+    }
+    uevent_source_destroy(&entry->source);
+    if (entry->sub._handle) {
+      orb_subscriber_destroy(&entry->sub);
+    }
+    delete entry;
+  }
+
   uevent_t base_ = UEVENT_INITIALIZER;
   EntryBase *entries_head_{nullptr};
+  Token next_token_{0};
   std::atomic<bool> quit_requested_{false};
 };
 
