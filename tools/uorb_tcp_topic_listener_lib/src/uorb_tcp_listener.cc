@@ -115,30 +115,44 @@ static void CmdStatus(uorb::listener::Fd &fd,
                       const std::vector<std::string> &) {
   char send_buffer[256];
   snprintf(send_buffer, sizeof(send_buffer),
-           "%-20s %-10s %-10s %-10s %-10s %-10s\n", "topic", "instance",
-           "queue", "sub", "pub", "index");
+           "%-20s %-10s %-10s %-10s %-10s %-10s %-10s\n", "topic", "instance",
+           "queue", "sub", "pub", "index", "age(ms)");
   fd.write(send_buffer);
 
-  size_t orb_topics_count = 0;
-  auto topics = orb_get_topics(&orb_topics_count);
-  for (size_t i = 0; i < orb_topics_count; ++i) {
-    for (size_t instance = 0; instance < ORB_MULTI_MAX_INSTANCES; ++instance) {
-      orb_status status{};
-      if (orb_get_topic_status(topics[i], instance, &status) == ORB_OK) {
-        std::string sub_count_str = std::to_string(status.subscriber_count);
-        if (status.has_untracked_subscriber) sub_count_str += "+";
+  struct StatusCtx {
+    uorb::listener::Fd *fd;
+    orb_abstime_us now_us;
+  } ctx{&fd, orb_absolute_time_us()};
 
-        std::string pub_count_str = std::to_string(status.publisher_count);
-        if (status.has_untracked_publisher) pub_count_str += "+";
+  orb_for_each_topic(
+      [](const struct orb_metadata *meta, unsigned int instance,
+         const struct orb_status *status, void *user_ctx) -> bool {
+        auto *c = static_cast<StatusCtx *>(user_ctx);
+        std::string sub_count_str = std::to_string(status->subscriber_count);
+        if (status->has_untracked_subscriber) sub_count_str += "+";
 
-        snprintf(send_buffer, sizeof(send_buffer),
-                 "%-20s %-10zu %-10d %-10s %-10s %-10d\n", topics[i]->o_name,
-                 instance, status.queue_size, sub_count_str.c_str(),
-                 pub_count_str.c_str(), status.latest_data_index);
-        fd.write(send_buffer);
-      }
-    }
-  }
+        std::string pub_count_str = std::to_string(status->publisher_count);
+        if (status->has_untracked_publisher) pub_count_str += "+";
+
+        std::string age_str = "-";
+        if (status->last_publish_time_us > 0) {
+          const uint64_t age_us =
+              (c->now_us >= status->last_publish_time_us)
+                  ? (c->now_us - status->last_publish_time_us)
+                  : 0;
+          age_str = std::to_string(age_us / 1000);
+        }
+
+        char line[256];
+        snprintf(line, sizeof(line),
+                 "%-20s %-10u %-10u %-10s %-10s %-10u %-10s\n", meta->o_name,
+                 instance, status->queue_size, sub_count_str.c_str(),
+                 pub_count_str.c_str(), status->latest_data_index,
+                 age_str.c_str());
+        c->fd->write(line);
+        return true;
+      },
+      &ctx);
 }
 
 static void TcpSocketSendThread(
