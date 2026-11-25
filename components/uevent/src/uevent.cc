@@ -78,6 +78,21 @@ class ManualEventSource final : public uevent::EventSource {
   std::atomic<bool> ready_{false};
 };
 
+// TimerEventSource: built-in monotonic one-shot or periodic timer source.
+class TimerEventSource final : public uevent::EventSource {
+ public:
+  TimerEventSource(uint32_t period_ms, bool periodic)
+      : period_ms_(period_ms), periodic_(periodic) {}
+
+  bool is_ready() const override { return false; }
+  uint32_t timer_period_ms() const override { return period_ms_; }
+  bool timer_periodic() const override { return periodic_; }
+
+ private:
+  const uint32_t period_ms_;
+  const bool periodic_;
+};
+
 }  // anonymous namespace
 
 // ---- C API implementation ----
@@ -217,5 +232,20 @@ int uevent_manual_source_reset(uevent_source_t *src) {
     errno = EINVAL;
     return -1;
   }
+  return 0;
+}
+
+int uevent_timer_source_create(uevent_source_t *src, uint32_t period_ms, bool periodic) {
+  if (!src || period_ms == 0) {
+    errno = EINVAL;
+    return -1;
+  }
+  auto *source = new (std::nothrow) TimerEventSource(period_ms, periodic);
+  if (!source) {
+    errno = ENOMEM;
+    return -1;
+  }
+  src->_handle = source;
+  src->data.u64 = 0;
   return 0;
 }

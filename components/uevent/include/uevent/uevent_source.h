@@ -89,6 +89,10 @@ class EventSource {
   virtual bool Trigger() { return false; }
   virtual bool Reset() { return false; }
 
+  // Optional timer hooks (implemented by TimerEventSource, zero RTTI).
+  virtual uint32_t timer_period_ms() const { return 0; }
+  virtual bool timer_periodic() const { return false; }
+
   // Wake the EventPoll blocked in Wait(). Call this from the event-producing
   // path (e.g., publisher thread). Thread-safe.
   void notify_waiters();

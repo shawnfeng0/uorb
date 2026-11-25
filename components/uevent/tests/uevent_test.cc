@@ -1128,3 +1128,55 @@ TEST(UeventTest, ConcurrentRemoveDestroyWhileLoopReturnsUserData) {
   looper.join();
   uevent_destroy(&base);
 }
+
+// ---- Built-in timer event source ----
+
+TEST(UeventTest, TimerSourceOneShotAndPeriodic) {
+  // Invalid arguments rejected.
+  errno = 0;
+  EXPECT_EQ(uevent_timer_source_create(nullptr, 10, false), -1);
+  EXPECT_EQ(errno, EINVAL);
+
+  uevent_source_t invalid_timer = UEVENT_SOURCE_INITIALIZER;
+  errno = 0;
+  EXPECT_EQ(uevent_timer_source_create(&invalid_timer, 0, true), -1);
+  EXPECT_EQ(errno, EINVAL);
+
+  uevent_t base = UEVENT_INITIALIZER;
+  ASSERT_EQ(uevent_create(&base), 0);
+
+  // One-shot timer: fires once, then does not re-fire.
+  uevent_source_t oneshot = UEVENT_SOURCE_INITIALIZER;
+  ASSERT_EQ(uevent_timer_source_create(&oneshot, 20, false), 0);
+  oneshot.data.u32 = 1U;
+  ASSERT_EQ(uevent_add(&base, &oneshot, 0), 0);
+
+  uevent_source_t ready[2] = {};
+  ASSERT_EQ(uevent_loop(&base, ready, 2, 500), 1);
+  EXPECT_EQ(ready[0]._handle, oneshot._handle);
+  EXPECT_EQ(ready[0].data.u32, 1U);
+
+  // Must not fire again.
+  EXPECT_EQ(uevent_loop(&base, ready, 2, 40), 0);
+  ASSERT_EQ(uevent_remove(&base, &oneshot), 0);
+  uevent_source_destroy(&oneshot);
+
+  // Periodic timer: fires repeatedly without manual re-arming.
+  uevent_source_t periodic = UEVENT_SOURCE_INITIALIZER;
+  ASSERT_EQ(uevent_timer_source_create(&periodic, 15, true), 0);
+  periodic.data.u32 = 2U;
+  ASSERT_EQ(uevent_add(&base, &periodic, 0), 0);
+
+  int ticks = 0;
+  for (int i = 0; i < 3; ++i) {
+    ASSERT_EQ(uevent_loop(&base, ready, 2, 500), 1);
+    EXPECT_EQ(ready[0]._handle, periodic._handle);
+    EXPECT_EQ(ready[0].data.u32, 2U);
+    ++ticks;
+  }
+  EXPECT_EQ(ticks, 3);
+
+  ASSERT_EQ(uevent_remove(&base, &periodic), 0);
+  uevent_source_destroy(&periodic);
+  uevent_destroy(&base);
+}

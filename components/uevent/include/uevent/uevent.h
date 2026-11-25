@@ -209,6 +209,21 @@ int uevent_manual_source_trigger(uevent_source_t *src);
  */
 int uevent_manual_source_reset(uevent_source_t *src);
 
+/**
+ * Create a built-in monotonic timer event source (zero extra threads or OS timerfd).
+ *
+ * When added to an event base via uevent_add(), the source fires after period_ms.
+ * If periodic is true, it automatically re-arms for the next period on each firing
+ * (catching up if delayed to avoid callback storms). Remove via uevent_remove()
+ * and destroy via uevent_source_destroy().
+ *
+ * @param src       event source handle to initialize
+ * @param period_ms timer interval in milliseconds (must be > 0)
+ * @param periodic  true for repeating timer, false for one-shot timer
+ * @return 0 on success, -1 on error (errno = EINVAL or ENOMEM)
+ */
+int uevent_timer_source_create(uevent_source_t *src, uint32_t period_ms, bool periodic);
+
 #ifdef __cplusplus
 }
 #endif

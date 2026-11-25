@@ -154,8 +154,10 @@ class EventPoll {
             needs_notify = true;
           }
         }
-        if (timeout_ms > 0) {
-          source.deadline_ = cv_.timespec_add_ms(cv_.get_now(), timeout_ms);
+        const uint32_t effective_timeout_ms =
+            (timeout_ms > 0) ? static_cast<uint32_t>(timeout_ms) : source.timer_period_ms();
+        if (effective_timeout_ms > 0) {
+          source.deadline_ = cv_.timespec_add_ms(cv_.get_now(), effective_timeout_ms);
           if (!source.has_deadline_) {
             source.has_deadline_ = true;
             ++deadline_count_;
@@ -290,6 +292,17 @@ class EventPoll {
             if (!s->timeout_fired_) {
               s->timeout_fired_ = true;
               ++timeout_fired_count_;
+            }
+            // Automatically re-arm periodic timer sources (catch up if stalled to avoid storms).
+            const uint32_t period_ms = s->timer_period_ms();
+            if (s->timer_periodic() && period_ms > 0) {
+              struct timespec next_dl = cv_.timespec_add_ms(s->deadline_, period_ms);
+              if (cv_.timespec_ge(now, next_dl)) {
+                next_dl = cv_.timespec_add_ms(now, period_ms);
+              }
+              s->deadline_ = next_dl;
+              s->has_deadline_ = true;
+              ++deadline_count_;
             }
           }
         }
