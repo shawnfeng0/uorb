@@ -157,9 +157,11 @@ orb_err orb_subscriber_set_callback(orb_subscriber_t *sub,
   synchronous callback (it's the caller's source buffer, not a copy).
 - `ctx` uses the union so callers can pass either a pointer or an
   integer, similar to POSIX `union sigval`.
-- **Callback safety**: may call `orb_subscriber_copy()` on the same
-  topic (uses `data_lock_`, no conflict with `callback_lock_`). Must
-  NOT call `orb_publisher_publish()` on the same topic.
+- **Callback safety**: dispatched with **no DeviceNode locks held**. May
+  safely call `orb_subscriber_copy()` (lock-free), `orb_publisher_publish()`
+  (even on the same topic, bounded by `kMaxSyncCallbackDepth = 16`),
+  `orb_subscriber_clear_callback()`, `orb_subscriber_destroy()`, or acquire
+  application mutexes without lock-order deadlocks.
 - `set_callback`, `clear_callback`, and `destroy` on the same subscriber
   must not be called concurrently with each other.
 
@@ -170,8 +172,11 @@ Publish(data)
   → write to ring buffer under data_lock_
   → release data_lock_
   → if callback_count_ > 0 (Dekker seq_cst fast-path):
-      for each CallbackEntry under callback_lock_:
-        entry.on_publish(data, entry.ctx)   // direct call to user callback
+      DispatchCallbacks(data):
+        advance stack cursor & increment active_calls under callback_lock_
+        release callback_lock_
+        entry.on_publish(data, entry.ctx)   // direct call, NO locks held
+        re-acquire callback_lock_, decrement active_calls, notify callback_cv_
 ```
 
 ## 8. DeviceNode Lifecycle
@@ -232,9 +237,12 @@ map them to `errno` values. Callers test with `err != ORB_OK` or
 3. **Using std primitives**: See RTOS constraints above. Always use
    `base::` wrappers or raw pthread.
 
-4. **Locking in callbacks**: Callbacks run under `callback_lock_`. Do
-   not acquire `callback_lock_` again (deadlock). Do not call Publish
-   on the same topic (lock-order violation). Calling Copy is safe.
+4. **Heavy work or cyclic publish in sync callbacks**: Sync callbacks run
+   on the publisher's thread with no DeviceNode locks held (so re-publishing
+   or locking application mutexes won't deadlock `callback_lock_`), but
+   deep cyclic chains hit `kMaxSyncCallbackDepth = 16` (skipping further
+   notifications for that publish) and slow callbacks stall publishers.
+   Prefer `uorb::EventLoop` or `uorb::AsyncDispatcher` for business logic.
 
 5. **ClearWakeup inside mu_**: Never call `ClearWakeup()` while holding
    `EventPoll::mu_`. It internally calls `notify_waiters()` which

@@ -196,12 +196,13 @@ orb_err orb_subscriber_set_callback(orb_subscriber_t *sub, orb_subscriber_callba
   }
   r->callback_entry.on_publish = cb;
   r->callback_entry.ctx = ctx;
+  r->callback_registered = true;
   if (!r->dev.RegisterCallback(&r->callback_entry)) {
+    r->callback_registered = false;
     r->callback_entry.on_publish = nullptr;
     r->callback_entry.ctx = {};
     return ORB_ERR_UNKNOWN;
   }
-  r->callback_registered = true;
   return ORB_OK;
 }
 

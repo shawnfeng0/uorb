@@ -434,11 +434,15 @@ typedef union {
  * Invoked when new data is published to the subscription's topic.
  * Use this to integrate with external event loops (see uorb_uevent/uorb_uevent.h).
  *
- * Note: The callback is invoked while the DeviceNode's callback_lock_ is held.
- * Since data operations (Copy/Publish) use a separate data_lock_, the callback
- * may safely call orb_subscriber_copy() on the same topic without deadlock.
- * Do not call orb_publisher_publish() on the same topic from the callback, as
- * this would acquire data_lock_ and then callback_lock_ in the same thread.
+ * Note: Callbacks are dispatched synchronously on the publisher's thread with
+ * NO DeviceNode locks held (neither data_lock_ nor callback_lock_). Therefore,
+ * callbacks may safely call orb_subscriber_copy() (lock-free),
+ * orb_publisher_publish() (even on the same topic, bounded by
+ * kMaxSyncCallbackDepth = 16), orb_subscriber_clear_callback(),
+ * orb_subscriber_destroy(), or acquire application mutexes without lock-order
+ * deadlocks. For heavier business logic or deep publish chains, prefer
+ * uorb::EventLoop or uorb::AsyncDispatcher so publishers only perform O(1)
+ * wakeup signals.
  *
  * @param msg pointer to the published message data (valid during the callback)
  * @param ctx user context passed to orb_subscriber_set_callback()
