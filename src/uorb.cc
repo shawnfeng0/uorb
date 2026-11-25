@@ -7,8 +7,16 @@
 
 #include <new>
 
+#include "base/allocator.h"
 #include "device_master.h"
 #include "device_node.h"
+
+namespace uorb {
+namespace base {
+std::atomic<orb_alloc_fn> Allocator::alloc_fn_{nullptr};
+std::atomic<orb_free_fn> Allocator::free_fn_{nullptr};
+}  // namespace base
+}  // namespace uorb
 
 using namespace uorb;
 
@@ -117,7 +125,7 @@ orb_err orb_subscriber_create_multi(orb_subscriber_t *sub, const struct orb_meta
     return err;
   }
 
-  auto *subscriber = new (std::nothrow) ReceiverLocal(*dev);
+  auto *subscriber = base::Allocator::New<ReceiverLocal>(*dev);
   if (!subscriber) {
     return ORB_ERR_NO_MEM;
   }
@@ -137,7 +145,7 @@ void orb_subscriber_destroy(orb_subscriber_t *sub) {
     r->dev.UnregisterCallback(&r->callback_entry);
     r->callback_registered = false;
   }
-  delete r;
+  base::Allocator::Delete(r);
   sub->_handle = nullptr;
 }
 
@@ -256,6 +264,23 @@ orb_err orb_get_topic_status(const struct orb_metadata *meta, unsigned int insta
 size_t orb_for_each_topic(orb_topic_visitor_fn visitor, void *ctx) {
   auto &master = DeviceMaster::get_instance();
   return master.ForEachTopic(visitor, ctx);
+}
+
+orb_err orb_set_allocator(orb_alloc_fn alloc_fn, orb_free_fn free_fn) {
+  return base::Allocator::Set(alloc_fn, free_fn);
+}
+
+orb_err orb_topic_preallocate(const struct orb_metadata *meta, unsigned int instance) {
+  if (!meta || instance >= ORB_MULTI_MAX_INSTANCES) {
+    return ORB_ERR_INVALID;
+  }
+  auto &master = DeviceMaster::get_instance();
+  DeviceNode *dev = nullptr;
+  const orb_err err = master.OpenDeviceNode(*meta, instance, &dev);
+  if (err != ORB_OK) {
+    return err;
+  }
+  return dev->EnsureBuffer() ? ORB_OK : ORB_ERR_NO_MEM;
 }
 
 const char *orb_version(void) { return UORB_GIT_TAG; }

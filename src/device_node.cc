@@ -6,6 +6,8 @@
 #include <new>
 #include <type_traits>
 
+#include "base/allocator.h"
+
 static_assert(alignof(std::atomic<size_t>) >= alignof(std::atomic<uint32_t>),
               "payload alignment must satisfy trailing uint32_t seq array alignment");
 static_assert(sizeof(std::atomic<size_t>) % alignof(std::atomic<uint32_t>) == 0,
@@ -124,7 +126,7 @@ uorb::DeviceNode::DeviceNode(const struct orb_metadata &meta, uint8_t instance)
       instance_(instance) {}
 
 uorb::DeviceNode::~DeviceNode() {
-  ::operator delete(buffer_.load(std::memory_order_relaxed));
+  base::Allocator::Free(buffer_.load(std::memory_order_relaxed));
 }
 
 bool uorb::DeviceNode::Copy(void *dst, unsigned *sub_generation_ptr) const {
@@ -204,39 +206,54 @@ unsigned uorb::DeviceNode::updates_available(unsigned generation) const {
   return generation_.load(std::memory_order_seq_cst) - generation;
 }
 
+bool uorb::DeviceNode::EnsureBuffer() {
+  if (buffer_.load(std::memory_order_acquire) != nullptr) {
+    return true;
+  }
+
+  base::LockGuard<base::Mutex> lg(data_lock_);
+  uint8_t *buf = buffer_.load(std::memory_order_relaxed);
+  if (buf != nullptr) {
+    return true;
+  }
+
+  const size_t total_bytes =
+      seq_offset_ + static_cast<size_t>(physical_slots_) * sizeof(std::atomic<uint32_t>);
+  void *raw = base::Allocator::Alloc(total_bytes);
+  if (nullptr == raw) {
+    return false;
+  }
+
+  buf = static_cast<uint8_t *>(raw);
+  auto *payload_init = reinterpret_cast<std::atomic<size_t> *>(buf);
+  const size_t total_payload_words = static_cast<size_t>(physical_slots_) * payload_words_;
+  for (size_t i = 0; i < total_payload_words; ++i) {
+    new (payload_init + i) std::atomic<size_t>(0);
+  }
+  auto *seq_init = reinterpret_cast<std::atomic<uint32_t> *>(buf + seq_offset_);
+  for (uint32_t i = 0; i < physical_slots_; ++i) {
+    new (seq_init + i) std::atomic<uint32_t>(0);
+  }
+
+  buffer_.store(buf, std::memory_order_release);
+  return true;
+}
+
 bool uorb::DeviceNode::Publish(const void *data) {
   if (data == nullptr) {
     return false;
+  }
+
+  if (buffer_.load(std::memory_order_acquire) == nullptr) {
+    if (!EnsureBuffer()) {
+      return false;
+    }
   }
 
   {
     base::LockGuard<base::Mutex> lg(data_lock_);
 
     uint8_t *buf = buffer_.load(std::memory_order_relaxed);
-    if (nullptr == buf) {
-      const size_t total_bytes =
-          seq_offset_ + static_cast<size_t>(physical_slots_) * sizeof(std::atomic<uint32_t>);
-      void *raw = ::operator new(total_bytes, std::nothrow);
-
-      /* failed or could not allocate */
-      if (nullptr == raw) {
-        return false;
-      }
-
-      buf = static_cast<uint8_t *>(raw);
-      auto *payload_init = reinterpret_cast<std::atomic<size_t> *>(buf);
-      const size_t total_payload_words = static_cast<size_t>(physical_slots_) * payload_words_;
-      for (size_t i = 0; i < total_payload_words; ++i) {
-        new (payload_init + i) std::atomic<size_t>(0);
-      }
-      auto *seq_init = reinterpret_cast<std::atomic<uint32_t> *>(buf + seq_offset_);
-      for (uint32_t i = 0; i < physical_slots_; ++i) {
-        new (seq_init + i) std::atomic<uint32_t>(0);
-      }
-
-      buffer_.store(buf, std::memory_order_release);
-    }
-
     auto *payload_base = reinterpret_cast<std::atomic<size_t> *>(buf);
     auto *seq_base = reinterpret_cast<std::atomic<uint32_t> *>(buf + seq_offset_);
 

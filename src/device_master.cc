@@ -3,6 +3,7 @@
 #include <atomic>
 #include <new>
 
+#include "base/allocator.h"
 #include "device_node.h"
 
 static_assert(sizeof(std::atomic<void *>) == sizeof(void *),
@@ -33,10 +34,11 @@ orb_err uorb::DeviceMaster::CreateAdvertiser(const orb_metadata &meta, unsigned 
     }
 
     if (!device_node) {
-      device_node = new (std::nothrow) DeviceNode(meta, static_cast<uint8_t>(group_tries));
-      if (!device_node) {
+      void *raw = base::Allocator::Alloc(sizeof(DeviceNode));
+      if (!raw) {
         return ORB_ERR_NO_MEM;
       }
+      device_node = new (raw) DeviceNode(meta, static_cast<uint8_t>(group_tries));
       device_node->add_publisher();
       node_list_.push_front(*device_node);
       meta.instances[group_tries].store(device_node, std::memory_order_release);
@@ -136,10 +138,11 @@ orb_err uorb::DeviceMaster::OpenDeviceNode(const orb_metadata &meta, unsigned in
     return ORB_OK;
   }
 
-  device_node = new (std::nothrow) DeviceNode(meta, static_cast<uint8_t>(instance));
-  if (!device_node) {
+  void *raw = base::Allocator::Alloc(sizeof(DeviceNode));
+  if (!raw) {
     return ORB_ERR_NO_MEM;
   }
+  device_node = new (raw) DeviceNode(meta, static_cast<uint8_t>(instance));
 
   node_list_.push_front(*device_node);
   meta.instances[instance].store(device_node, std::memory_order_release);

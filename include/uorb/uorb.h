@@ -208,6 +208,7 @@ extern "C" {
  *   orb_subscriber_clear_callback().
  * - Introspection: orb_exists(), orb_group_count(),
  *   orb_get_topic_status(), orb_for_each_topic(), orb_version(), orb_strerror().
+ * - Memory / RTOS: orb_set_allocator(), orb_topic_preallocate().
  * - Time: orb_absolute_time_us(), orb_elapsed_time_us().
  */
 
@@ -541,6 +542,38 @@ typedef bool (*orb_topic_visitor_fn)(const struct orb_metadata *meta,
  * @return Number of topic instances visited (0 if visitor is NULL or none exist)
  */
 size_t orb_for_each_topic(orb_topic_visitor_fn visitor, void *ctx);
+
+/**
+ * Custom allocator function signatures for deterministic / RTOS memory pools.
+ */
+typedef void *(*orb_alloc_fn)(size_t size);
+typedef void (*orb_free_fn)(void *ptr);
+
+/**
+ * Install custom allocator hooks for all internal uORB allocations
+ * (DeviceNode, ring buffers, and subscriber handles).
+ *
+ * Must be called before creating handles (or after destroying all active
+ * subscriber handles before restoring). Pass NULL for both to restore the
+ * default allocator. Passing only one NULL returns ORB_ERR_INVALID.
+ *
+ * @param alloc_fn Allocation function (must return at least max_align_t alignment)
+ * @param free_fn  Deallocation function
+ * @return ORB_OK on success, ORB_ERR_INVALID otherwise
+ */
+orb_err orb_set_allocator(orb_alloc_fn alloc_fn, orb_free_fn free_fn);
+
+/**
+ * Pre-allocate the DeviceNode and ring buffer for a topic instance.
+ *
+ * Calling this during startup guarantees that subsequent orb_publisher_publish()
+ * calls perform zero dynamic memory allocations (deterministic RT latency).
+ *
+ * @param meta     Topic metadata (ORB_ID(...))
+ * @param instance Topic instance (0 .. ORB_MULTI_MAX_INSTANCES - 1)
+ * @return ORB_OK on success, ORB_ERR_INVALID or ORB_ERR_NO_MEM on error
+ */
+orb_err orb_topic_preallocate(const struct orb_metadata *meta, unsigned int instance);
 
 /**
  * Get orb version string

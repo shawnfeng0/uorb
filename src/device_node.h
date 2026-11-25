@@ -47,6 +47,9 @@ class DeviceNode {
   // Publish data to this node.
   bool Publish(const void *data);
 
+  // Pre-allocate ring buffer storage so subsequent Publish() calls perform zero allocations.
+  bool EnsureBuffer();
+
   void FillStatus(orb_status *status) const;
 
   void add_subscriber();

@@ -1850,4 +1850,71 @@ TEST_F(UnitTest, topic_enumeration_and_last_publish_time_us) {
   orb_publisher_destroy(&pub_b);
 }
 
+TEST_F(UnitTest, custom_allocator_and_zero_heap_preallocate) {
+  static const struct orb_metadata prealloc_topic = {
+      "orb_prealloc_test", sizeof(orb_test_s), 0, "", 2, ORB_DURABILITY_DURABLE,
+      uorb::topic_hash("orb_prealloc_test"), {}};
+
+  // Half-NULL allocator hooks must be rejected.
+  auto dummy_alloc = [](size_t n) -> void * { return std::malloc(n); };
+  auto dummy_free = [](void *p) { std::free(p); };
+  EXPECT_EQ(orb_set_allocator(dummy_alloc, nullptr), ORB_ERR_INVALID);
+  EXPECT_EQ(orb_set_allocator(nullptr, dummy_free), ORB_ERR_INVALID);
+
+  // Invalid preallocate arguments rejected.
+  EXPECT_EQ(orb_topic_preallocate(nullptr, 0), ORB_ERR_INVALID);
+  EXPECT_EQ(orb_topic_preallocate(&prealloc_topic, ORB_MULTI_MAX_INSTANCES), ORB_ERR_INVALID);
+
+  // Install counting allocator.
+  static std::atomic<int> alloc_calls{0};
+  static std::atomic<int> free_calls{0};
+  alloc_calls.store(0);
+  free_calls.store(0);
+
+  ASSERT_EQ(orb_set_allocator(
+                [](size_t n) -> void * {
+                  alloc_calls.fetch_add(1, std::memory_order_relaxed);
+                  return std::malloc(n);
+                },
+                [](void *p) {
+                  free_calls.fetch_add(1, std::memory_order_relaxed);
+                  std::free(p);
+                }),
+            ORB_OK);
+
+  // Pre-allocate DeviceNode + ring buffer: must invoke custom allocator twice.
+  ASSERT_EQ(orb_topic_preallocate(&prealloc_topic, 0), ORB_OK);
+  EXPECT_EQ(alloc_calls.load(), 2);
+
+  // Second preallocate is idempotent (0 new allocations).
+  ASSERT_EQ(orb_topic_preallocate(&prealloc_topic, 0), ORB_OK);
+  EXPECT_EQ(alloc_calls.load(), 2);
+
+  orb_publisher_t pub = ORB_PUBLISHER_INITIALIZER;
+  ASSERT_EQ(orb_publisher_create(&pub, &prealloc_topic), ORB_OK);
+  orb_subscriber_t sub = ORB_SUBSCRIBER_INITIALIZER;
+  ASSERT_EQ(orb_subscriber_create(&sub, &prealloc_topic), ORB_OK);
+  EXPECT_EQ(alloc_calls.load(), 3);  // +1 for ReceiverLocal
+
+  // Hot path: Publish() and Copy() must perform ZERO allocations.
+  const int allocs_before_hot_path = alloc_calls.load();
+  for (int i = 1; i <= 10; ++i) {
+    orb_test_s m{};
+    m.val = i;
+    ASSERT_EQ(orb_publisher_publish(pub, &m), ORB_OK);
+    orb_test_s out{};
+    ASSERT_EQ(orb_subscriber_copy(sub, &out), ORB_OK);
+    EXPECT_EQ(out.val, i);
+  }
+  EXPECT_EQ(alloc_calls.load(), allocs_before_hot_path);
+
+  // Destroy subscriber before restoring default allocator so free_calls matches.
+  orb_subscriber_destroy(&sub);
+  EXPECT_EQ(free_calls.load(), 1);
+  orb_publisher_destroy(&pub);
+
+  // Restore default allocator.
+  ASSERT_EQ(orb_set_allocator(nullptr, nullptr), ORB_OK);
+}
+
 }  // namespace uORBTest
