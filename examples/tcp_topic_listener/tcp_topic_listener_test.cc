@@ -18,7 +18,6 @@
 #include "uorb/topics/sensor_accel.h"
 #include "uorb/topics/sensor_gyro.h"
 #include "uorb/topics/uorb_topics.h"
-#include "uorb_uevent/uorb_uevent.h"
 #include "uorb_tcp_listener.h"
 
 template <const orb_metadata &T>
@@ -70,8 +69,7 @@ template <const orb_metadata &T>
 
   uevent_t poll = UEVENT_INITIALIZER;
   uevent_create(&poll);
-  uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
-  uorb_subscriber_create_source(&src, subscription_data.handle());
+  uevent_source_t src = subscription_data.event_source();
   uevent_add(&poll, &src, 0);
 
   while (true) {

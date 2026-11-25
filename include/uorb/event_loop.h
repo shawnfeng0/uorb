@@ -1,47 +1,17 @@
 /**
- * @file uorb_uevent.h
- * Bridge between uORB subscriptions and the generic event loop.
+ * @file event_loop.h
+ * Single-threaded, user-driven C++ event loop for uORB topics and timers.
  *
- * This is the only header that knows about both uorb.h and uevent.h.
- * uORB and uevent libraries are completely independent.
+ * Spawns zero threads: callers drive callback dispatch on their own thread via
+ * Run() or RunOnce(). For a dedicated worker thread, see <uorb/async_dispatcher.h>.
  */
 
 #pragma once
 
-#include <uorb/uorb.h>
+#ifdef __cplusplus
+
 #include <uevent/uevent.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#define UORB_UEVENT_API_DECLARED 1
-
-/**
- * Create an event source that wraps a uORB subscription.
- *
- * The returned event source can be added to an event base via uevent_add().
- * When the subscription receives new data (published to its topic), the
- * event source will be notified and reported as ready in uevent_loop().
- *
- * @param src event source handle to initialize
- * @param sub uORB subscription handle
- * @return 0 on success, -1 on error
- */
-uevent_err uorb_subscriber_create_source(uevent_source_t *src, orb_subscriber_t sub);
-
-/**
- * Destroy an event source created by uorb_subscriber_create_source().
- *
- * The event source must be removed from the event base (via uevent_remove())
- * before calling this function.
- *
- * @param src event source handle (may be NULL)
- */
-void uorb_subscriber_destroy_source(uevent_source_t *src);
-
-#ifdef __cplusplus
-}
+#include <uorb/uorb.h>
 
 #include <atomic>
 #include <new>
@@ -52,13 +22,13 @@ namespace uorb {
 
 /**
  * EventLoop: C++ wrapper around the generic event loop C API.
- * Provides type-safe callback dispatch for uORB subscriptions without
- * std::function or hash map lookup overhead.
+ * Provides type-safe callback dispatch for uORB subscriptions and timers
+ * without std::function or hash map lookup overhead.
  *
  * Thread safety: Not thread-safe, except for Quit() which is thread-safe
- * and may be called from any thread. Subscribe, RunOnce, Run, and the
- * destructor must be called from the same thread. The callback dispatch
- * runs on the caller's thread inside RunOnce/Run.
+ * and may be called from any thread. Subscribe, AddTimer, Unsubscribe,
+ * RunOnce, Run, and the destructor must be called from the same thread.
+ * Callbacks run on the caller's thread inside RunOnce/Run.
  */
 class EventLoop {
  public:
@@ -91,8 +61,8 @@ class EventLoop {
     orb_subscriber_t sub = ORB_SUBSCRIBER_INITIALIZER;
     if (orb_subscriber_create_multi(&sub, &meta, instance) != ORB_OK) return kInvalidToken;
 
-    uevent_source_t source = UEVENT_SOURCE_INITIALIZER;
-    if (uorb_subscriber_create_source(&source, sub) != 0) {
+    uevent_source_t source = orb_subscriber_event_source(sub);
+    if (!source._handle) {
       orb_subscriber_destroy(&sub);
       return kInvalidToken;
     }
@@ -102,7 +72,6 @@ class EventLoop {
     auto *entry =
         new (std::nothrow) TypedEntry<MsgType, Callable>(sub, source, std::forward<Callback>(cb));
     if (!entry) {
-      uorb_subscriber_destroy_source(&source);
       orb_subscriber_destroy(&sub);
       return kInvalidToken;
     }
@@ -258,9 +227,10 @@ class EventLoop {
     entry->token = tok;
     entry->source.data.u64 = tok;
     if (uevent_add(&base_, &entry->source, 0) != 0) {
-      uevent_source_destroy(&entry->source);
       if (entry->sub._handle) {
         orb_subscriber_destroy(&entry->sub);
+      } else {
+        uevent_source_destroy(&entry->source);
       }
       delete entry;
       return kInvalidToken;
@@ -295,9 +265,10 @@ class EventLoop {
     if (base_._handle) {
       uevent_remove(&base_, &entry->source);
     }
-    uevent_source_destroy(&entry->source);
     if (entry->sub._handle) {
       orb_subscriber_destroy(&entry->sub);
+    } else {
+      uevent_source_destroy(&entry->source);
     }
     delete entry;
   }
@@ -309,7 +280,5 @@ class EventLoop {
 };
 
 }  // namespace uorb
-
-#include <uorb_uevent/async_dispatcher.h>
 
 #endif  // __cplusplus

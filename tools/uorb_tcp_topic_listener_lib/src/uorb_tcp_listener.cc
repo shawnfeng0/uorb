@@ -6,7 +6,6 @@
 
 #include <uorb/uorb.h>
 #include <uevent/uevent.h>
-#include <uorb_uevent/uorb_uevent.h>
 
 #include <csignal>
 #include <thread>
@@ -68,8 +67,7 @@ static void CmdListener(uorb::listener::Fd &fd,
 
   uevent_t poll = UEVENT_INITIALIZER;
   uevent_create(&poll);
-  uevent_source_t source = UEVENT_SOURCE_INITIALIZER;
-  uorb_subscriber_create_source(&source, sub);
+  uevent_source_t source = orb_subscriber_event_source(sub);
   uevent_add(&poll, &source, 0);
 
   uorb::listener::DataPrinter data_printer(*meta);
@@ -106,7 +104,6 @@ static void CmdListener(uorb::listener::Fd &fd,
   } while (true);
 
   uevent_remove(&poll, &source);
-  uorb_subscriber_destroy_source(&source);
   uevent_destroy(&poll);
   orb_subscriber_destroy(&sub);
 }

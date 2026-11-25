@@ -27,23 +27,16 @@
 #include <type_traits>
 #include <utility>
 
-#ifndef UORB_UEVENT_API_DECLARED
-extern "C" {
-uevent_err uorb_subscriber_create_source(uevent_source_t *src, orb_subscriber_t sub);
-void uorb_subscriber_destroy_source(uevent_source_t *src);
-}
-#endif
-
 namespace uorb {
 
 /**
  * AsyncDispatcher: thread-safe asynchronous callback dispatcher for uORB topics.
  *
- * Owns a single POSIX worker thread backed by uevent. Callbacks always execute
- * on the worker thread with no uORB or dispatcher locks held, so callbacks may
- * freely Publish() any topic (including the same topic), Copy() any topic,
- * acquire application mutexes, Subscribe() new topics, or Unsubscribe()
- * themselves.
+ * Owns a single POSIX worker thread backed by uevent (spawned only when the
+ * caller explicitly invokes Start()). Callbacks always execute on the worker
+ * thread with no uORB or dispatcher locks held, so callbacks may freely
+ * Publish() any topic (including the same topic), Copy() any topic, acquire
+ * application mutexes, Subscribe() new topics, or Unsubscribe() themselves.
  *
  * Compatible with C++14 and -fno-exceptions -fno-rtti (no STL containers,
  * std::thread, std::mutex, or std::function).
@@ -168,8 +161,8 @@ class AsyncDispatcher {
       return kInvalidToken;
     }
 
-    uevent_source_t source = UEVENT_SOURCE_INITIALIZER;
-    if (uorb_subscriber_create_source(&source, sub) != 0) {
+    uevent_source_t source = orb_subscriber_event_source(sub);
+    if (!source._handle) {
       orb_subscriber_destroy(&sub);
       return kInvalidToken;
     }
@@ -179,7 +172,6 @@ class AsyncDispatcher {
     auto *entry = new (std::nothrow)
         TypedEntry<MsgType, Callable>(sub, source, policy, std::forward<Callback>(cb));
     if (!entry) {
-      uorb_subscriber_destroy_source(&source);
       orb_subscriber_destroy(&sub);
       return kInvalidToken;
     }

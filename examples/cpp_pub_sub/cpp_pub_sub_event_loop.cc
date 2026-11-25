@@ -18,7 +18,7 @@
 #include "uorb/topics/example_string.h"
 #include "uorb/topics/sensor_accel.h"
 #include "uorb/topics/sensor_gyro.h"
-#include "uorb_uevent/uorb_uevent.h"
+#include "uorb/event_loop.h"
 
 void thread_publisher_example_string() {
   uorb::PublicationData<uorb::msg::example_string> pub_example_string;

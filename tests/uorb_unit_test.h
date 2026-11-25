@@ -42,7 +42,6 @@
 #include <uorb/topics/orb_test_queue_poll.h>
 #include <uorb/topics/orb_test_volatile.h>
 #include <uorb/uorb.h>
-#include <uorb_uevent/uorb_uevent.h>
 
 #include <cerrno>
 #include <cmath>
@@ -140,12 +139,9 @@ void uORBTest::UnitTest::latency_test(const orb_metadata *T) {
 
     uevent_t poll = UEVENT_INITIALIZER;
     uevent_create(&poll);
-    uevent_source_t src1 = UEVENT_SOURCE_INITIALIZER;
-    uorb_subscriber_create_source(&src1, test_multi_sub);
-    uevent_source_t src2 = UEVENT_SOURCE_INITIALIZER;
-    uorb_subscriber_create_source(&src2, test_multi_sub_medium);
-    uevent_source_t src3 = UEVENT_SOURCE_INITIALIZER;
-    uorb_subscriber_create_source(&src3, test_multi_sub_large);
+    uevent_source_t src1 = orb_subscriber_event_source(test_multi_sub);
+    uevent_source_t src2 = orb_subscriber_event_source(test_multi_sub_medium);
+    uevent_source_t src3 = orb_subscriber_event_source(test_multi_sub_large);
     uevent_add(&poll, &src1, 0);
     uevent_add(&poll, &src2, 0);
     uevent_add(&poll, &src3, 0);
@@ -201,9 +197,6 @@ void uORBTest::UnitTest::latency_test(const orb_metadata *T) {
     uevent_remove(&poll, &src1);
     uevent_remove(&poll, &src2);
     uevent_remove(&poll, &src3);
-    uorb_subscriber_destroy_source(&src1);
-    uorb_subscriber_destroy_source(&src2);
-    uorb_subscriber_destroy_source(&src3);
     uevent_destroy(&poll);
 
     orb_subscriber_destroy(&test_multi_sub);

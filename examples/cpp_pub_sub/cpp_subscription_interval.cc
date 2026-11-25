@@ -9,7 +9,6 @@
 #include "uorb/publication.h"
 #include "uorb/subscription_interval.h"
 #include "uorb/topics/sensor_accel.h"
-#include "uorb_uevent/uorb_uevent.h"
 
 void publish_accel_samples() {
   uorb::PublicationData<uorb::msg::sensor_accel> publisher;
@@ -39,8 +38,7 @@ int main() {
   uorb::SubscriptionInterval<uorb::msg::sensor_accel> subscription(500 * 1000);
   uevent_t poll = UEVENT_INITIALIZER;
   uevent_create(&poll);
-  uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
-  uorb_subscriber_create_source(&src, subscription.handle());
+  uevent_source_t src = subscription.event_source();
   uevent_add(&poll, &src, 0);
 
   std::thread publisher(publish_accel_samples);
@@ -62,7 +60,6 @@ int main() {
 
   publisher.join();
   uevent_remove(&poll, &src);
-  uorb_subscriber_destroy_source(&src);
   uevent_destroy(&poll);
   return 0;
 }

@@ -21,23 +21,52 @@ std::atomic<orb_free_fn> Allocator::free_fn_{nullptr};
 using namespace uorb;
 
 // ReceiverLocal: internal struct representing a uORB subscription.
-// Stores DeviceNode reference, generation tracking, and an optional
-// publish callback (set by the bridge library via orb_subscriber_set_callback).
-struct ReceiverLocal {
+// Inherits uevent::EventSource directly so any subscriber handle can be added
+// to a uevent loop via orb_subscriber_event_source() with zero extra allocation
+// and zero synchronous user-callback hooks.
+struct ReceiverLocal final : public uevent::EventSource {
   DeviceNode &dev;
   unsigned last_generation;
-  bool callback_registered;
-  detail::CallbackEntry callback_entry;
+  detail::WaiterEntry waiter_entry;
+  std::atomic<bool> waiter_registered{false};
 
   explicit ReceiverLocal(DeviceNode &device_node)
       : dev(device_node),
         last_generation(device_node.initial_generation()),
-        callback_registered(false) {
+        waiter_entry{this, {}} {
     device_node.add_subscriber();
   }
 
-  ~ReceiverLocal() {
+  ~ReceiverLocal() override {
+    if (waiter_registered.exchange(false, std::memory_order_acq_rel)) {
+      dev.UnregisterWaiter(&waiter_entry);
+    }
     dev.remove_subscriber();
+  }
+
+  bool is_owned_by_uevent() const override { return false; }
+
+  bool is_ready() const override { return updates_available() > 0; }
+
+  uevent_err SetWakeup(uevent::EventPoll *poll) override {
+    const uevent_err err = EventSource::SetWakeup(poll);
+    if (err != UEVENT_OK) {
+      return err;
+    }
+    if (!waiter_registered.exchange(true, std::memory_order_acq_rel)) {
+      if (!dev.RegisterWaiter(&waiter_entry)) {
+        waiter_registered.store(false, std::memory_order_release);
+        ClearWakeup();
+        return UEVENT_ERR_INVALID;
+      }
+    }
+    return UEVENT_OK;
+  }
+
+  void OnRemoved() override {
+    if (waiter_registered.exchange(false, std::memory_order_acq_rel)) {
+      dev.UnregisterWaiter(&waiter_entry);
+    }
   }
 
   bool Copy(void *buffer) { return dev.Copy(buffer, &last_generation); }
@@ -167,11 +196,6 @@ void orb_subscriber_destroy(orb_subscriber_t *sub) {
   }
 
   auto *r = reinterpret_cast<ReceiverLocal *>(sub->_handle);
-
-  if (r->callback_registered) {
-    r->dev.UnregisterCallback(&r->callback_entry);
-    r->callback_registered = false;
-  }
   base::Allocator::Delete(r);
   sub->_handle = nullptr;
 }
@@ -217,42 +241,14 @@ bool orb_subscriber_check_update(orb_subscriber_t sub) {
   return r.updates_available() > 0;
 }
 
-orb_err orb_subscriber_set_callback(orb_subscriber_t sub, orb_subscriber_callback_fn cb,
-                                    orb_callback_ctx ctx) {
-  if (!sub._handle || !cb) {
-    return ORB_ERR_INVALID;
-  }
-  auto *r = reinterpret_cast<ReceiverLocal *>(sub._handle);
-  if (r->callback_registered) {
-    return ORB_ERR_BUSY;
-  }
-  r->callback_entry.on_publish = cb;
-  r->callback_entry.ctx = ctx;
-  r->callback_registered = true;
-  if (!r->dev.RegisterCallback(&r->callback_entry)) {
-    r->callback_registered = false;
-    r->callback_entry.on_publish = nullptr;
-    r->callback_entry.ctx = {};
-    return ORB_ERR_UNKNOWN;
-  }
-  return ORB_OK;
-}
-
-orb_err orb_subscriber_clear_callback(orb_subscriber_t sub) {
+uevent_source_t orb_subscriber_event_source(orb_subscriber_t sub) {
+  uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
   if (!sub._handle) {
-    return ORB_ERR_INVALID;
+    return src;
   }
   auto *r = reinterpret_cast<ReceiverLocal *>(sub._handle);
-  if (!r->callback_registered) {
-    return ORB_OK;
-  }
-  bool ok = r->dev.UnregisterCallback(&r->callback_entry);
-  if (ok) {
-    r->callback_registered = false;
-    r->callback_entry.on_publish = nullptr;
-    r->callback_entry.ctx = {};
-  }
-  return ok ? ORB_OK : ORB_ERR_UNKNOWN;
+  src._handle = static_cast<uevent::EventSource *>(r);
+  return src;
 }
 
 bool orb_exists(const struct orb_metadata *meta, unsigned int instance) {

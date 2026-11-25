@@ -13,7 +13,6 @@
 #include "uorb/subscription.h"
 #include "uorb/subscription_interval.h"
 #include "uorb/topics/example_string.h"
-#include "uorb_uevent/uorb_uevent.h"
 
 void *thread_publisher(void *unused) {
   (void)unused;
@@ -46,8 +45,7 @@ void *thread_subscriber(void *unused) {
 
   uevent_t poll = UEVENT_INITIALIZER;
   uevent_create(&poll);
-  uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
-  uorb_subscriber_create_source(&src, sub_example_string.handle());
+  uevent_source_t src = sub_example_string.event_source();
   uevent_add(&poll, &src, 0);
 
   while (true) {
@@ -65,7 +63,6 @@ void *thread_subscriber(void *unused) {
   }
 
   uevent_remove(&poll, &src);
-  uorb_subscriber_destroy_source(&src);
   uevent_destroy(&poll);
 
   printf("subscription over\n");

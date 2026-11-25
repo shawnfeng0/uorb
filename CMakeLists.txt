@@ -21,9 +21,15 @@ message(STATUS "uORB version: ${UORB_GIT_TAG}")
 add_compile_options(-Wextra -Wall)
 
 # =============================================================================
-# Library 1: uorb (pub/sub only)
+# Library 1: uevent (generic event/wait primitive, independent of uORB)
+# =============================================================================
+add_subdirectory(components/uevent)
+
+# =============================================================================
+# Library 2: uorb (pub/sub + EventLoop/AsyncDispatcher built on uevent)
 # =============================================================================
 add_library(uorb STATIC
+        src/async_dispatcher.cc
         src/device_master.cc
         src/device_node.cc
         src/uorb.cc
@@ -31,22 +37,15 @@ add_library(uorb STATIC
 target_include_directories(uorb PUBLIC include)
 target_include_directories(uorb PRIVATE src)
 target_compile_definitions(uorb PRIVATE UORB_GIT_TAG="${UORB_GIT_TAG}")
-target_link_libraries(uorb PRIVATE pthread)
-
-# =============================================================================
-# Component libraries (uevent and bridge)
-# =============================================================================
-add_subdirectory(components/uevent)
-add_subdirectory(components/uorb_uevent)
+target_link_libraries(uorb PUBLIC uevent PRIVATE pthread)
 
 # =============================================================================
 # Install (disabled for embedded builds)
 # =============================================================================
-# install(TARGETS uorb uevent uorb_uevent
+# install(TARGETS uevent uorb
 #         ARCHIVE DESTINATION lib)
-# install(DIRECTORY include/uorb DESTINATION include)
 # install(DIRECTORY components/uevent/include/uevent DESTINATION include)
-# install(DIRECTORY components/uorb_uevent/include/uorb_uevent DESTINATION include)
+# install(DIRECTORY include/uorb DESTINATION include)
 
 # =============================================================================
 # Examples

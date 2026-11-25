@@ -10,6 +10,8 @@
 #include <stdint.h>
 #include <time.h>
 
+#include <uevent/uevent.h>
+
 #ifdef __cplusplus
 #include <atomic>
 #include <type_traits>
@@ -204,9 +206,8 @@ extern "C" {
  *   orb_publisher_discard_loan().
  * - Subscription: orb_subscriber_create(),
  *   orb_subscriber_create_multi(), orb_subscriber_destroy(), orb_subscriber_copy(),
- *   orb_subscriber_copy_once(), orb_subscriber_check_update().
- * - Publish callback: orb_subscriber_set_callback(),
- *   orb_subscriber_clear_callback().
+ *   orb_subscriber_copy_once(), orb_subscriber_check_update(),
+ *   orb_subscriber_event_source().
  * - Introspection: orb_exists(), orb_group_count(),
  *   orb_get_topic_status(), orb_for_each_topic(), orb_version(), orb_strerror().
  * - Memory / RTOS: orb_set_allocator(), orb_topic_preallocate().
@@ -376,9 +377,8 @@ orb_err orb_subscriber_create(orb_subscriber_t *sub, const struct orb_metadata *
  * Subscribe to a multi-instance of a topic.
  *
  * The returned value is a subscriber handle that can be passed to
- * orb_subscriber_set_callback() to receive publish notifications.
- * in order to wait for updates to a topic, as well as orb_subscriber_copy(),
- * orb_subscriber_check_update().
+ * orb_subscriber_event_source() to wait for updates via uevent, as well as
+ * orb_subscriber_copy() and orb_subscriber_check_update().
  *
  * If there were any publications of the topic prior to the subscription,
  * orb_subscriber_check_update() right after orb_subscriber_create() will return true.
@@ -464,63 +464,21 @@ orb_err orb_subscriber_copy_once(const struct orb_metadata *meta, void *buffer);
 bool orb_subscriber_check_update(orb_subscriber_t sub);
 
 /**
- * Callback context union, similar to POSIX union sigval.
- * The caller chooses whether to pass a pointer or an integer.
- */
-typedef union {
-  void *ptr;
-  uint32_t u32;
-  uint64_t u64;
-} orb_callback_ctx;
-
-/**
- * Callback type for publish notifications.
+ * Obtain a borrowed uevent_source_t view for a uORB subscriber handle.
  *
- * Invoked when new data is published to the subscription's topic.
- * Use this to integrate with external event loops (see uorb_uevent/uorb_uevent.h).
+ * The returned event source is owned by the subscriber handle (zero extra
+ * allocation) and can be added directly to a uevent loop via uevent_add().
+ * When new data is published to the subscriber's topic, the event source is
+ * woken and reported as ready in uevent_loop().
  *
- * Note: Callbacks are dispatched synchronously on the publisher's thread with
- * NO DeviceNode locks held (neither data_lock_ nor callback_lock_). Therefore,
- * callbacks may safely call orb_subscriber_copy() (lock-free),
- * orb_publisher_publish() (even on the same topic, bounded by
- * kMaxSyncCallbackDepth = 16), orb_subscriber_clear_callback(),
- * orb_subscriber_destroy(), or acquire application mutexes without lock-order
- * deadlocks. For heavier business logic or deep publish chains, prefer
- * uorb::EventLoop or uorb::AsyncDispatcher so publishers only perform O(1)
- * wakeup signals.
- *
- * @param msg pointer to the published message data (valid during the callback)
- * @param ctx user context passed to orb_subscriber_set_callback()
- */
-typedef void (*orb_subscriber_callback_fn)(const void *msg, orb_callback_ctx ctx);
-
-/**
- * Register a callback to be invoked when new data is published.
- *
- * Only one callback can be registered per subscription at a time.
- * Registering a second callback while one is already registered will
- * fail with ORB_ERR_BUSY.
- *
- * Thread safety: orb_subscriber_set_callback(), orb_subscriber_clear_callback(),
- * and orb_subscriber_destroy() on the same subscriber handle must not be called
- * concurrently with each other. The callback itself is invoked from the
- * publisher's thread and may safely call orb_subscriber_copy().
- *
- * @param sub subscription handle
- * @param cb  callback function (must not be NULL)
- * @param ctx user context (pointer or integer) passed to cb
- * @return ORB_OK on success, error code otherwise
- */
-orb_err orb_subscriber_set_callback(orb_subscriber_t sub, orb_subscriber_callback_fn cb,
-                                    orb_callback_ctx ctx);
-
-/**
- * Remove a previously registered publish callback.
+ * Lifetime: remove the source from its uevent base via uevent_remove() before
+ * calling orb_subscriber_destroy(). Calling uevent_source_destroy() on a
+ * borrowed subscriber source is unnecessary (and safely ignored).
  *
  * @param sub subscription handle (passed by value)
- * @return ORB_OK on success, error code otherwise
+ * @return initialized uevent_source_t, or UEVENT_SOURCE_INITIALIZER if sub is invalid
  */
-orb_err orb_subscriber_clear_callback(orb_subscriber_t sub);
+uevent_source_t orb_subscriber_event_source(orb_subscriber_t sub);
 
 /**
  * Check if a topic has already been created and published (advertised)

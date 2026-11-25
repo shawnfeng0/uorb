@@ -7,7 +7,8 @@
 #include <gtest/gtest.h>
 #include <uevent/uevent.h>
 #include <uorb/publication.h>
-#include <uorb_uevent/uorb_uevent.h>
+#include <uorb/async_dispatcher.h>
+#include <uorb/event_loop.h>
 #include <uorb/subscription.h>
 #include <uorb/topics/orb_test.h>
 #include <uorb/topics/orb_test_large.h>
@@ -245,8 +246,7 @@ TEST(EventLoopTest, SubscriptionCannotBindToMultipleEventPolls) {
   ASSERT_EQ(uevent_create(&base_b), 0);
   ASSERT_NE(base_b._handle, nullptr);
 
-  uevent_source_t source = UEVENT_SOURCE_INITIALIZER;
-  ASSERT_EQ(uorb_subscriber_create_source(&source, sub.handle()), 0);
+  uevent_source_t source = sub.event_source();
   ASSERT_NE(source._handle, nullptr);
 
   ASSERT_EQ(uevent_add(&base_a, &source, 0), 0);
@@ -257,7 +257,6 @@ TEST(EventLoopTest, SubscriptionCannotBindToMultipleEventPolls) {
   EXPECT_EQ(uevent_add(&base_b, &source, 0), 0);
   EXPECT_EQ(uevent_remove(&base_b, &source), 0);
 
-  uorb_subscriber_destroy_source(&source);
   uevent_destroy(&base_a);
   uevent_destroy(&base_b);
 }

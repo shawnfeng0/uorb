@@ -11,7 +11,7 @@
 #include <uevent/uevent.h>
 #include <uorb/topics/orb_test.h>
 #include <uorb/uorb.h>
-#include <uorb_uevent/uorb_uevent.h>
+#include <uorb/uorb.h>
 
 #include <atomic>
 #include <chrono>
@@ -227,7 +227,7 @@ static void run_uevent_poll_many_subs(
 
   for (int i = 0; i < num_subs; ++i) {
     orb_subscriber_create_multi(&subs[i], ORB_ID(orb_test), 0);
-    uorb_subscriber_create_source(&sources[i], subs[i]);
+    sources[i] = orb_subscriber_event_source(subs[i]);
     uevent_add(&poll, &sources[i], 0);
   }
 
@@ -265,7 +265,6 @@ static void run_uevent_poll_many_subs(
 
   for (int i = 0; i < num_subs; ++i) {
     uevent_remove(&poll, &sources[i]);
-    uorb_subscriber_destroy_source(&sources[i]);
     orb_subscriber_destroy(&subs[i]);
   }
   uevent_destroy(&poll);
@@ -283,7 +282,7 @@ static void run_uevent_poll_blocking(int num_subs, int duration_ms) {
   std::vector<uevent_source_t> sources(num_subs, UEVENT_SOURCE_INITIALIZER);
   for (int i = 0; i < num_subs; ++i) {
     orb_subscriber_create_multi(&subs[i], ORB_ID(orb_test), 0);
-    uorb_subscriber_create_source(&sources[i], subs[i]);
+    sources[i] = orb_subscriber_event_source(subs[i]);
     uevent_add(&poll, &sources[i], 0);
   }
 
@@ -329,7 +328,6 @@ static void run_uevent_poll_blocking(int num_subs, int duration_ms) {
 
   for (int i = 0; i < num_subs; ++i) {
     uevent_remove(&poll, &sources[i]);
-    uorb_subscriber_destroy_source(&sources[i]);
     orb_subscriber_destroy(&subs[i]);
   }
   uevent_destroy(&poll);

@@ -1,7 +1,5 @@
 #include "device_node.h"
 
-#include <pthread.h>
-
 #include <cstring>
 #include <new>
 #include <type_traits>
@@ -16,45 +14,6 @@ static_assert(std::is_trivially_destructible<std::atomic<size_t>>::value,
               "atomic<size_t> must be trivially destructible");
 static_assert(std::is_trivially_destructible<std::atomic<uint32_t>>::value,
               "atomic<uint32_t> must be trivially destructible");
-
-namespace {
-
-// Per-thread stack of currently executing synchronous callbacks.
-// Uses POSIX pthread_key_t (zero heap allocation, RTOS-safe without C++11
-// thread_local / TLS runtime requirements). Used by UnregisterCallback() to
-// distinguish self-unregistration (including self-destroy of ReceiverLocal
-// inside its own callback) from cross-thread unregistration, and by
-// DispatchCallbacks() to cap recursive sync callback depth.
-struct ActiveCallFrame {
-  uorb::detail::CallbackEntry *entry;
-  uint32_t depth;
-  bool detached_by_self;
-  ActiveCallFrame *prev;
-};
-
-pthread_key_t g_active_call_key;
-pthread_once_t g_active_call_key_once = PTHREAD_ONCE_INIT;
-bool g_active_call_key_ready = false;
-
-void InitActiveCallKey() {
-  g_active_call_key_ready = (pthread_key_create(&g_active_call_key, nullptr) == 0);
-}
-
-inline ActiveCallFrame *GetActiveCallTop() {
-  pthread_once(&g_active_call_key_once, InitActiveCallKey);
-  if (!g_active_call_key_ready) {
-    return nullptr;
-  }
-  return static_cast<ActiveCallFrame *>(pthread_getspecific(g_active_call_key));
-}
-
-inline void SetActiveCallTop(ActiveCallFrame *frame) {
-  if (g_active_call_key_ready) {
-    pthread_setspecific(g_active_call_key, frame);
-  }
-}
-
-}  // namespace
 
 static inline uint16_t RoundPowOfTwo(uint16_t n) {
   if (n == 0) {
@@ -333,132 +292,44 @@ bool uorb::DeviceNode::Publish(const void *data) {
     }
   }
 
-  // Dekker fast-path: generation_.store(seq_cst) paired with callback_count_.load(seq_cst)
-  // vs RegisterCallback's callback_count_.fetch_add(seq_cst) paired with updates_available(seq_cst)
-  // guarantees no missed wakeups while avoiding callback_lock_ when no callbacks are registered.
-  if (callback_count_.load(std::memory_order_seq_cst) > 0) {
-    DispatchCallbacks(data);
+  // Dekker fast-path: generation_.store(seq_cst) paired with waiter_count_.load(seq_cst)
+  // vs RegisterWaiter's waiter_count_.fetch_add(seq_cst) paired with updates_available(seq_cst)
+  // guarantees no missed wakeups while avoiding waiter_lock_ when no waiters are registered.
+  if (waiter_count_.load(std::memory_order_seq_cst) > 0) {
+    NotifyWaiters();
   }
 
   return true;
 }
 
-bool uorb::DeviceNode::RegisterCallback(detail::CallbackEntry *entry) {
-  if (!entry || !entry->on_publish) {
+bool uorb::DeviceNode::RegisterWaiter(detail::WaiterEntry *entry) {
+  if (!entry || !entry->source) {
     return false;
   }
 
-  base::LockGuard<base::Mutex> lg(callback_lock_);
-  entry->active_calls = 0;
-  entry->waiting_unregister = false;
-  receiver_list_.push_front(*entry);
-  callback_count_.fetch_add(1, std::memory_order_seq_cst);
+  base::LockGuard<base::Mutex> lg(waiter_lock_);
+  waiter_list_.push_front(*entry);
+  waiter_count_.fetch_add(1, std::memory_order_seq_cst);
   return true;
 }
 
-bool uorb::DeviceNode::UnregisterCallback(detail::CallbackEntry *entry) {
+bool uorb::DeviceNode::UnregisterWaiter(detail::WaiterEntry *entry) {
   if (!entry) {
     return false;
   }
 
-  base::LockGuard<base::Mutex> lg(callback_lock_);
-  if (!receiver_list_.remove_if_exists(*entry)) {
+  base::LockGuard<base::Mutex> lg(waiter_lock_);
+  if (!waiter_list_.remove_if_exists(*entry)) {
     return false;
   }
-  callback_count_.fetch_sub(1, std::memory_order_release);
-
-  // Detach any active call frames on THIS thread for `entry` so self-unregister
-  // (or self-destroy of ReceiverLocal inside its own callback) neither deadlocks
-  // nor causes use-after-free when the outer DispatchCallbacks frame returns.
-  for (ActiveCallFrame *f = GetActiveCallTop(); f != nullptr; f = f->prev) {
-    if (f->entry == entry && !f->detached_by_self) {
-      f->detached_by_self = true;
-      --entry->active_calls;
-    }
-  }
-
-  // Wait for any OTHER threads currently executing `entry->on_publish` to finish
-  // before returning so callers can safely destroy `entry` and captured context.
-  if (entry->active_calls > 0) {
-    entry->waiting_unregister = true;
-    while (entry->active_calls > 0) {
-      callback_cv_.wait(callback_lock_);
-    }
-    entry->waiting_unregister = false;
-  }
+  waiter_count_.fetch_sub(1, std::memory_order_release);
   return true;
 }
 
-void uorb::DeviceNode::DispatchCallbacks(const void *data) {
-  // Stack-overflow circuit breaker for cyclic synchronous callbacks (e.g. A -> B -> A).
-  // Async consumers (uorb::EventLoop / uorb::AsyncDispatcher) never recurse here
-  // because their wakeup hook only signals EventPoll (depth == 1).
-  ActiveCallFrame *const prev_top = GetActiveCallTop();
-  const uint32_t current_depth = prev_top ? prev_top->depth : 0u;
-  if (current_depth >= kMaxSyncCallbackDepth) {
-    return;
-  }
-
-  detail::CallbackEntry cursor{};  // on_publish == nullptr marks traversal cursor
-  base::UniqueLock<base::Mutex> lock(callback_lock_);
-  receiver_list_.push_front(cursor);
-
-  struct CursorGuard {
-    decltype(receiver_list_) &list;
-    detail::CallbackEntry &cur;
-    base::UniqueLock<base::Mutex> &lk;
-    ~CursorGuard() {
-      if (!lk.owns_lock()) {
-        lk.lock();
-      }
-      list.remove_if_exists(cur);
-    }
-  } cursor_guard{receiver_list_, cursor, lock};
-
-  for (;;) {
-    detail::CallbackEntry *next = receiver_list_.next_of(cursor);
-    if (!next) {
-      break;
-    }
-
-    // Advance cursor past `next` before releasing callback_lock_.
-    receiver_list_.remove_if_exists(cursor);
-    receiver_list_.insert_after(*next, cursor);
-
-    if (next->on_publish == nullptr) {
-      // Another thread's traversal cursor; skip.
-      continue;
-    }
-
-    const orb_subscriber_callback_fn fn = next->on_publish;
-    const orb_callback_ctx ctx = next->ctx;
-    ++next->active_calls;
-
-    ActiveCallFrame frame{next, current_depth + 1u, false, prev_top};
-    SetActiveCallTop(&frame);
-
-    // Release callback_lock_ BEFORE invoking user code: eliminates all deadlocks
-    // caused by reentrant Publish(), cross-topic AB-BA Publish(), user mutex
-    // lock-order inversions, and self/sibling UnregisterCallback().
-    lock.unlock();
-
-    struct CallGuard {
-      DeviceNode *self;
-      base::UniqueLock<base::Mutex> &lk;
-      ActiveCallFrame &fr;
-      ~CallGuard() {
-        SetActiveCallTop(fr.prev);
-        lk.lock();
-        if (!fr.detached_by_self) {
-          detail::CallbackEntry *e = fr.entry;
-          if (--e->active_calls == 0 && e->waiting_unregister) {
-            self->callback_cv_.notify_all();
-          }
-        }
-      }
-    } call_guard{this, lock, frame};
-
-    fn(data, ctx);
+void uorb::DeviceNode::NotifyWaiters() {
+  base::LockGuard<base::Mutex> lg(waiter_lock_);
+  for (auto &entry : waiter_list_) {
+    entry.source->notify_waiters();
   }
 }
 

@@ -37,7 +37,6 @@
 #include <uevent/uevent.h>
 #include <uorb/publication_multi.h>
 #include <uorb/subscription_interval.h>
-#include <uorb_uevent/uorb_uevent.h>
 
 #include <atomic>
 #include <cerrno>
@@ -178,8 +177,7 @@ TEST_F(UnitTest, uevent_poll_rejects_invalid_arguments) {
   orb_subscriber_t subscription = ORB_SUBSCRIBER_INITIALIZER;
   EXPECT_EQ(orb_subscriber_create(&subscription, ORB_ID(orb_test)), ORB_OK);
   ASSERT_NE(subscription._handle, nullptr);
-  uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
-  uorb_subscriber_create_source(&src, subscription);
+  uevent_source_t src = orb_subscriber_event_source(subscription);
   uevent_source_t ready[1] = {UEVENT_SOURCE_INITIALIZER};
 
   EXPECT_EQ(uevent_add(nullptr, &src, 0), UEVENT_ERR_INVALID);
@@ -204,7 +202,6 @@ TEST_F(UnitTest, uevent_poll_rejects_invalid_arguments) {
   EXPECT_EQ(uevent_loopbreak(nullptr), UEVENT_ERR_INVALID);
 
   uevent_destroy(&base);
-  uorb_subscriber_destroy_source(&src);
   orb_subscriber_destroy(&subscription);
 }
 
@@ -727,8 +724,7 @@ TEST_F(UnitTest, queue_poll_notify) {
   uevent_t poll = UEVENT_INITIALIZER;
   uevent_create(&poll);
   ASSERT_NE(poll._handle, nullptr);
-  uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
-  uorb_subscriber_create_source(&src, sfd);
+  uevent_source_t src = orb_subscriber_event_source(sfd);
   ASSERT_NE(src._handle, nullptr);
   ASSERT_EQ(uevent_add(&poll, &src, 0), 0);
 
@@ -751,7 +747,6 @@ TEST_F(UnitTest, queue_poll_notify) {
   }
 
   ASSERT_EQ(uevent_remove(&poll, &src), 0);
-  uorb_subscriber_destroy_source(&src);
   uevent_destroy(&poll);
   test_queue_thread.join();
 
@@ -775,8 +770,7 @@ TEST_F(UnitTest, poll_timeout_semantics) {
   uevent_t poll = UEVENT_INITIALIZER;
   uevent_create(&poll);
   ASSERT_NE(poll._handle, nullptr);
-  uevent_source_t src = UEVENT_SOURCE_INITIALIZER;
-  uorb_subscriber_create_source(&src, sub);
+  uevent_source_t src = orb_subscriber_event_source(sub);
   ASSERT_NE(src._handle, nullptr);
   ASSERT_EQ(uevent_add(&poll, &src, 0), 0);
 
@@ -812,7 +806,6 @@ TEST_F(UnitTest, poll_timeout_semantics) {
 
   publisher.join();
   ASSERT_EQ(uevent_remove(&poll, &src), 0);
-  uorb_subscriber_destroy_source(&src);
   uevent_destroy(&poll);
   orb_publisher_destroy(&pub);
   orb_subscriber_destroy(&sub);
@@ -1309,7 +1302,7 @@ TEST_F(UnitTest, concurrent_lookup_exists_and_lifecycle) {
   status_thread.join();
 }
 
-TEST_F(UnitTest, cpp_convenience_publish_copy_and_subscription_callbacks) {
+TEST_F(UnitTest, cpp_convenience_publish_copy_and_event_source) {
   orb_test_s sent{};
   sent.val = 7331;
   ASSERT_EQ(uorb::publish<uorb::msg::orb_test>(sent), ORB_OK);
@@ -1319,33 +1312,28 @@ TEST_F(UnitTest, cpp_convenience_publish_copy_and_subscription_callbacks) {
   EXPECT_EQ(received.val, 7331);
 
   uorb::Subscription<uorb::msg::orb_test> sub;
-  EXPECT_EQ(sub.ClearCallback(), ORB_OK);  // safe no-op before subscribing
+  // Drain initial sample
+  while (sub.Updated()) {
+    sub.Copy(&received);
+  }
 
-  struct CbState {
-    std::atomic<int> calls{0};
-    std::atomic<int> last_val{0};
-  } state;
-
-  auto cb = [](const void *msg, orb_callback_ctx ctx) {
-    auto *s = static_cast<CbState *>(ctx.ptr);
-    s->last_val.store(static_cast<const orb_test_s *>(msg)->val, std::memory_order_relaxed);
-    s->calls.fetch_add(1, std::memory_order_relaxed);
-  };
-
-  orb_callback_ctx ctx{};
-  ctx.ptr = &state;
-  ASSERT_EQ(sub.SetCallback(cb, ctx), ORB_OK);
-  EXPECT_EQ(sub.SetCallback(cb, ctx), ORB_ERR_BUSY);
+  uevent_t base = UEVENT_INITIALIZER;
+  ASSERT_EQ(uevent_create(&base), UEVENT_OK);
+  uevent_source_t src = sub.event_source();
+  ASSERT_NE(src._handle, nullptr);
+  ASSERT_EQ(uevent_add(&base, &src, 0), UEVENT_OK);
 
   sent.val = 8442;
   ASSERT_EQ(uorb::publish<uorb::msg::orb_test>(sent), ORB_OK);
-  EXPECT_EQ(state.calls.load(), 1);
-  EXPECT_EQ(state.last_val.load(), 8442);
 
-  ASSERT_EQ(sub.ClearCallback(), ORB_OK);
-  sent.val = 9553;
-  ASSERT_EQ(uorb::publish<uorb::msg::orb_test>(sent), ORB_OK);
-  EXPECT_EQ(state.calls.load(), 1);
+  uevent_source_t ready[1] = {UEVENT_SOURCE_INITIALIZER};
+  ASSERT_EQ(uevent_loop(&base, ready, 1, 100), 1);
+  EXPECT_EQ(ready[0]._handle, src._handle);
+  ASSERT_TRUE(sub.Update(&received));
+  EXPECT_EQ(received.val, 8442);
+
+  ASSERT_EQ(uevent_remove(&base, &src), UEVENT_OK);
+  uevent_destroy(&base);
 }
 
 TEST_F(UnitTest, generated_msg_respects_orb_durability_constant) {
@@ -1500,257 +1488,6 @@ TEST_F(UnitTest, lock_free_copy_queued_zero_extra_slots_and_preemption_skip) {
   EXPECT_EQ(got.val, 99);
 
   orb_subscriber_destroy(&sub);
-  orb_publisher_destroy(&pub);
-}
-
-TEST_F(UnitTest, callback_reentrant_publish_same_topic_and_depth_cap) {
-  static const struct orb_metadata reentrant_topic = {
-      "orb_reentrant_cb_test", sizeof(orb_test_s), 0, "", 1, ORB_DURABILITY_DURABLE, {}};
-
-  struct Ctx {
-    orb_publisher_t *pub;
-    std::atomic<int> calls{0};
-    int max_republish;
-  };
-
-  orb_publisher_t pub = ORB_PUBLISHER_INITIALIZER;
-  orb_subscriber_t sub = ORB_SUBSCRIBER_INITIALIZER;
-  ASSERT_EQ(orb_publisher_create(&pub, &reentrant_topic), ORB_OK);
-  ASSERT_EQ(orb_subscriber_create(&sub, &reentrant_topic), ORB_OK);
-
-  // 1) Finite reentrant publish on the same topic must succeed without deadlocking.
-  Ctx ctx{&pub, {0}, 3};
-  orb_callback_ctx cb_ctx{};
-  cb_ctx.ptr = &ctx;
-  ASSERT_EQ(orb_subscriber_set_callback(sub,
-                [](const void *data, orb_callback_ctx c) {
-                  auto *state = static_cast<Ctx *>(c.ptr);
-                  const int n = state->calls.fetch_add(1) + 1;
-                  if (n < state->max_republish) {
-                    orb_test_s next = *static_cast<const orb_test_s *>(data);
-                    next.val += 1;
-                    EXPECT_EQ(orb_publisher_publish(*state->pub, &next), ORB_OK);
-                  }
-                },
-                cb_ctx),
-            ORB_OK);
-
-  orb_test_s msg{};
-  msg.val = 10;
-  ASSERT_EQ(orb_publisher_publish(pub, &msg), ORB_OK);
-  EXPECT_EQ(ctx.calls.load(), 3);
-
-  orb_test_s latest{};
-  ASSERT_EQ(orb_subscriber_copy(sub, &latest), ORB_OK);
-  EXPECT_EQ(latest.val, 12);
-
-  // 2) Unbounded cyclic self-publish must hit the depth circuit breaker cleanly
-  //    instead of overflowing the stack, while still publishing the data.
-  ctx.calls.store(0);
-  ctx.max_republish = 1000;
-  msg.val = 100;
-  ASSERT_EQ(orb_publisher_publish(pub, &msg), ORB_OK);
-  EXPECT_GT(ctx.calls.load(), 1);
-  EXPECT_LE(ctx.calls.load(), 32);
-
-  orb_subscriber_destroy(&sub);
-  orb_publisher_destroy(&pub);
-}
-
-TEST_F(UnitTest, callback_abba_user_mutex_and_cross_topic_publish_no_deadlock) {
-  static const struct orb_metadata topic_a = {
-      "orb_abba_topic_a", sizeof(orb_test_s), 0, "", 1, ORB_DURABILITY_DURABLE, {}};
-  static const struct orb_metadata topic_b = {
-      "orb_abba_topic_b", sizeof(orb_test_s), 0, "", 1, ORB_DURABILITY_DURABLE, {}};
-
-  orb_publisher_t pub_a = ORB_PUBLISHER_INITIALIZER;
-  orb_publisher_t pub_b = ORB_PUBLISHER_INITIALIZER;
-  orb_subscriber_t sub_a = ORB_SUBSCRIBER_INITIALIZER;
-  orb_subscriber_t sub_b = ORB_SUBSCRIBER_INITIALIZER;
-  ASSERT_EQ(orb_publisher_create(&pub_a, &topic_a), ORB_OK);
-  ASSERT_EQ(orb_publisher_create(&pub_b, &topic_b), ORB_OK);
-  ASSERT_EQ(orb_subscriber_create(&sub_a, &topic_a), ORB_OK);
-  ASSERT_EQ(orb_subscriber_create(&sub_b, &topic_b), ORB_OK);
-
-  struct Shared {
-    uorb::base::Mutex app_mu;
-    orb_publisher_t *pub_a;
-    orb_publisher_t *pub_b;
-    std::atomic<int> a_calls{0};
-    std::atomic<int> b_calls{0};
-  } shared{{}, &pub_a, &pub_b, {0}, {0}};
-
-  orb_callback_ctx ctx{};
-  ctx.ptr = &shared;
-
-  // Callback on A acquires app_mu (unless called from Thread 1 which already holds
-  // app_mu, i.e. val == 2) and publishes B (when msg.val == 1).
-  ASSERT_EQ(orb_subscriber_set_callback(sub_a,
-                [](const void *data, orb_callback_ctx c) {
-                  auto *s = static_cast<Shared *>(c.ptr);
-                  const auto *m = static_cast<const orb_test_s *>(data);
-                  if (m->val != 2) {
-                    uorb::base::LockGuard<uorb::base::Mutex> lg(s->app_mu);
-                    s->a_calls.fetch_add(1, std::memory_order_relaxed);
-                  } else {
-                    s->a_calls.fetch_add(1, std::memory_order_relaxed);
-                  }
-                  if (m->val == 1) {
-                    orb_test_s b_msg{};
-                    b_msg.val = 0;
-                    EXPECT_EQ(orb_publisher_publish(*s->pub_b, &b_msg), ORB_OK);
-                  }
-                },
-                ctx),
-            ORB_OK);
-
-  // Callback on B acquires app_mu and publishes A (when msg.val == 1).
-  ASSERT_EQ(orb_subscriber_set_callback(sub_b,
-                [](const void *data, orb_callback_ctx c) {
-                  auto *s = static_cast<Shared *>(c.ptr);
-                  const auto *m = static_cast<const orb_test_s *>(data);
-                  {
-                    uorb::base::LockGuard<uorb::base::Mutex> lg(s->app_mu);
-                    s->b_calls.fetch_add(1, std::memory_order_relaxed);
-                  }
-                  if (m->val == 1) {
-                    orb_test_s a_msg{};
-                    a_msg.val = 0;
-                    EXPECT_EQ(orb_publisher_publish(*s->pub_a, &a_msg), ORB_OK);
-                  }
-                },
-                ctx),
-            ORB_OK);
-
-  constexpr int kIters = 200;
-  // Thread 1: holds app_mu while calling Publish(A) (app_mu -> A.callback_lock_).
-  std::thread t1([&]() {
-    for (int i = 0; i < kIters; ++i) {
-      uorb::base::LockGuard<uorb::base::Mutex> lg(shared.app_mu);
-      orb_test_s m{};
-      m.val = 2;
-      EXPECT_EQ(orb_publisher_publish(pub_a, &m), ORB_OK);
-    }
-  });
-  // Thread 2: publishes A -> triggers callback -> locks app_mu & publishes B.
-  std::thread t2([&]() {
-    for (int i = 0; i < kIters; ++i) {
-      orb_test_s m{};
-      m.val = 1;
-      EXPECT_EQ(orb_publisher_publish(pub_a, &m), ORB_OK);
-    }
-  });
-  // Thread 3: publishes B -> triggers callback -> locks app_mu & publishes A.
-  std::thread t3([&]() {
-    for (int i = 0; i < kIters; ++i) {
-      orb_test_s m{};
-      m.val = 1;
-      EXPECT_EQ(orb_publisher_publish(pub_b, &m), ORB_OK);
-    }
-  });
-
-  t1.join();
-  t2.join();
-  t3.join();
-
-  EXPECT_EQ(shared.a_calls.load(), kIters * 3);
-  EXPECT_EQ(shared.b_calls.load(), kIters * 2);
-
-  orb_subscriber_destroy(&sub_a);
-  orb_subscriber_destroy(&sub_b);
-  orb_publisher_destroy(&pub_a);
-  orb_publisher_destroy(&pub_b);
-}
-
-TEST_F(UnitTest, callback_self_destroy_sibling_destroy_and_cross_thread_drain) {
-  static const struct orb_metadata lifecycle_topic = {
-      "orb_cb_lifecycle_test", sizeof(orb_test_s), 0, "", 1, ORB_DURABILITY_DURABLE, {}};
-
-  orb_publisher_t pub = ORB_PUBLISHER_INITIALIZER;
-  ASSERT_EQ(orb_publisher_create(&pub, &lifecycle_topic), ORB_OK);
-
-  // 1) Self-destroy + sibling-destroy from inside a callback (must not deadlock or UAF).
-  struct SelfDestroyCtx {
-    orb_subscriber_t self;
-    orb_subscriber_t sibling;
-    int self_calls{0};
-    int sibling_calls{0};
-  } sd_ctx{ORB_SUBSCRIBER_INITIALIZER, ORB_SUBSCRIBER_INITIALIZER, 0, 0};
-
-  ASSERT_EQ(orb_subscriber_create(&sd_ctx.sibling, &lifecycle_topic), ORB_OK);
-  ASSERT_EQ(orb_subscriber_create(&sd_ctx.self, &lifecycle_topic), ORB_OK);
-
-  orb_callback_ctx sibling_cb_ctx{};
-  sibling_cb_ctx.ptr = &sd_ctx;
-  ASSERT_EQ(orb_subscriber_set_callback(sd_ctx.sibling,
-                [](const void *, orb_callback_ctx c) {
-                  static_cast<SelfDestroyCtx *>(c.ptr)->sibling_calls++;
-                },
-                sibling_cb_ctx),
-            ORB_OK);
-
-  // Registered second -> push_front puts `self` before `sibling` in receiver_list_.
-  orb_callback_ctx self_cb_ctx{};
-  self_cb_ctx.ptr = &sd_ctx;
-  ASSERT_EQ(orb_subscriber_set_callback(sd_ctx.self,
-                [](const void *, orb_callback_ctx c) {
-                  auto *s = static_cast<SelfDestroyCtx *>(c.ptr);
-                  s->self_calls++;
-                  orb_subscriber_destroy(&s->sibling);
-                  orb_subscriber_destroy(&s->self);
-                },
-                self_cb_ctx),
-            ORB_OK);
-
-  orb_test_s msg{};
-  msg.val = 1;
-  ASSERT_EQ(orb_publisher_publish(pub, &msg), ORB_OK);
-  EXPECT_EQ(sd_ctx.self_calls, 1);
-  EXPECT_EQ(sd_ctx.sibling_calls, 0);
-  EXPECT_EQ(sd_ctx.self._handle, nullptr);
-  EXPECT_EQ(sd_ctx.sibling._handle, nullptr);
-
-  // 2) Cross-thread destroy must wait until an in-flight callback finishes before
-  //    returning, preventing use-after-free of heap context freed after destroy.
-  struct DrainCtx {
-    std::atomic<bool> entered{false};
-    std::atomic<bool> finished{false};
-    int *heap_guard{nullptr};
-  };
-  auto *drain = new DrainCtx{};
-  drain->heap_guard = new int(42);
-
-  orb_subscriber_t slow_sub = ORB_SUBSCRIBER_INITIALIZER;
-  ASSERT_EQ(orb_subscriber_create(&slow_sub, &lifecycle_topic), ORB_OK);
-  orb_callback_ctx drain_cb_ctx{};
-  drain_cb_ctx.ptr = drain;
-  ASSERT_EQ(orb_subscriber_set_callback(slow_sub,
-                [](const void *, orb_callback_ctx c) {
-                  auto *d = static_cast<DrainCtx *>(c.ptr);
-                  d->entered.store(true, std::memory_order_release);
-                  std::this_thread::sleep_for(std::chrono::milliseconds(30));
-                  EXPECT_EQ(*d->heap_guard, 42);
-                  d->finished.store(true, std::memory_order_release);
-                },
-                drain_cb_ctx),
-            ORB_OK);
-
-  std::thread pub_thread([&]() {
-    orb_test_s m{};
-    m.val = 2;
-    EXPECT_EQ(orb_publisher_publish(pub, &m), ORB_OK);
-  });
-
-  while (!drain->entered.load(std::memory_order_acquire)) {
-    std::this_thread::yield();
-  }
-  // Destroy while callback is mid-flight: must block until callback completes.
-  orb_subscriber_destroy(&slow_sub);
-  EXPECT_TRUE(drain->finished.load(std::memory_order_acquire));
-  delete drain->heap_guard;
-  delete drain;
-
-  pub_thread.join();
   orb_publisher_destroy(&pub);
 }
 

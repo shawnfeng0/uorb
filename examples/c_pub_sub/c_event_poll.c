@@ -7,7 +7,6 @@
 #include "uevent/uevent.h"
 #include "uorb/topics/example_string.h"
 #include "uorb/topics/sensor_accel.h"
-#include "uorb_uevent/uorb_uevent.h"
 
 static void *publish_example_string(void *unused) {
   (void)unused;
@@ -71,25 +70,12 @@ int main(void) {
     SRC_SENSOR_ACCEL = 2,
   };
 
-  uevent_source_t string_src = UEVENT_SOURCE_INITIALIZER;
-  uevent_source_t accel_src = UEVENT_SOURCE_INITIALIZER;
-  uorb_subscriber_create_source(&string_src, string_sub);
-  uorb_subscriber_create_source(&accel_src, accel_sub);
-  if (!string_src._handle || !accel_src._handle) {
-    printf("Failed to create event sources\n");
-    if (string_src._handle) uorb_subscriber_destroy_source(&string_src);
-    if (accel_src._handle) uorb_subscriber_destroy_source(&accel_src);
-    uevent_destroy(&base);
-    orb_subscriber_destroy(&string_sub);
-    orb_subscriber_destroy(&accel_sub);
-    return 1;
-  }
+  uevent_source_t string_src = orb_subscriber_event_source(string_sub);
+  uevent_source_t accel_src = orb_subscriber_event_source(accel_sub);
   string_src.data.u32 = SRC_EXAMPLE_STRING;
   accel_src.data.u32 = SRC_SENSOR_ACCEL;
   if (uevent_add(&base, &string_src, 0) != 0 || uevent_add(&base, &accel_src, 0) != 0) {
     printf("Failed to add event sources\n");
-    uorb_subscriber_destroy_source(&string_src);
-    uorb_subscriber_destroy_source(&accel_src);
     uevent_destroy(&base);
     orb_subscriber_destroy(&string_sub);
     orb_subscriber_destroy(&accel_sub);
@@ -136,8 +122,6 @@ int main(void) {
 
   uevent_remove(&base, &string_src);
   uevent_remove(&base, &accel_src);
-  uorb_subscriber_destroy_source(&string_src);
-  uorb_subscriber_destroy_source(&accel_src);
   uevent_destroy(&base);
   orb_subscriber_destroy(&string_sub);
   orb_subscriber_destroy(&accel_sub);

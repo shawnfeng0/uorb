@@ -1,10 +1,10 @@
 #pragma once
 
+#include <uevent/uevent_source.h>
 #include <uorb/uorb.h>
 
 #include <atomic>
 
-#include "base/condition_variable.h"
 #include "base/intrusive_list/forward_list.h"
 #include "base/intrusive_list/list.h"
 #include "base/mutex.h"
@@ -16,16 +16,11 @@ class UnitTest;
 namespace uorb {
 namespace detail {
 
-// Function-pointer based callback entry for DeviceNode's publish notification.
-// Embedded in ReceiverLocal for O(1) registration and O(1) unregistration.
-// A stack-allocated entry with on_publish == nullptr is used as an intrusive
-// traversal cursor during out-of-lock callback dispatch in Publish().
-struct CallbackEntry {
-  orb_subscriber_callback_fn on_publish{nullptr};
-  orb_callback_ctx ctx{};
+// Intrusive waiter entry linking a uORB subscriber's uevent::EventSource into
+// DeviceNode's publish notification list (zero heap allocation, O(1) add/remove).
+struct WaiterEntry {
+  uevent::EventSource *source{nullptr};
   intrusive_list::list_node node{};
-  uint32_t active_calls{0};       // protected by DeviceNode::callback_lock_
-  bool waiting_unregister{false}; // protected by DeviceNode::callback_lock_
 };
 
 }  // namespace detail
@@ -73,9 +68,9 @@ class DeviceNode {
   }
   void mark_untracked_publisher();
 
-  // add item to list of work items to schedule on node update
-  bool RegisterCallback(detail::CallbackEntry *entry);
-  bool UnregisterCallback(detail::CallbackEntry *entry);
+  // Register / unregister an EventSource waiter woken on Publish().
+  bool RegisterWaiter(detail::WaiterEntry *entry);
+  bool UnregisterWaiter(detail::WaiterEntry *entry);
 
   // Returns the number of updated data relative to the parameter 'generation'
   unsigned updates_available(unsigned generation) const;
@@ -101,15 +96,14 @@ class DeviceNode {
   friend uORBTest::UnitTest;
 
   static constexpr uint8_t kMaxCounterValue = 0x7F;
-  static constexpr uint32_t kMaxSyncCallbackDepth = 16;
 
-  void DispatchCallbacks(const void *data);
+  void NotifyWaiters();
 
   // --- Group 1: Writer-only mutex (isolated from lock-free Copy() readers) ---
   // Lock ordering:
-  //   data_lock_     →  leaf lock (only serializes concurrent writers & lazy allocation)
-  //   callback_lock_ →  leaf lock (NEVER held across user callbacks; out-of-lock dispatch)
-  //   Copy()         →  100% lock-free (never acquires data_lock_ or callback_lock_)
+  //   data_lock_    →  leaf lock (only serializes concurrent writers & lazy allocation)
+  //   waiter_lock_  →  EventSource::notify_mu_ → EventPoll::mu_ (strict DAG; no user code)
+  //   Copy()        →  100% lock-free (never acquires data_lock_ or waiter_lock_)
   // data_lock_ only serializes concurrent writers in Publish(). Keeping it at
   // the front prevents writer lock-contention cache traffic from invalidating
   // the reader-hot fields in Group 3 (buffer_, slot geometry, generation_).
@@ -118,16 +112,15 @@ class DeviceNode {
   std::atomic<uint8_t *> loan_buffer_{nullptr};   /**< lazy single-slot loan staging buffer */
   std::atomic<bool> loan_in_use_{false};          /**< true while a loan is checked out */
 
-  // --- Group 2: Cold / low-frequency callback & lifecycle fields ---
+  // --- Group 2: Cold / low-frequency waiter & lifecycle fields ---
   // Naturally separates Group 1 (writer mutex) from Group 3 (reader-hot block)
   // across cache lines without adding alignas() padding overhead on MCUs.
-  mutable base::Mutex callback_lock_{};  // protects: receiver_list_, active_calls
-  base::ConditionVariable callback_cv_{};
-  intrusive_list::list<detail::CallbackEntry, &detail::CallbackEntry::node> receiver_list_;
+  mutable base::Mutex waiter_lock_{};  // protects: waiter_list_
+  intrusive_list::list<detail::WaiterEntry, &detail::WaiterEntry::node> waiter_list_;
   intrusive_list::forward_list_node device_list_node_{};
   std::atomic<uint32_t> subscriber_count_{0};
   std::atomic<uint32_t> publisher_count_{0};
-  std::atomic<uint32_t> callback_count_{0}; /**< number of registered callbacks */
+  std::atomic<uint32_t> waiter_count_{0}; /**< number of registered EventSource waiters */
   std::atomic<bool> has_untracked_subscriber_{false};
   std::atomic<bool> has_untracked_publisher_{false};
 
